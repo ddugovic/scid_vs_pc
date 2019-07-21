@@ -17,7 +17,7 @@
 #define SCID_MOVELIST_H
 
 #include "common.h"
-#include <algorithm>
+
 
 //////////////////////////////////////////////////////////////////////
 //  MoveList:  Constants
@@ -48,16 +48,19 @@ struct simpleMoveT
     int      score;          // used for alpha/beta ordering.
 };
 
-inline bool isNullMove (const simpleMoveT* sm)
+inline bool isNullMove (simpleMoveT * sm)
 {
     return (sm->from == sm->to  &&  sm->from != NULL_SQUARE
               &&  piece_Type(sm->movingPiece) == KING);
 }
 
-inline bool cmpSimpleMoveScore(const simpleMoveT& a, const simpleMoveT& b) {
-    return a.score < b.score;
-}
-
+#ifdef WINCE
+errorT writeSimpleMove (/*FILE **/Tcl_Channel fp, simpleMoveT * sm);
+errorT readSimpleMove (/*FILE **/Tcl_Channel fp, simpleMoveT * sm);
+#else
+errorT writeSimpleMove (FILE * fp, simpleMoveT * sm);
+errorT readSimpleMove (FILE * fp, simpleMoveT * sm);
+#endif
 
 class MoveList
 {
@@ -66,11 +69,27 @@ private:
     simpleMoveT Moves [MAX_LEGAL_MOVES];
 
 public:
+#ifdef WINCE
+  void* operator new(size_t sz) {
+    void* m = my_Tcl_Alloc(sz);
+    return m;
+  }
+  void operator delete(void* m) {
+    my_Tcl_Free((char*)m);
+  }
+  void* operator new [] (size_t sz) {
+    void* m = my_Tcl_AttemptAlloc(sz);
+    return m;
+  }
+
+  void operator delete [] (void* m) {
+    my_Tcl_Free((char*)m);
+  }
+
+#endif
     MoveList() { ListSize = 0; }
     ~MoveList() {}
 
-    simpleMoveT* begin() { return Moves; };
-    simpleMoveT* end() { return Moves + ListSize; }
     inline uint Size() { return ListSize; }
     inline void Clear() { ListSize = 0; }
     inline void Add (simpleMoveT * sm);
@@ -78,36 +97,12 @@ public:
     inline simpleMoveT * Get (uint index);
     inline void Remove (uint index);
 
-    void MoveToFront(uint index) {
-        // Promotes a move to the front of the list, pushing
-        // all moves that were ahead of it down one place.
-        ASSERT(index < Size());
-        std::rotate(begin(), begin() + index, begin() + index + 1);
-    }
-    void SwapWithFirst(uint index) {
-        ASSERT(index < Size());
-        std::iter_swap(begin(), begin() + index);
-    }
+    void MoveToFront (uint index);
+    void SwapWithFirst (uint index);
     int  Find (simpleMoveT * sm);
-    void FindBest(uint index) {
-        ASSERT(index < Size());
-        // Searches the move list from the specified index to the end of
-        // the list to find the move in that range of the list with the
-        // highest score, and swaps the best move found with the move at
-        // the specified index if it is not already there.
-        // The moves earlier in the list (at indices 0 to index-1) are
-        // ignored and are not moved.
-        std::iter_swap(begin() + index,
-            std::max_element(begin() + index, end(), cmpSimpleMoveScore)
-        );
-    }
-    void Sort() {
-        // Sort the move list by the score field in descending order,
-        // with highest scores first.
-        std::sort(begin(), end(), cmpSimpleMoveScore);
-        std::reverse(begin(), end());
-    }
-
+    void FindBest (uint index);
+    void Sort (void);
+    bool IsSorted (void);
     uint SelectBySquare (squareT sq);
 };
 
@@ -144,53 +139,6 @@ MoveList::Remove (uint index)
         Moves[index] = Moves[ListSize];
     }
 }
-
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// MoveList::Find
-//   Searches for a move in the list.
-//   Returns the index of the move with the same from-square,
-//   to-square and promotion-piece values as the specified
-//   move, if it is in the list. If the move is not found,
-//   the value -1 is returned.
-inline int
-MoveList::Find (simpleMoveT * sm)
-{
-    for (uint i=0; i < ListSize; i++) {
-        simpleMoveT * lsm = &(Moves[i]);
-        if (sm->from == lsm->from  &&  sm->to == lsm->to
-                &&  sm->promote == lsm->promote) {
-            return (int) i;
-        }
-    }
-    return -1;
-}
-
-
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// MoveList::SelectBySquare
-//   Restricts the list to only contain moves which
-//   move a piece to or from the specified square.
-//   Returns the new size of the list.
-inline uint
-MoveList::SelectBySquare (squareT sq)
-{
-    uint index = 0;
-    for (uint i=0; i < ListSize; i++) {
-        simpleMoveT * sm = &(Moves[i]);
-        if (sm->from != sq  &&  sm->to != sq) {
-            // Skip this move, it does not match.
-            continue;
-        }
-        // Copy this move to an earlier index if necessary:
-        if (i != index) {
-            Moves[index] = *sm;
-        }
-        index++;
-    }
-    ListSize = index;
-    return ListSize;
-}
-
 
 #endif  // SCID_MOVELIST_H
 

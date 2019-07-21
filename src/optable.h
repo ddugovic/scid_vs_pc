@@ -27,8 +27,8 @@ const uint OPTABLE_MAX_ROWS = 20;
 const uint OPTABLE_DEFAULT_ROWS = 10;
 const uint OPTABLE_MAX_EXTRA_MOVES = 10;
 const uint OPLINE_MOVES = (OPTABLE_COLUMNS + OPTABLE_MAX_EXTRA_MOVES) * 2;
-const uint OPTABLE_MAX_LINES = 2000;
-const uint OPTABLE_MAX_TABLE_LINES = 5000;//500;
+const uint OPTABLE_MAX_LINES = 10000;       //2000
+const uint OPTABLE_MAX_TABLE_LINES = 25000; //5000
 const uint OPTABLE_MAX_STARTLINE = 100;
 
 const uint OPTABLE_Text  = 0;
@@ -67,7 +67,7 @@ const uint OPTABLE_All = 1;
 
 struct moveOrderT {
     uint id;       // Move Order id number
-    uint count;    // Number of times this order has occurred
+    uint count;    // Number of times this order has occured
     char * moves;  // String containing the moves in SAN notation
 };
 
@@ -78,7 +78,7 @@ class OpLine
     char *      White;
     char *      Black;
     char *      Site;
-    gamenumT    GameNumber;
+    gameNumberT GameNumber;
     idNumberT   WhiteID;
     idNumberT   BlackID;
     eloT        WhiteElo;   // Actual White rating (no estimate)
@@ -103,16 +103,34 @@ class OpLine
     uint        EgTheme;
 
     void Init (void);
-    void Init (Game * g, const IndexEntry * ie, gamenumT gameNum,
+    void Init (Game * g, IndexEntry * ie, gameNumberT gameNum,
                uint maxExtraMoves, uint maxThemeMoveNumber);
     void Destroy (void);
 
   public:
+#ifdef WINCE
+  void* operator new(size_t sz) {
+    void* m = my_Tcl_Alloc(sz);
+    return m;
+  }
+  void operator delete(void* m) {
+    my_Tcl_Free((char*)m);
+  }
+  void* operator new [] (size_t sz) {
+    void* m = my_Tcl_AttemptAlloc(sz);
+    return m;
+  }
+
+  void operator delete [] (void* m) {
+    my_Tcl_Free((char*)m);
+  }
+
+#endif 
     OpLine () { Init(); }
-    OpLine (Game * g, const IndexEntry * ie, gamenumT gnum, uint max, uint tm) {
+    OpLine (Game * g, IndexEntry * ie, gameNumberT gnum, uint max, uint tm) {
         Init (g, ie, gnum, max, tm);
     }
-    ~OpLine() { Destroy(); }
+    ~OpLine() { }
     void SetPositionalThemes (Position * pos);
     void Insert (OpLine * subline);
     void SetMoveOrderID (uint id) { MoveOrderID = id; }
@@ -128,6 +146,7 @@ class OpLine
 class OpTable
 {
   private:
+    uint        Base;
     uint        NumRows;
     uint        TargetRows;
     uint        NumLines;
@@ -175,17 +194,40 @@ class OpTable
     void PrintNotes (DString * dstr, uint format);
 
   public:
-    OpTable (const char * type, Game * g, PBook * ecoBook) {
-        Init (type, g, ecoBook);
+#ifdef WINCE
+  void* operator new(size_t sz) {
+    void* m = my_Tcl_Alloc(sz);
+    return m;
+  }
+  void operator delete(void* m) {
+    my_Tcl_Free((char*)m);
+  }
+  void* operator new [] (size_t sz) {
+    void* m = my_Tcl_AttemptAlloc(sz);
+    return m;
+  }
+
+  void operator delete [] (void* m) {
+    my_Tcl_Free((char*)m);
+  }
+
+#endif 
+    OpTable (uint base, const char * type, Game * g, PBook * ecoBook) {
+        Init (base, type, g, ecoBook);
     }
-    OpTable (const char * type, Game * g) { Init (type, g, NULL); }
+    OpTable (uint base, const char * type, Game * g) { Init (base, type, g, NULL); }
+#ifdef WINCE
+    ~OpTable() { Clear();  my_Tcl_Free((char*) Type); }
+#else
     ~OpTable() { Clear();  delete[] Type; }
-    void Init (const char * type, Game * g, PBook * ecoBook);
+#endif
+    void Init (uint base, const char * type, Game * g, PBook * ecoBook);
     void Clear ();
     void ClearNotes ();
     void SetFormat (const char * str);
     void SetDecimalChar (char c) { DecimalChar = c; }
 
+    uint GetBase () { return Base;}
     uint GetTotalCount() { return FilterCount; }
     uint GetTheoryCount() { return TheoryCount; }
 

@@ -14,33 +14,47 @@
 
 
 #include "common.h"
+#include "error.h"
 #include "game.h"
 #include "gfile.h"
 #include "position.h"
 #include "pgnparse.h"
 #include "naglatex.h"
 #include "nagtext.h"
+
 #include "bytebuf.h"
 #include "textbuf.h"
 #include "stored.h"
-#include "dstring.h"
+
+#ifdef _MSC_VER
+#include <intrin.h> /* for _alloca(), etc.. */
+#endif
+
+#include <math.h>
 #include <string.h>
+#include <ctype.h>
 
 // Piece letters translation
-int language = 0; // default to english
-//  0 = en, 
-//  1 = fr, 2 = es, 3 = de, 4 = it, 5 = ne, 6 = cz
-//  7 = hu, 8 = no, 9 = sw, 10 = ca, 11 = fi, 12 = gr
-//  TODO Piece translations for greek
-const char * langPieces[] = { "", 
-"PPKRQDRTBFNC", "PPKRQDRTBANC", "PBKKQDRTBLNS", 
-"PPKRQDRTBANC", "PpKKQDRTBLNP", "PPKKQDRVBSNJ",
-"PGKKQVRBBFNH", "PBKKQDRTBLNS", "PBKKQDRTBLNS", "PPKRQDRTBANC", "PSKKQDRTBLNR", "" };
+// (not all languages have piece translation)
 
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// transPieces():
-// Given a string, will translate pieces from english to another language
+int language = 0; // default to english
+//  0 = en,
+//  1 = fr, 2 = es, 3 = de,
+//  4 = it, 5 = ne, 6 = cz
+//  7 = hu, 8 = no, 9 = sw, 10 = gk, 11 = tr
+//  format is P?K?Q?R?B?N?  (Pawn King Queen Rook Bishop kNight)
+//  where ? is replaced by an ascii char in the new language
+//  see 'case INFO_LANGUAGE' in tkscid.cpp
+
+const char * langPieces[] = { "",
+"PPKRQDRTBFNC", "PPKRQDRTBANC", "PBKKQDRTBLNS",
+"PPKRQDRTBANC", "PpKKQDRTBLNP", "PPKKQDRVBSNJ",
+"PGKKQVRBBFNH", "PBKKQDRTBLNS", "PBKKQDRTBLNS", "PSKPQBR[BANI", "PPKSQVRKBFNA" };
+
+// Translate pieces (moves) from english to another language
+
 void transPieces(char *s) {
+
   if (language == 0) return;
   char * ptr = s;
   int i;
@@ -70,6 +84,7 @@ char transPiecesChar(char c) {
   return ret;
 }
 
+// ============ PG : destructor that frees all memory ===============
 Game::~Game() {
     while (MoveChunk->next != NULL) {
         moveChunkT * tempChunk = MoveChunk->next;
@@ -78,39 +93,52 @@ Game::~Game() {
     }
     delete MoveChunk;
 
+    if (WhiteStr) { delete[] WhiteStr; }
+    if (BlackStr) { delete[] BlackStr; }
+    if (EventStr) { delete[] EventStr; }
+    if (SiteStr)  { delete[] SiteStr;  }
+    if (RoundStr) { delete[] RoundStr; }
+
+    // Delete the comment string allocator object:
+    delete StrAlloc;
+    // Delete the Current position:
     delete CurrentPos;
+
+    // Delete the saved position:
     if (SavedPos) { delete SavedPos; }
+    // Delete the start position:
     if (StartPos) { delete StartPos; }
-    ClearExtraTags();
 }
 
 // =================================================
 // PG : returns the variation number of current move
 // returns 0 if in main line
 uint Game::GetVarNumber() {
+    moveT *     move;
+    moveT *     parent;
     uint varNumber = 0;
     ASSERT(CurrentMove != NULL && CurrentMove->prev != NULL);
-    moveT* move = CurrentMove;
+    move = CurrentMove;
     if (VarDepth == 0) { // not in a variation!
         return 0;
     }
-    
+
     while (move->prev->marker != START_MARKER) {
         move = move->prev;
     }
-    move = move->prev;
+          move = move->prev;
     // Now CurrentMove == the start marker.
     ASSERT (move != NULL);
     ASSERT (move->varParent != NULL);
-    moveT* parent = move->varParent;
+    parent = move->varParent;
 
     while (parent->varChild != move) {
-        ASSERT (parent->varChild != NULL);
-        parent = parent->varChild;
-        ASSERT (parent->marker == START_MARKER);
-        varNumber++;
+            ASSERT (parent->varChild != NULL);
+            parent = parent->varChild;
+            ASSERT (parent->marker == START_MARKER);
+            varNumber++;
     }
-    return varNumber;  
+    return varNumber;
 }
 // ===================================================
 
@@ -150,20 +178,20 @@ game_printNag (byte nag, char * str, bool asSymbol, gameFormatT format)
         return;
     }
 
-    if (nag >= (sizeof evalNagsRegular / sizeof (const char *))) {
-        if (format == PGN_FORMAT_LaTeX) *str = 0;
-        else sprintf (str, "$%u", nag);
-        return;
-    }
-
     if (asSymbol) {
-       if (format == PGN_FORMAT_LaTeX) {
-          strcpy (str, evalNagsLatex[nag]);
+       if (format == PGN_FORMAT_Latex) {
+         if (nag < (sizeof evalNagsLatex / sizeof (const char *)))
+           strcpy (str, evalNagsLatex[nag]);
+         else
+           strcpy (str , "");
        } else {
-         strcpy (str, evalNagsRegular[nag]);
+         if (nag < (sizeof evalNagsRegular / sizeof (const char *)))
+           strcpy (str, evalNagsRegular[nag]);
+         else
+           sprintf (str, "$%i", nag);
        }
        if (nag == NAG_Diagram) {
-          if (format == PGN_FORMAT_LaTeX) {
+          if (format == PGN_FORMAT_Latex) {
               strcpy (str, evalNagsLatex[nag]);
           } else if (format == PGN_FORMAT_HTML) {
               strcpy(str, "<i>(D)</i>");
@@ -173,7 +201,7 @@ game_printNag (byte nag, char * str, bool asSymbol, gameFormatT format)
        }
        return;
     } else {
-    sprintf (str, "%s$%d", format == PGN_FORMAT_LaTeX ? "\\" : "", nag);
+       sprintf (str, "%s$%d", format == PGN_FORMAT_Latex ? "\\" : "", nag);
     }
 }
 
@@ -495,37 +523,40 @@ Game::FreeMove (moveT * move)
 void
 Game::Init()
 {
-    CurrentPos = new Position;
-    StartPos = NULL;
-    SavedPos = NULL;
+    // Allocate initial chunk of moves:
     MoveChunk = NULL;
     AllocateMoreMoves();
-    NBase = NULL;
-    NumTags = 0;
+    StartPos = NULL;
+    CurrentPos = new Position;
+    KeepDecodedMoves = true;
+    SavedPos = NULL;
+    SavedMove = NULL;
+    SavedPlyCount = 0;
+    SavedVarDepth = VarDepth = 0;
     NextGame = NULL;
-    Clear();
-}
+    Altered = false;
 
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// Game::ClearStandardTags():
-//      Clears all of the standard tags.
-//
-void
-Game::ClearStandardTags ()
-{
-    WhiteStr.clear();
-    BlackStr.clear();
-    EventStr.clear();
-    SiteStr.clear();
-    RoundStr.clear();
+    NBase = NULL;
+    WhiteStr = BlackStr = EventStr = SiteStr = RoundStr = NULL;
     Date = ZERO_DATE;
     EventDate = ZERO_DATE;
-    EcoCode = 0;
     Result = RESULT_None;
+    EcoCode = 0;
     WhiteElo = BlackElo = 0;
-    WhiteEstimateElo = BlackEstimateElo = 0;
     WhiteRatingType = BlackRatingType = RATING_Elo;
     ScidFlags[0] = 0;
+
+    // Initialise compact String allocator for game comments:
+    // Allocate space for game comments in chinks of about 8 Kb.
+    StrAlloc = new StrAllocator (8000);
+
+    NumTags = 0;
+    PgnStyle = PGN_STYLE_TAGS | PGN_STYLE_VARS | PGN_STYLE_COMMENTS;
+    PgnFormat = PGN_FORMAT_Plain;
+    HtmlStyle = 0;
+    PgnLastMovePos = PgnNextMovePos = 0;
+
+    Clear();
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -560,7 +591,11 @@ Game::ClearMoves ()
         MoveChunk = tempChunk;
     }
     MoveChunk->numFree = MOVE_CHUNKSIZE;
+
     FreeList = NULL;
+
+    // Delete any comments:
+    StrAlloc->DeleteAll();
 
     // Initialise FirstMove: start and end of movelist markers
     FirstMove = NewMove();
@@ -585,17 +620,11 @@ Game::ClearMoves ()
 void
 Game::Clear()
 {
-    if (StartPos != NULL) { delete StartPos; StartPos = NULL; }
-    if (SavedPos != NULL) { delete SavedPos; SavedPos = NULL; }
+    GameNumber = 0;
     SavedMove = NULL;
-    SavedPlyCount = 0;
-    SavedVarDepth = VarDepth = 0;
-    Altered = false;
+    KeepDecodedMoves = true;
 
-    PgnStyle = PGN_STYLE_TAGS | PGN_STYLE_VARS | PGN_STYLE_COMMENTS;
-    PgnFormat = PGN_FORMAT_Plain;
-    HtmlStyle = 0;
-    PgnLastMovePos = 0;
+    StrAlloc->DeleteAll();
 
     // CommentsFlag = NagsFlag = VarsFlag = 0;
     PromotionsFlag = false;
@@ -611,7 +640,7 @@ Game::Clear()
 //      Converts a string to a gameFormatT, returning true on success
 //      or false on error.
 //      The string should be a case-insensitive unique prefix of
-//      "plain" (or "pgn"), "HTML", "LaTeX" or "Color".
+//      "plain" (or "pgn"), "HTML", "Latex", or "Color".
 bool
 Game::PgnFormatFromString (const char * str, gameFormatT * fmt)
 {
@@ -621,8 +650,8 @@ Game::PgnFormatFromString (const char * str, gameFormatT * fmt)
         *fmt = PGN_FORMAT_Plain;
     } else if (strIsCasePrefix (str, "HTML")) {
         *fmt = PGN_FORMAT_HTML;
-    } else if (strIsCasePrefix (str, "LaTeX")) {
-        *fmt = PGN_FORMAT_LaTeX;
+    } else if (strIsCasePrefix (str, "Latex")) {
+        *fmt = PGN_FORMAT_Latex;
     } else if (strIsCasePrefix (str, "Color")) {
         *fmt = PGN_FORMAT_Color;
     } else {
@@ -781,11 +810,35 @@ Game::SetMoveComment (const char * comment)
 {
     ASSERT (CurrentMove != NULL  &&  CurrentMove->prev != NULL);
     moveT * m = CurrentMove->prev;
+    if (m->comment)
+        StrAlloc->Delete (m->comment);
     if (comment == NULL) {
-        m->comment.clear();
+        m->comment = NULL;
     } else {
-        m->comment = comment;
+        m->comment = StrAlloc->Duplicate (comment);
         // CommentsFlag = 1;
+    }
+}
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Game::AppendMoveComment():
+//      Append to the comment for a move. A comment before the game
+//      itself is stored as a comment of FirstMove.
+//
+void
+Game::AppendMoveComment (const char * comment)
+{
+    ASSERT (CurrentMove != NULL  &&  CurrentMove->prev != NULL);
+    if (comment != NULL) {
+	moveT * m = CurrentMove->prev;
+	if (m->comment) {
+	    uint length = strLength (m->comment);
+	    char delim = length == 0 || isspace (m->comment[length - 1]) ? '\0' : ' ';
+	    m->comment = StrAlloc->Append (m->comment, comment, delim);
+	} else {
+	    m->comment = StrAlloc->Duplicate (comment);
+	    // CommentsFlag = 1;
+	}
     }
 }
 
@@ -841,19 +894,7 @@ Game::MoveToPly (ushort hmNumber)
     for (ushort i=0; i < hmNumber; i++) {
         if (CurrentMove->marker != END_MARKER) { MoveForward(); }
     }
-}
-
-void Game::MoveTo (const std::vector<int>& v)
-{
-    if (v.size() == 0) return;
-    MoveToPly(v.back());
-    for (uint i = v.size() -1; i > 0; i--) {
-        if ((i % 2) == 1) {
-            for (int j=0; j < v[i -1]; j++) MoveForward();
-        } else {
-            MoveIntoVariation(v[i -1]);
-        }
-    }
+    return;
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1038,12 +1079,11 @@ Game::FirstVariation (uint varNumber)
 //    This function was implemented by Manuel Hoelss, with a few fixes
 //    added by myself (Shane Hudson).
 errorT
-Game::MainVariation ()
+Game::MainVariation (uint varNumber)
 {
-    std::vector<int> v = GetCurrentLocation();
-    if (v.size() < 3) return ERROR_NoVariation;
-    MoveTo(std::vector<int>(v.begin() +2 , v.end()));
-    int varNumber = v[1];
+    if (varNumber >= CurrentMove->numVariations) {
+        return ERROR_NoVariation;
+    }
 
     moveT * parent = CurrentMove;
     moveT * firstVar = CurrentMove->varChild;
@@ -1053,7 +1093,7 @@ Game::MainVariation ()
         // Move the selected variation to the front, as in FirstVariation()
 
         // Remove the numbered variation from the linked list:
-        for (int i=0; i < varNumber; i++) {
+        for (uint i=0; i < varNumber; i++) {
             ASSERT (m->varParent == CurrentMove && m->marker == START_MARKER);
             parent = m;
             m = m->varChild;
@@ -1079,6 +1119,26 @@ Game::MainVariation ()
 
     m = CurrentMove->varChild->next; // first move in first variation
 
+    if (CurrentMove->varChild->comment) {
+      // move the prevar comment as "(comment)" to the promoted move - S.A
+      char newcomment[strLength(CurrentMove->varChild->comment) + \
+      ( CurrentMove->varChild->next->comment ? strLength(CurrentMove->varChild->next->comment) : 0 ) \
+      + 3 + 1];
+
+      if (CurrentMove->varChild->next->comment) {
+        sprintf (newcomment, "(%s) %s", CurrentMove->varChild->comment, CurrentMove->varChild->next->comment);
+      } else {
+        sprintf (newcomment, "(%s)", CurrentMove->varChild->comment);
+      }
+
+      StrAlloc->Delete (CurrentMove->varChild->comment);
+      if (m->comment)
+        StrAlloc->Delete (m->comment);
+
+      CurrentMove->varChild->comment = NULL;
+      m->comment = StrAlloc->Duplicate(newcomment);
+    }
+
     CurrentMove->moveData  = m->moveData;
     CurrentMove->comment   = m->comment;
     CurrentMove->next      = m->next;
@@ -1100,9 +1160,10 @@ Game::MainVariation ()
     // game, pawn promotions, will be wrong if the variation was
     // promoted to an actual game move, so call MakeHomePawnList()
     // so go through the game moves and ensure it is correct.
+    SaveState ();
     MakeHomePawnList (NULL);
-    v[2] += v[0];
-    MoveTo(std::vector<int>(v.begin() +2 , v.end()));
+    RestoreState ();
+
     return OK;
 }
 
@@ -1182,22 +1243,41 @@ Game::Truncate (void)
 {
     ASSERT (CurrentMove != NULL);
     CurrentMove->marker = END_MARKER;
+    CurrentMove->varChild = NULL;
+    CurrentMove->next = NULL;
+    CurrentMove->numVariations = 0;
     return;
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Game::TruncateAndFree():
-//      Truncate game at the current move.
-//      and free moves
+//      Truncate game at the current move and free moves
 //
+// These two procs currently UNUSED - S.A.
+// I added TruncateAndFreeMove to allow for recursive removal of variatinos, which were previously unhandled.
+
 void
 Game::TruncateAndFree (void)
 {
-    ASSERT (CurrentMove != NULL);
+    TruncateAndFreeMove (CurrentMove);
+}
 
-    moveT * move = CurrentMove->next;
+void
+Game::TruncateAndFreeMove (moveT * thisMove)
+{
+    ASSERT (thisMove != NULL);
+
+    moveT * move = thisMove->next;
     moveT * tmp = NULL;
     while (move->marker != END_MARKER && move != NULL) {
+
+      // free variations
+      moveT * var = move->varChild;
+      while (var) {
+        var = (move->varChild)->varChild;
+        TruncateAndFreeMove (move->varChild);
+      }
+
       tmp = move->next;
       FreeMove(move);
       move = tmp;
@@ -1206,15 +1286,16 @@ Game::TruncateAndFree (void)
     if (move != NULL)
       FreeMove(move);
 
-    CurrentMove->next = NULL;
-    CurrentMove->marker = END_MARKER;
+    thisMove->marker = END_MARKER;
+    thisMove->varChild = NULL;
+    thisMove->next = NULL;
+    thisMove->numVariations = 0;
+    return;
 }
 
 
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// Game::TruncateStart():
 //      Truncate all moves leading to current position.
-//      todo: copy comments (in WritePGN?)
+
 void
 Game::TruncateStart (void)
 {
@@ -1226,19 +1307,24 @@ Game::TruncateStart (void)
     CurrentMove->prev->marker = END_MARKER;
     FirstMove->next = CurrentMove;
     CurrentMove->prev = FirstMove;
+    TextBuffer tb;
+    tb.SetBufferSize (TBUF_SIZE);
+    tb.SetWrapColumn (TBUF_SIZE);
     gameFormatT gfmt = PgnFormat;
     SetPgnFormat (PGN_FORMAT_Plain);
     // we need to switch off short header style or PGN parsing will not work
     uint  old_style = GetPgnStyle ();
-    if (PgnStyle & PGN_STYLE_SHORT_HEADER) 
+    if (PgnStyle & PGN_STYLE_SHORT_HEADER)
       SetPgnStyle (PGN_STYLE_SHORT_HEADER, false);
-    std::pair<const char*, unsigned> pgnBuf = WriteToPGN();
-    Clear();
-    PgnParser parser (pgnBuf.first);
+    // hmmm - why do we have to set this explicitly here S.A
+    SetPgnStyle (PGN_STYLE_COMMENTS, true);
+    WriteToPGN (&tb);
+    Init();
+    PgnParser parser (tb.GetBuffer());
     parser.ParseGame (this);
     SetPgnFormat (gfmt);
     MoveToPly(0);
-    if (old_style & PGN_STYLE_SHORT_HEADER) 
+    if (old_style & PGN_STYLE_SHORT_HEADER)
       SetPgnStyle (PGN_STYLE_SHORT_HEADER, true);
 }
 
@@ -1251,7 +1337,8 @@ Game::TruncateStart (void)
 //    game that will be stored in the index file and used to speed
 //    up searches (material at end of game, etc) is up to date.
 
-void Game::MakeHomePawnList (byte * pbPawnList)
+uint
+Game::MakeHomePawnList (byte * pbPawnList)
 {
     // Use a temporary dummy array if none was provided:
     byte tempPawnList [9];
@@ -1259,14 +1346,24 @@ void Game::MakeHomePawnList (byte * pbPawnList)
         pbPawnList = tempPawnList;
     }
 
-    // We zero out the list first:
-    for (int i = 0; i < 9; i++) pbPawnList[i] = 0;
+    // If nonstandard start, we do not make the list:
+    if (NonStandardStart) {
+        pbPawnList[0] = 0; return 0;
+    }
 
     uint count = 0;
+    uint hpOld, hpNew;
     uint halfByte = 0;
     errorT err = OK;
-    uint hpOld = HPSIG_StdStart;    // All 16 pawns are on their home squares.
-    byte* pbList = pbPawnList +1;
+    byte * pbList = pbPawnList;
+    hpOld = HPSIG_StdStart;    // All 16 pawns are on their home squares.
+
+    // We zero out the list first:
+    for (count = 0; count < 9; count++) {
+        *pbList = 0; pbList++;
+    }
+    count = 0;
+    pbList = pbPawnList; pbList++;
 
     NumHalfMoves = 0;
     PromotionsFlag = false;
@@ -1274,19 +1371,9 @@ void Game::MakeHomePawnList (byte * pbPawnList)
     MoveToPly(0);
 
     while (err == OK) {
-        uint hpNew = CurrentPos->GetHPSig();
-        uint changed = hpOld - hpNew;
-        if (changed != 0 && !NonStandardStart) {
-            // Find the idx of the moved pawn
-            uint changeValue = 0;
-            while (1) {
-                changed = changed >> 1;
-                if (changed == 0) break;
-                changeValue++;
-            }
-
-            // There are only 16 pawns, so we can store two pawn moves
-            // in every byte
+        hpNew = CurrentPos->GetHPSig();
+        if (hpNew != hpOld) {
+            byte changeValue = (byte) (log2 (hpOld - hpNew));
             if (halfByte == 0) {
                 *pbList = (changeValue << 4);  halfByte = 1;
             } else {
@@ -1310,6 +1397,7 @@ void Game::MakeHomePawnList (byte * pbPawnList)
 
     // First byte in pawnlist array stores the count:
     pbPawnList[0] = (byte) count;
+    return count;
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1320,8 +1408,8 @@ inline int
 calcHomePawnMask (pieceT pawn, pieceT * board)
 {
     ASSERT (pawn == WP  ||  pawn == BP);
-    pieceT * bd = &(board[ (pawn == WP ? H2 : H7) ]);
-    int result = 0;
+    register pieceT * bd = &(board[ (pawn == WP ? H2 : H7) ]);
+    register int result = 0;
     if (*bd == pawn) { result |= 128; }  bd--;   // H-fyle pawn
     if (*bd == pawn) { result |=  64; }  bd--;   // G-fyle pawn
     if (*bd == pawn) { result |=  32; }  bd--;   // F-fyle pawn
@@ -1339,7 +1427,7 @@ calcHomePawnMask (pieceT pawn, pieceT * board)
 inline uint
 updateHomePawnMask (uint oldMask, fyleT f)
 {
-    uint newMask = oldMask;
+    register uint newMask = oldMask;
     newMask &= ~((uint) 1 << f);
     return newMask;
 }
@@ -1408,7 +1496,8 @@ Game::MaterialMatch (ByteBuffer * buf, byte * min, byte * max,
     errorT err = OK;
 
     if (buf == NULL) {
-        MoveToPly(0);
+        // This was previously unused, but now used to search the end position
+        // MoveToPly(0);
     } else {
         Clear();
         err = DecodeStart (buf);
@@ -1433,8 +1522,8 @@ Game::MaterialMatch (ByteBuffer * buf, byte * min, byte * max,
         if ((int)plyCount > maxPly) { return false; }
         if ((int)plyCount < minPly) { goto Next_Move; }
 
-// For these comparisons, we really could only do half of them each move,
-// according to which side just moved.
+	// For these comparisons, we really could only do half of them each move,
+	// according to which side just moved.
         // For non-pawns, the count could be increased by promotions:
         if (CurrentPos->PieceCount(WQ) < min[WQ]) { goto Check_Promotions; }
         if (CurrentPos->PieceCount(BQ) < min[BQ]) { goto Check_Promotions; }
@@ -1515,10 +1604,7 @@ Game::MaterialMatch (ByteBuffer * buf, byte * min, byte * max,
 
       Next_Move:
         if (buf == NULL) {
-            MoveForward();
-            if (CurrentMove->marker == END_MARKER) {
-                err = ERROR_EndOfMoveList;
-            }
+            err = MoveForward();
         } else {
             err = DecodeNextMove (buf, NULL);
         }
@@ -1748,10 +1834,7 @@ Game::ExactMatch (Position * searchPos, ByteBuffer * buf, simpleMoveT * sm,
         }
 #endif
         if (buf == NULL) {
-            MoveForward ();
-            if (CurrentMove->marker == END_MARKER) {
-                err = ERROR_EndOfMoveList;
-            }
+            err = MoveForward();
         } else {
             err = DecodeNextMove (buf, NULL);
             if (err != OK  &&  err != ERROR_EndOfMoveList) {
@@ -1849,10 +1932,7 @@ Game::VarExactMatch (Position * searchPos, gameExactMatchT searchType)
             if (match) { return true; }
         }
         // Continue down this variation:
-        MoveForward();
-        if (CurrentMove->marker == END_MARKER) {
-            err = ERROR_EndOfMoveList;
-        }
+        err = MoveForward();
     }
     return false;
 }
@@ -1868,8 +1948,8 @@ Game::GetPartialMoveList (DString * outStr, uint plyCount)
     // unaltered:
 
     SaveState ();
-    MoveToPly(0);
 
+    MoveToPly(0);
     char temp [80];
     for (uint i=0; i < plyCount; i++) {
         if (CurrentMove->marker == END_MARKER) {
@@ -1886,8 +1966,6 @@ Game::GetPartialMoveList (DString * outStr, uint plyCount)
             CurrentPos->MakeSANString(&(m->moveData),
                                       m->san, SAN_CHECKTEST);
         }
-        // add one space for indenting to work out right
-        outStr->Append (" ");
         outStr->Append (m->san);
         MoveForward();
     }
@@ -1897,7 +1975,8 @@ Game::GetPartialMoveList (DString * outStr, uint plyCount)
     return OK;
 }
 
-// Search a game for matching move(s) 
+
+// Search a game for matching move(s)
 // (based on Game::GetPartialMoveList)
 
 bool
@@ -1929,29 +2008,29 @@ Game::MoveMatch (int m_argc, char **m_argv, uint plyCount, bool wToMove, bool bT
             bool found = 1;
             // Examine following moves to see all match
             while (j < m_argc) {
-                if (! m->next) {
-                    found = 0;
-                    break;
-                }
-                if (j == 1) SaveState();
-                MoveForward();
-                m = CurrentMove;
-                if (m->san[0] == 0) {
-                    CurrentPos->MakeSANString(&(m->moveData), m->san, checkTest);
-                }
-                if (m_argv[j][0] != '?' && strcmp(m->san, m_argv[j]) != 0) {
-                    j++;
-                    found = 0;
-                    break;
-                } else {
-                    j++;
-                }
+              if (! m->next) {
+                  found = 0;
+                  break;
+              }
+              if (j == 1) SaveState();
+              MoveForward();
+              m = CurrentMove;
+              if (m->san[0] == 0) {
+                  CurrentPos->MakeSANString(&(m->moveData), m->san, checkTest);
+              }
+              if (m_argv[j][0] != '?' && strcmp(m->san, m_argv[j]) != 0) {
+                  j++;
+                  found = 0;
+                  break;
+              } else {
+                  j++;
+              }
             }
             if (j > 1) RestoreState();
 
             if (found) {
-                return true;
-            }
+              return true;
+           }
         }
 skipmove:
         MoveForward();
@@ -1959,7 +2038,6 @@ skipmove:
 
     return false;
 }
-
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Game::GetSAN():
@@ -2010,14 +2088,16 @@ Game::GetPrevMoveUCI (char * str)
 {
     ASSERT (str != NULL);
     moveT * m = CurrentMove->prev;
+
     if (m->marker == START_MARKER  ||  m->marker == END_MARKER) {
         str[0] = 0;
         return;
     }
-    SaveState();
-    MoveBackup();
-    CurrentPos->MakeUCIString (&(m->moveData), str);
-    RestoreState();
+//     if (m->san[0] == 0) {
+        MoveBackup();
+        CurrentPos->MakeUCIString (&(m->moveData), str);
+        MoveForward();
+//     }
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2029,15 +2109,16 @@ Game::GetNextMoveUCI (char * str)
 {
     ASSERT (str != NULL);
     moveT * m = CurrentMove;
+
     if (m->marker == START_MARKER  ||  m->marker == END_MARKER) {
       str[0] = 0;
       return;
     }
+    //MoveBackup();
     CurrentPos->MakeUCIString (&(m->moveData), str);
+    //MoveForward();
 }
 
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// commentEmpty:
 //    Called by WriteMoveList to check there is really
 //    something to print given display options.
 //    comment is supposed to be non null
@@ -2083,48 +2164,50 @@ Game::WriteComment (TextBuffer * tb, const char * preStr,
     char * s = NULL;
 
     if (PgnStyle & PGN_STYLE_STRIP_MARKS) {
-        s = strDuplicate (comment);
-        strTrimMarkCodes (s);
+      s = strDuplicate (comment);
+      strTrimMarkCodes (s);
     } else {
-      s = (char *) comment;
+      if (PgnStyle & PGN_STYLE_STRIP_BRACES) {
+        s = strDuplicate (comment);
+        strConvertBraces (s);
+      } else {
+        s = (char *) comment;
+      }
     }
 
     if (s[0] != '\0') {
 
-        if (IsColorFormat()) {
-            tb->PrintString ("<c_");
-            tb->PrintInt (NumMovesPrinted);
-            tb->PrintChar ('>');
-        }
+      if (IsColorFormat()) {
+          tb->PrintString ("<c_");
+          tb->PrintInt (NumMovesPrinted);
+          tb->PrintChar ('>');
+      }
 
-        if (IsColorFormat()) {
-            // Translate "<", ">" in comments:
-            tb->AddTranslation ('<', "<lt>");
-            tb->AddTranslation ('>', "<gt>");
-            // S.A any issues ?
-            tb->NewlinesToSpaces (0);
-            tb->PrintString (s);
-            tb->ClearTranslation ('<');
-            tb->ClearTranslation ('>');
-        } else {
-            tb->PrintString (preStr);
-            tb->PrintString (s);
-            tb->PrintString (postStr);
-        }
-
-        if (IsColorFormat()) { tb->PrintString ("</c>"); }
+      if (IsColorFormat()) {
+          // Translate "<", ">" in comments:
+          tb->AddTranslation ('<', "<lt>");
+          tb->AddTranslation ('>', "<gt>");
+          // S.A any issues ?
+          tb->NewlinesToSpaces (0);
+          tb->PrintString (s);
+          tb->ClearTranslation ('<');
+          tb->ClearTranslation ('>');
+      } else {
+          tb->PrintString (preStr);
+          tb->PrintString (s);
+          tb->PrintString (postStr);
+      }
+      if (IsColorFormat()) { tb->PrintString ("</c>"); }
     }
 
-    if (PgnStyle & PGN_STYLE_STRIP_MARKS) {
+    if (PgnStyle & PGN_STYLE_STRIP_MARKS)
         delete[] s;
-    }
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// Game::WriteMoveList():
 //      Write the moves, variations and comments in PGN notation.
 //      Recursive; calls itself to write variations.
-//
+
 errorT
 Game::WriteMoveList (TextBuffer *tb, uint plyCount,
                      moveT * oldCurrentMove, bool printMoveNum, bool inComment)
@@ -2140,10 +2223,13 @@ Game::WriteMoveList (TextBuffer *tb, uint plyCount,
     const char * newline = "\n";
     bool printDiagrams = false;
 
+    // Needed for the odd case concerning comments/nullmoves/variations
+    static uint inNullMove = 0;
+
     if (IsHtmlFormat()) {
-        preCommentStr = "";
-        postCommentStr = "";
-        startTable = "<table width=\"50%\">\n";
+        preCommentStr = "{";
+        postCommentStr = "}";
+        startTable = "<table width=\"50%\" cellpadding=5>\n";
         startColumn = "<tr align=left>\n  <td width=\"15%\"><b>";
         nextColumn = "</b></td>\n  <td width=\"45%\" align=left><b>";
         endColumn = "</b></td>\n</tr>\n";
@@ -2151,17 +2237,7 @@ Game::WriteMoveList (TextBuffer *tb, uint plyCount,
         newline = "<br>\n";
         printDiagrams = true;
     }
-    if (IsLatexFormat()) {
-        preCommentStr = "\\begin{nochess}{\\rm ";
-        postCommentStr = "}\\end{nochess}";
-        startTable = "\n\\begin{tabular}{p{1cm}p{2cm}p{2cm}}\n";
-        startColumn = "";
-        nextColumn = "&";
-        endColumn = "\\\\\n";
-        endTable = "\\end{tabular}\n\n";
-        newline = "\n";
-        printDiagrams = true;
-    }
+
     if (IsColorFormat()) {
         startTable = "<br>";
         newline = "<br>";
@@ -2180,8 +2256,9 @@ Game::WriteMoveList (TextBuffer *tb, uint plyCount,
     moveT * m = CurrentMove;
 
     // Print null moves:
-    if ((PgnStyle & PGN_STYLE_NO_NULL_MOVES) && !inComment &&
-            IsPlainFormat() && m->isNull()) {
+    if ((isNullMove(m) && PgnStyle & PGN_STYLE_NO_NULL_MOVES) && !inComment &&
+            IsPlainFormat()) {
+        if (!inNullMove) inNullMove = VarDepth;
         inComment = true;
         tb->PrintString(preCommentStr);
         preCommentStr = "";
@@ -2189,16 +2266,16 @@ Game::WriteMoveList (TextBuffer *tb, uint plyCount,
     }
 
     // If this is a variation and it starts with a comment, print it:
-    if ((VarDepth > 0 || CurrentMove->prev == FirstMove) && 
-            ! CurrentMove->prev->comment.empty()) {
+    if ((VarDepth > 0 || CurrentMove->prev == FirstMove) &&
+            CurrentMove->prev->comment != NULL) {
         if (PgnStyle & PGN_STYLE_COMMENTS) {
-            WriteComment (tb, preCommentStr, CurrentMove->prev->comment.c_str(),
+            WriteComment (tb, preCommentStr, CurrentMove->prev->comment,
                           postCommentStr);
             tb->PrintSpace();
             if (!VarDepth) {
                 tb->ClearTranslation ('\n');
                 tb->NewLine();
-                if (IsColorFormat() || IsLatexFormat()) {
+                if (IsColorFormat()) {
                     tb->NewLine();
                 }
             }
@@ -2208,6 +2285,13 @@ Game::WriteMoveList (TextBuffer *tb, uint plyCount,
     while (CurrentMove->marker != END_MARKER) {
         moveT *m = CurrentMove;
         bool commentLine = false;
+
+        // If the move being printed is the game's "current move" then
+        // set the current PGN position accordingly:
+
+        if (m == oldCurrentMove) {
+            PgnNextMovePos = NumMovesPrinted;
+        }
 
         // Stop the output if a specified stopLocation was given and has
         // been reached:
@@ -2220,9 +2304,9 @@ Game::WriteMoveList (TextBuffer *tb, uint plyCount,
         }
 
         bool printThisMove = true;
-        if (m->isNull()) {
-            // Null moves are not printed in LaTeX or HTML:
-            if (IsLatexFormat()  ||  IsHtmlFormat()) {
+        if (isNullMove(m)) {
+            // Null moves are not printed in HTML:
+            if (IsHtmlFormat()) {
                 printThisMove = false;
                 printMoveNum = true;
             }
@@ -2233,6 +2317,7 @@ Game::WriteMoveList (TextBuffer *tb, uint plyCount,
                     // Enter inComment mode to convert rest of line
                     // to a comment:
                     inComment = true;
+                    if (!inNullMove) inNullMove = VarDepth;
                     tb->PrintString(preCommentStr);
                     preCommentStr = "";
                     postCommentStr = "";
@@ -2241,86 +2326,85 @@ Game::WriteMoveList (TextBuffer *tb, uint plyCount,
                 printMoveNum = true;
             }
         }
-        int colWidth = 6;
+        int colWidth = 12;
         NumMovesPrinted++;
 
         if (printThisMove) {
-        // Print the move number and following dots if necessary:
-        if (IsColorFormat()) {
-            tb->PrintString ("<m_");
-            tb->PrintInt (NumMovesPrinted);
-            tb->PrintChar ('>');
-        }
-        if (printMoveNum  ||  (CurrentPos->GetToMove() == WHITE)) {
-            if ((PgnStyle & PGN_STYLE_COLUMN)  &&  VarDepth == 0) {
-                tb->PrintString (startColumn);
-                char temp [10];
-                sprintf (temp, "%4u.", CurrentPos->GetFullMoveCount());
-                tb->PrintString (temp);
-                if (CurrentPos->GetToMove() == BLACK) {
-                    tb->PauseTranslations();
-                    tb->PrintString (nextColumn);
-                    tb->PrintString ("...");
-                    if (IsPlainFormat()  ||  IsColorFormat()) {
-                        tb->PrintString ("        ");
+            // Print the move number and following dots if necessary:
+            if (IsColorFormat()) {
+                tb->PrintString ("<m_");
+                tb->PrintInt (NumMovesPrinted);
+                tb->PrintChar ('>');
+            }
+            if (printMoveNum  ||  (CurrentPos->GetToMove() == WHITE)) {
+                if ((PgnStyle & PGN_STYLE_COLUMN)  &&  VarDepth == 0) {
+                    tb->PrintString (startColumn);
+                    char temp [10];
+                    sprintf (temp, "%4u.", CurrentPos->GetFullMoveCount());
+                    tb->PrintString (temp);
+                    if (CurrentPos->GetToMove() == BLACK) {
+                        tb->PauseTranslations();
+                        tb->PrintString (nextColumn);
+                        tb->PrintString ("...");
+                        if (IsPlainFormat()  ||  IsColorFormat()) {
+                            tb->PrintString ("        ");
+                        }
+                        tb->ResumeTranslations();
                     }
-                    tb->ResumeTranslations();
-                }
-            } else {
-            if (PgnStyle & PGN_STYLE_MOVENUM_SPACE) {
-                tb->PrintInt(CurrentPos->GetFullMoveCount(), (CurrentPos->GetToMove() == WHITE ? "." : ". ..."));
                 } else {
-                    tb->PrintInt(CurrentPos->GetFullMoveCount(), (CurrentPos->GetToMove() == WHITE ? "." : "..."));
-                }
-                if (PgnStyle & PGN_STYLE_MOVENUM_SPACE) {
-                    if (IsLatexFormat()) {
-                        tb->PrintChar ('~');
+                    if (PgnStyle & PGN_STYLE_MOVENUM_SPACE) {
+                        tb->PrintInt(CurrentPos->GetFullMoveCount(), (CurrentPos->GetToMove() == WHITE ? "." : ". ..."));
                     } else {
-                        tb->PrintChar (' ');
+                        tb->PrintInt(CurrentPos->GetFullMoveCount(), (CurrentPos->GetToMove() == WHITE ? "." : "..."));
+                    }
+
+                    if (PgnStyle & PGN_STYLE_MOVENUM_SPACE) {
+                            tb->PrintChar (' ');
                     }
                 }
+                printMoveNum = false;
             }
-            printMoveNum = false;
-        }
 
-        // Now print the move: only regenerate the SAN string if necessary.
+            if (m == oldCurrentMove->prev) { PgnLastMovePos = NumMovesPrinted; }
+            if (m == oldCurrentMove) { PgnNextMovePos = NumMovesPrinted; }
 
-        if ((PgnStyle & PGN_STYLE_COLUMN)  &&  VarDepth == 0) {
-            tb->PauseTranslations();
-            tb->PrintString (nextColumn);
-            tb->ResumeTranslations();
-        }
-        if (IsColorFormat() && (PgnStyle & PGN_STYLE_UNICODE)) {
-            char buf[100];
-            char* q = buf;
+            // Now print the move: only regenerate the SAN string if necessary.
 
-            for (char const* p = m->san; *p; ++p) {
-                ASSERT(q - buf < sizeof(buf) - 4);
+            if ((PgnStyle & PGN_STYLE_COLUMN)  &&  VarDepth == 0) {
+                tb->PauseTranslations();
+                tb->PrintString (nextColumn);
+                tb->ResumeTranslations();
+            }
+                if (IsColorFormat() && (PgnStyle & PGN_STYLE_UNICODE)) {
+                        char buf[100];
+                        char* q = buf;
 
-                switch (*p) {
-                    case 'K':    q = strncpy(q, "\xe2\x99\x94", 3) + 3; break;
-                    case 'Q':    q = strncpy(q, "\xe2\x99\x95", 3) + 3; break;
-                    case 'R':    q = strncpy(q, "\xe2\x99\x96", 3) + 3; break;
-                    case 'B':    q = strncpy(q, "\xe2\x99\x97", 3) + 3; break;
-                    case 'N':    q = strncpy(q, "\xe2\x99\x98", 3) + 3; break;
-                    case 'P':    q = strncpy(q, "\xe2\x99\x99", 3) + 3; break;
-                    default:    *q++ = *p; break;
+                        for (char const* p = m->san; *p; ++p) {
+			    ASSERT(q - buf < sizeof(buf) - 4);
+
+			    switch (*p) {
+				case 'K':        q = strncpy(q, "\xe2\x99\x94", 3) + 3; break;
+				case 'Q':        q = strncpy(q, "\xe2\x99\x95", 3) + 3; break;
+				case 'R':        q = strncpy(q, "\xe2\x99\x96", 3) + 3; break;
+				case 'B':        q = strncpy(q, "\xe2\x99\x97", 3) + 3; break;
+				case 'N':        q = strncpy(q, "\xe2\x99\x98", 3) + 3; break;
+				case 'P':        q = strncpy(q, "\xe2\x99\x99", 3) + 3; break;
+				default:        *q++ = *p; break;
+			    }
+                        }
+                        *q = '\0';
+                        tb->PrintWord (buf);
+                } else {
+                        // translate pieces
+                        strcpy(tempTrans, m->san);
+                        transPieces(tempTrans);
+                        //tb->PrintWord (m->san);
+                        tb->PrintWord (tempTrans);
+            }
+                colWidth -= strLength (m->san);
+                if (IsColorFormat()) {
+                        tb->PrintString ("</m>");
                 }
-
-            }
-            *q = '\0';
-            tb->PrintWord (buf);
-        } else {
-            // translate pieces
-            strcpy(tempTrans, m->san);
-            transPieces(tempTrans);
-            //tb->PrintWord (m->san);
-            tb->PrintWord (tempTrans);
-        }
-        colWidth -= strLength (m->san);
-        if (IsColorFormat()) {
-            tb->PrintString ("</m>");
-        }
         }
 
         bool endedColumn = false;
@@ -2379,22 +2463,10 @@ Game::WriteMoveList (TextBuffer *tb, uint plyCount,
                 if (IsHtmlFormat()  &&  VarDepth == 0) {
                     tb->PrintString ("</b>");
                 }
-                if (IsLatexFormat()) {
-                    // The commented-out code below will print diagrams
-                    // in variations smaller than game diagrams:
-                    //if (VarDepth == 0) {
-                    //    tb->PrintString("\n\\font\\Chess=chess20\n");
-                    //} else {
-                    //    tb->PrintString("\n\\font\\Chess=chess10\n");
-                    //}
-                    tb->PrintString ("\n\\begin{diagram}\n");
-                }
                 MoveForward ();
                 DString * dstr = new DString;
                 if (IsHtmlFormat()) {
                     CurrentPos->DumpHtmlBoard (dstr, HtmlStyle, NULL);
-                } else {
-                    CurrentPos->DumpLatexBoard (dstr);
                 }
                 MoveBackup ();
                 tb->PrintString (dstr->Data());
@@ -2402,21 +2474,19 @@ Game::WriteMoveList (TextBuffer *tb, uint plyCount,
                 if (IsHtmlFormat()  &&  VarDepth == 0) {
                     tb->PrintString ("<b>");
                 }
-                if (IsLatexFormat()) {
-                    tb->PrintString ("\n\\end{diagram}\n");
-                }
                 printMoveNum = true;
             }
 
-            if (!m->comment.empty() && ! CommentEmpty(m->comment.c_str()) ) {
+            if (m->comment != NULL && ! CommentEmpty(m->comment) ) {
                 if (!inComment && IsPlainFormat()  &&
                     (PgnStyle & PGN_STYLE_NO_NULL_MOVES)) {
                     // If this move has no variations, but the next move
                     // is a null move, enter inComment mode:
-                    if (m->next->isNull()  &&
+                    if (isNullMove(m->next)  &&
                           ((!(PgnStyle & PGN_STYLE_VARS))  ||
                             (CurrentMove->next->numVariations == 0))) {
                         inComment = true;
+                        if (!inNullMove) inNullMove = VarDepth;
                         tb->PrintString(preCommentStr);
                         preCommentStr = "";
                         postCommentStr = "";
@@ -2438,17 +2508,20 @@ Game::WriteMoveList (TextBuffer *tb, uint plyCount,
                 }
 */
                 if (IsHtmlFormat()  &&  VarDepth == 0) {
-                    tb->PrintString ("</b><dl><dd>");
+                    if (PgnStyle & PGN_STYLE_INDENT_COMMENTS)
+                        tb->PrintString ("</b><dl><dd>");
+                    else
+                        tb->PrintString ("</b>");
                 }
                 if ((PgnStyle & PGN_STYLE_INDENT_COMMENTS) && VarDepth == 0) {
                     if (IsColorFormat()) {
                         tb->PrintString ("<br><ip1>");
                     } else {
-                        tb->SetIndent (tb->GetIndent() + 4); tb->Indent();
+                      tb->SetIndent (tb->GetIndent() + 4); tb->Indent();
                     }
                 }
 
-                WriteComment (tb, preCommentStr, m->comment.c_str(), postCommentStr);
+                WriteComment (tb, preCommentStr, m->comment, postCommentStr);
 
                 if ((PgnStyle & PGN_STYLE_INDENT_COMMENTS) && VarDepth == 0) {
                     if (IsColorFormat()) {
@@ -2460,26 +2533,21 @@ Game::WriteMoveList (TextBuffer *tb, uint plyCount,
                 } else {
                     tb->PrintSpace();
                 }
-                if (printDiagrams  &&  strIsPrefix ("#", m->comment.c_str())) {
-                    if (IsLatexFormat()) {
-                        tb->PrintString ("\n\\begin{diagram}\n");
-                    }
+                if (printDiagrams  &&  strIsPrefix ("#", m->comment)) {
                     MoveForward ();
                     DString * dstr = new DString;
                     if (IsHtmlFormat()) {
                         CurrentPos->DumpHtmlBoard (dstr, HtmlStyle, NULL);
-                    } else {
-                        CurrentPos->DumpLatexBoard (dstr);
                     }
                     MoveBackup ();
                     tb->PrintString (dstr->Data());
-                    if (IsLatexFormat()) {
-                        tb->PrintString ("\n\\end{diagram}\n");
-                    }
                     delete dstr;
                 }
                 if (IsHtmlFormat() && VarDepth == 0) {
-                    tb->PrintString ("</dl><b>");
+                    if (PgnStyle & PGN_STYLE_INDENT_COMMENTS)
+                        tb->PrintString ("</dl></b>");
+                    else
+                        tb->PrintString ("<b>");
                 }
                 printMoveNum = true;
             }
@@ -2508,44 +2576,37 @@ Game::WriteMoveList (TextBuffer *tb, uint plyCount,
                 }
             }
             if (IsColorFormat()  &&  VarDepth == 0) { tb->PrintString ("<var>"); }
-            // Doesn't indent first var in column mode properly 
+            // Doesn't indent first var in column mode properly
             // if including !(PgnStyle & PGN_STYLE_COLUMN) here.
             // But as-is, depth 3 vars don't indent in COLUMN mode (bug)
-            if ((PgnStyle & PGN_STYLE_INDENT_VARS) && IsColorFormat()) {
+            if (PgnStyle & PGN_STYLE_INDENT_VARS) {
                 if ( !commentLine ) {
-                    tb->PrintString ("<br>");
+                    if (IsColorFormat())
+                          tb->PrintString ("<br>");
+                    if (IsHtmlFormat())
+                          tb->PrintString (newline);
                 }
             }
             for (uint i=0; i < m->numVariations; i++) {
                 if (PgnStyle & PGN_STYLE_INDENT_VARS) {
                     if (IsColorFormat()) {
-                        switch (VarDepth) {
-                            case 0: tb->PrintString ("<ip1>"); break;
-                            case 1: tb->PrintString ("<ip2>"); break;
-                            case 2: tb->PrintString ("<ip3>"); break;
-                            case 3: tb->PrintString ("<ip4>"); break;
-                        }
+                        char temp[20];
+                        sprintf (temp, "<ip%u>", VarDepth + 1);
+                        tb->PrintString (temp);
                     } else {
+                        if (IsHtmlFormat())
+                            tb->PrintString ("<dl><dd>");
                         tb->SetIndent (tb->GetIndent() + 4); tb->Indent();
                     }
                 }
                 if (IsHtmlFormat()) {
-                    if (VarDepth == 0) { tb->PrintString ("</b><dl><dd>"); }
-                }
-                if (IsLatexFormat()  &&  VarDepth == 0) {
-                    if (PgnStyle & PGN_STYLE_INDENT_VARS) {
-                        tb->PrintLine ("\\begin{variation}");
-                    } else {
-                        tb->PrintString ("{\\rm ");
-                    }
+                    if (VarDepth == 0) { tb->PrintString ("</b>"); }
                 }
                 if (IsColorFormat()) { tb->PrintString ("<blue>"); }
 
                 // Note tabs in column mode don't work after this VarDepth>1 for some reason
-                // this VarDepth check is redundant i think 
-                if (!IsLatexFormat()  ||  VarDepth != 0) {
-                    tb->PrintChar ('(');
-                }
+                // this VarDepth check is redundant i think
+                tb->PrintChar ('(');
 
                 MoveIntoVariation (i);
                 NumMovesPrinted++;
@@ -2558,29 +2619,20 @@ Game::WriteMoveList (TextBuffer *tb, uint plyCount,
                     return OK;
                 }
                 MoveExitVariation();
-                if (!IsLatexFormat()  ||  VarDepth != 0) {
-                    tb->PrintChar (')');
-                }
-                if (IsColorFormat()) { tb->PrintString ("<blue>"); }
+                tb->PrintChar (')');
+                if (IsColorFormat())
+                  tb->PrintString ("<blue>");
                 if (IsHtmlFormat()) {
-                    if (VarDepth == 0) { tb->PrintString ("</dl><b>"); }
-                }
-                if (IsLatexFormat()  &&  VarDepth == 0) {
-                    if (PgnStyle & PGN_STYLE_INDENT_VARS) {
-                        tb->PrintLine ("\\end{variation}");
-                    } else {
-                        tb->PrintString ("}");
-                    }
+                    if (VarDepth == 0) { tb->PrintString ("<b>"); }
                 }
                 if (PgnStyle & PGN_STYLE_INDENT_VARS) {
                     if (IsColorFormat()) {
-                        switch (VarDepth) {
-                            case 0: tb->PrintString ("</ip1><br>"); break;
-                            case 1: tb->PrintString ("</ip2><br>"); break;
-                            case 2: tb->PrintString ("</ip3><br>"); break;
-                            case 3: tb->PrintString ("</ip4><br>"); break;
-                        }
+                        char temp[20];
+                        sprintf (temp, "</ip%u><br>", VarDepth + 1);
+                        tb->PrintString (temp);
                     } else {
+                        if (IsHtmlFormat())
+                            tb->PrintString ("</dl>");
                         tb->SetIndent (tb->GetIndent() - 4); tb->Indent();
                     }
                 } else { tb->PrintSpace(); }
@@ -2590,6 +2642,7 @@ Game::WriteMoveList (TextBuffer *tb, uint plyCount,
                 tb->PrintString ("</var>");
             }
         }
+
         if ((PgnStyle & PGN_STYLE_COLUMN)  &&  VarDepth == 0) {
             if (endedColumn) { tb->PrintString(startTable); }
             if (!endedColumn  &&  CurrentPos->GetToMove() == BLACK) {
@@ -2597,10 +2650,23 @@ Game::WriteMoveList (TextBuffer *tb, uint plyCount,
                 endedColumn = true;
             }
         }
+
+
         MoveForward();
         plyCount++;
+        if (CurrentMove == oldCurrentMove->prev) {
+            PgnLastMovePos = NumMovesPrinted;
+        }
+        if (CurrentMove == oldCurrentMove) {
+            PgnNextMovePos = NumMovesPrinted;
+        }
     }
-    if (inComment) { tb->PrintString ("}"); }
+    if (inComment) {
+      if (!inNullMove || inNullMove >= VarDepth || !PGN_STYLE_NO_NULL_MOVES)
+        tb->PrintString ("}");
+    }
+    if (inNullMove == VarDepth)
+      inNullMove = 0;
     if (IsHtmlFormat()  &&  VarDepth == 0) { tb->PrintString ("</b>"); }
     if ((PgnStyle & PGN_STYLE_COLUMN)  &&  VarDepth == 0) {
         tb->PrintString(endTable);
@@ -2620,21 +2686,13 @@ Game::WriteMoveList (TextBuffer *tb, uint plyCount,
 errorT
 Game::WritePGN (TextBuffer * tb, uint stopLocation)
 {
-    char temp [255];
+    char temp [1024];
     char dateStr [20];
     const char * newline = "\n";
     tb->NewlinesToSpaces (false);
     if (IsHtmlFormat()) { newline = "<br>\n"; }
     if (IsLatexFormat()) {
-        newline = "\\\\\n";
-        tb->AddTranslation ('#', "\\#");
-        tb->AddTranslation ('%', "\\%");
-        tb->AddTranslation ('&', "\\&");
-        tb->AddTranslation ('<', "$<$");
-        tb->AddTranslation ('>', "$>$");
-        tb->AddTranslation ('_', "\\_");
-        // tb->AddTranslation ('[', "$[$");
-        // tb->AddTranslation (']', "$]$");
+                  return WritePGNtoLaTeX(tb, stopLocation);
     }
     if (IsColorFormat()) {
         newline = "<br>";
@@ -2645,7 +2703,7 @@ Game::WritePGN (TextBuffer * tb, uint stopLocation)
         PgnStyle |= PGN_STYLE_INDENT_VARS;
     }
 
-    // First: is there a pre-game comment? If so, print it:
+// First: is there a pre-game comment? If so, print it:
 //    if (FirstMove->comment != NULL && (PgnStyle & PGN_STYLE_COMMENTS)
 //        &&  ! strIsAllWhitespace (FirstMove->comment)) {
 //        tb->AddTranslation ('\n', newline);
@@ -2673,7 +2731,6 @@ Game::WritePGN (TextBuffer * tb, uint stopLocation)
 
     date_DecodeToString (Date, dateStr);
     if (IsHtmlFormat()) { tb->PrintLine("<p><b>"); }
-    if (IsLatexFormat()) { tb->PrintLine ("{\\bf"); }
 
 //    if (IsColorFormat()) {
 //        tb->AddTranslation ('<', "<lt>");
@@ -2683,10 +2740,10 @@ Game::WritePGN (TextBuffer * tb, uint stopLocation)
     if (PgnStyle & PGN_STYLE_SHORT_HEADER) {
         // Print tags in short, 3-line format:
 
-        //if (IsHtmlFormat()) { tb->PrintString ("<font size=+1>"); }
-        if (IsLatexFormat()) { tb->PrintString ("$\\circ$ "); }
+        if (IsHtmlFormat())
+           tb->PrintString ("<center>");
         if (PgnFormat==PGN_FORMAT_Color) {tb->PrintString ("<tag>"); }
-        tb->PrintString (GetWhiteStr());
+        tb->PrintString (WhiteStr);
         if (WhiteElo > 0) {
             sprintf (temp, "  (%u)", WhiteElo);
             tb->PrintString (temp);
@@ -2695,33 +2752,29 @@ Game::WritePGN (TextBuffer * tb, uint stopLocation)
         case PGN_FORMAT_HTML:
             tb->PrintString (" &nbsp;&nbsp; -- &nbsp;&nbsp; ");
             break;
-        case PGN_FORMAT_LaTeX:
-            tb->PrintString (newline);
-            tb->PrintString ("$\\bullet$ ");
-            break;
         default:
             tb->PrintString ("   --   ");
             break;
         }
-        tb->PrintString (GetBlackStr());
+        tb->PrintString (BlackStr);
         if (BlackElo > 0) {
             sprintf (temp, "  (%u)", BlackElo);
             tb->PrintString (temp);
         }
-        //if (IsHtmlFormat()) { tb->PrintString ("</font>"); }
+        if (IsHtmlFormat())
+           tb->PrintString ("<br>");
         tb->PrintString (newline);
 
-        tb->PrintString (GetEventStr());
-        if (!RoundStr.empty() && RoundStr != "?") {
-            tb->PrintString (IsHtmlFormat() ? " &nbsp;(" : " (");
-            tb->PrintString (GetRoundStr());
+        tb->PrintString (EventStr);
+        if (!strEqual (RoundStr, "")  &&  !strEqual (RoundStr, "?")) {
+            tb->PrintString (IsHtmlFormat() ? "&nbsp;&nbsp;(Round&nbsp;" : "  (Round ");
+            tb->PrintString (RoundStr);
             tb->PrintString (")");
         }
         tb->PrintString (IsHtmlFormat() ? "&nbsp;&nbsp; " : "  ");
-        if (IsLatexFormat()) { tb->PrintString (newline); }
-        if (!SiteStr.empty() && SiteStr != "?") {
-            tb->PrintString (GetSiteStr());
-            tb->PrintString (newline);
+        if (!strEqual (SiteStr, "")  &&  !strEqual (SiteStr, "?")) {
+            tb->PrintString (SiteStr);
+            tb->PrintString (IsHtmlFormat() ? " &nbsp; &nbsp; " : "  ");
         }
 
         // Remove ".??" or ".??.??" from end of dateStr, then print it:
@@ -2731,46 +2784,35 @@ Game::WritePGN (TextBuffer * tb, uint stopLocation)
 
         // Print ECO code:
         tb->PrintString (IsHtmlFormat() ? " &nbsp; &nbsp; " : "  ");
-        if (IsLatexFormat()) { tb->PrintString ("\\hfill "); }
         tb->PrintString (RESULT_LONGSTR[Result]);
         if (EcoCode != 0) {
             tb->PrintString (IsHtmlFormat() ? " &nbsp; &nbsp; " : "  ");
-            if (IsLatexFormat()) { tb->PrintString ("\\hfill "); }
             ecoStringT ecoStr;
             eco_ToExtendedString (EcoCode, ecoStr);
             tb->PrintString (ecoStr);
         }
-        for (uint i=0; i < NumTags; i++) {
-            if( !strcmp(TagList[i].tag, "Annotator"))
-            {
-                sprintf (temp, " (%s)", TagList[i].value);
-                tb->PrintString (temp);
-            }
-        }
-
         tb->PrintString (newline);
         if (PgnFormat==PGN_FORMAT_Color) {tb->PrintString ("</tag>"); }
 
         // Print FEN if non-standard start:
 
         if (NonStandardStart) {
-            if (IsLatexFormat()) {
-                tb->PrintString ("\n\\begin{diagram}\n");
                 DString dstr;
-                StartPos->DumpLatexBoard (&dstr);
-                tb->PrintString (dstr.Data());
-                tb->PrintString ("\n\\end{diagram}\n");
-            } else if (IsHtmlFormat()) {
-                DString dstr;
-                StartPos->DumpHtmlBoard (&dstr, HtmlStyle, NULL);
-                tb->PrintString (dstr.Data());
-            } else {
                 char fenStr [256];
                 StartPos->PrintFEN (fenStr, FEN_ALL_FIELDS);
-                sprintf (temp, "Position: %s%s", fenStr, newline);
-                tb->PrintString (temp);
+
+            if (IsHtmlFormat()) {
+                       dstr.Append ("<br>");
+                       dstr.Append (fenStr);
+               StartPos->DumpHtmlBoard (&dstr, HtmlStyle, NULL);
+               tb->PrintString (dstr.Data());
+            } else {
+               sprintf (temp, "Position: %s%s", fenStr, newline);
+               tb->PrintString (temp);
             }
         }
+        if (IsHtmlFormat())
+            tb->PrintString ("</center>");
     } else {
         // Print tags in standard PGN format, one per line:
         // Note: we want no line-wrapping when printing PGN tags
@@ -2778,17 +2820,17 @@ Game::WritePGN (TextBuffer * tb, uint stopLocation)
         uint wrapColumn = tb->GetWrapColumn();
         tb->SetWrapColumn (99999);
         if (IsColorFormat()) { tb->PrintString ("<tag>"); }
-        sprintf (temp, "[Event \"%s\"]%s", GetEventStr(), newline);
+        sprintf (temp, "[Event \"%s\"]%s", EventStr, newline);
         tb->PrintString (temp);
-        sprintf (temp, "[Site \"%s\"]%s", GetSiteStr(), newline);
+        sprintf (temp, "[Site \"%s\"]%s", SiteStr, newline);
         tb->PrintString (temp);
         sprintf (temp, "[Date \"%s\"]%s", dateStr, newline);
         tb->PrintString (temp);
-        sprintf (temp, "[Round \"%s\"]%s", GetRoundStr(), newline);
+        sprintf (temp, "[Round \"%s\"]%s", RoundStr, newline);
         tb->PrintString (temp);
-        sprintf (temp, "[White \"%s\"]%s", GetWhiteStr(), newline);
+        sprintf (temp, "[White \"%s\"]%s", WhiteStr, newline);
         tb->PrintString (temp);
-        sprintf (temp, "[Black \"%s\"]%s", GetBlackStr(), newline);
+        sprintf (temp, "[Black \"%s\"]%s", BlackStr, newline);
         tb->PrintString (temp);
         sprintf (temp, "[Result \"%s\"]%s", RESULT_LONGSTR[Result], newline);
         tb->PrintString (temp);
@@ -2842,35 +2884,28 @@ Game::WritePGN (TextBuffer * tb, uint stopLocation)
         tb->SetWrapColumn (wrapColumn);
     }
 
-//    if (IsColorFormat()) {
-//        tb->ClearTranslation ('<');
-//        tb->ClearTranslation ('>');
-//    }
+    //    if (IsColorFormat()) {
+    //        tb->ClearTranslation ('<');
+    //        tb->ClearTranslation ('>');
+    //    }
 
     if (IsHtmlFormat()) { tb->PrintLine("</b></p>"); }
-    if (IsLatexFormat()) {
-        tb->PrintLine ("}\n\\begin{chess}{\\bf ");
-    } else {
-        tb->PrintString (newline);
-    }
+    tb->PrintString (newline);
 
     // Now print the move list. First, we note the current position and
     // move, so we can reconstruct the game state afterwards:
     moveT * oldCurrentMove = CurrentMove;
     if (stopLocation == 0) { SaveState(); }
     MoveToPly(0);
+    PgnLastMovePos = PgnNextMovePos = 1;
 
     if (IsHtmlFormat()) { tb->PrintString ("<p>"); }
     NumMovesPrinted = 1;
     StopLocation = stopLocation;
     WriteMoveList (tb, StartPlyCount, oldCurrentMove, true, false);
     if (IsHtmlFormat()) { tb->PrintString ("<b>"); }
-    if (IsLatexFormat()) { tb->PrintString ("\n}\\end{chess}\n{\\bf "); }
     if (IsColorFormat()) { tb->PrintString ("<tag>"); }
     tb->PrintWord (RESULT_LONGSTR [Result]);
-    if (IsLatexFormat()) {
-        tb->PrintString ("}\n\\begin{center} \\hrule \\end{center}");
-    }
     if (IsHtmlFormat()) { tb->PrintString ("</b><hr></p>"); }
     if (IsColorFormat()) { tb->PrintString ("</tag>"); }
     tb->NewLine();
@@ -2880,32 +2915,618 @@ Game::WritePGN (TextBuffer * tb, uint stopLocation)
     return OK;
 }
 
+// Draw Latex Score Graph
+
+errorT
+Game::WritePGNGraphToLatex(TextBuffer * tb)
+{
+        char temp [256];
+
+        MoveToPly(0);
+        PgnLastMovePos = PgnNextMovePos = 1;
+        moveT * m = CurrentMove;
+
+        const uint arrcnt = (!NumHalfMoves)? 1 : NumHalfMoves;
+#ifdef _MSC_VER /* no support for C99 VLAs */
+        double * scores = (double *) _alloca(arrcnt * sizeof(double));
+        char   * events = (char   *) _alloca(arrcnt * sizeof(char));
+#else
+        double scores[arrcnt];
+        char   events[arrcnt];
+#endif
+        for (uint i = 0; i < arrcnt; i++) {
+                scores[i] = 0;
+                events[i] = ' ';
+        }
+
+        double maxScore = 0;
+        double minScore = 0;
+        int numScoresFound = 0;
+        int minScoresRequired = 3;
+        bool scoresFound = false;
+
+        int x = 0;
+        // Handle gaps in scores using average curve or lastscore
+        // to fill the missing score
+        double lastScore = HUGE_VAL;
+        while (m->marker != END_MARKER) {
+            if (m->comment != NULL) {
+                if (strIsScore(m->comment)) {
+                    numScoresFound++;
+                    double possibleScore = strGetScore(m->comment);
+                    if (possibleScore == 0.0) {
+                        if (lastScore==HUGE_VAL) {
+                            // since this is the first score it is okay and more probable to stay 0.0
+                            // latter it might make more sense to check if starting move is white
+                            // and starting move = first move and match most engine analysis by giving
+                            // white a slight punch of say 0.1 instead.
+                        } else {
+                            // More probably here since this not the first score in the game
+                            // That it is really a missing score so set to lastScore if the delta
+                            // is > 0.1 an improvement can be made here of doing a lookahead at the
+                            // next score and if it is in range average them difference instead
+                            // however this will more reflect the actuals from the computer
+                            // We could instead plot a smooth curve through the data as a seperate line
+                            possibleScore = (fabs(lastScore-possibleScore) > 0.1) ? lastScore : possibleScore;
+                        }
+                    } else {
+                        if (possibleScore == HUGE_VAL || possibleScore == -HUGE_VAL) {
+                            // Score is out of range
+                            if (lastScore != HUGE_VAL) {
+                                // Not the first score so correct via Last Score
+                                possibleScore = lastScore;
+                            } else {
+                                // Very first score is out of wack so normalize it
+                                possibleScore = 0.0;
+                            }
+                        }
+                    }
+                    scores[x] = possibleScore;
+                    lastScore = possibleScore;
+                    // get maxes later because of new compressions on y scales
+                    // maxScore = (scores[x] > maxScore) ? scores[x] : maxScore;
+                    // minScore = (scores[x] < minScore) ? scores[x] : minScore;
+                }
+                if (strstr(m->comment, "BLUNDER") != NULL) {
+                        events[x] = 'B';
+                }
+            }
+            MoveForward();
+            m = CurrentMove;
+            x++;
+        }
+
+	// Need a minimum # of scores before a chart will make sense
+	if (numScoresFound >= minScoresRequired) {
+	   scoresFound = true;
+	}
+
+	// As it is a whole move graph lets continue the score on a half move
+	int scoreHalfMoves = x;
+	if (scoreHalfMoves % 2) {
+		scores[scoreHalfMoves] = lastScore;
+	    scoreHalfMoves++;
+	}
+
+	// Most analysis scores are roughly in centipawns where 1.0 = Pawn, 3.0 = Minor piece
+	// But analysis includes much more than material differences and scores can very
+	// greatly for example when an enigne starts see most paths leading to decisive
+	// winning positions it isn't uncommond for an analysis score to swing into the hundreds
+	// This adds a challenge when graphing to allow the details to be seen in lower
+	// scales while allowing details to also be seen in higher scales.
+	//
+	// New multi teir y scaling
+	// 0 - 3 Natural Y scale
+	// 3 - 10 Compressed Y scale covering 3 - 20
+	// 10 - 15 Compressed Y scale covering 20 - 50
+	// New cap on Y scall of 50
+	// Compress secondary and tertiary Y scales and cap Y scale
+	for (int i=0; i<scoreHalfMoves; i++) {
+	    double y = scores[i];
+	    double ynew = fabs(y);  // absolute
+	    double sign = (y > 0) ? 1 : ((y < 0) ? -1 : 0);
+	    if (ynew>3 && ynew<=20) {
+	       double oldrange = 20-3;
+	       double newrange = 10-3;
+	       ynew = ((ynew-3) * newrange / oldrange) + 3;
+	    } else {
+	      if (ynew>20 && ynew<=50) {
+		 double oldrange = 50-20;
+		 double newrange = 15-10;
+		 ynew = ((ynew-20) * newrange / oldrange) + 10;
+	      }
+	    }
+	    if (ynew > 50) ynew = 15;
+	    ynew = ynew * sign;
+	    maxScore = (ynew > maxScore) ? ynew : maxScore;
+	    minScore = (ynew < minScore) ? ynew : minScore;
+	    scores[i] = ynew;
+	}
+
+        // Getting maxX from the number of half moves is a little awkward
+        // int maxX = ((NumHalfMoves / 10) + 1) * 5;
+        int xTick = 5;
+        int lastX = (scoreHalfMoves / 2) + 1; // Number of Moves to Cover
+        int maxX = ((lastX + xTick - 1) / xTick) * xTick;
+        bool finalTick = false;
+        /*
+        if (maxX - lastX > 2) {
+           finalTick = true;
+        }
+        */
+
+        int maxY = 5;
+        int minY = -5;
+        int minX = 1;
+
+        double yscale=0.014;
+
+        if (maxScore > 10) {
+           maxY = 15;
+           yscale+=0.008;
+        } else {
+           if (maxScore > 3) {
+              maxY = 10;
+              yscale+=0.004;
+           }
+        }
+
+        if (minScore < -10) {
+           minY = -15;
+           yscale+=0.008;
+        } else {
+           if (minScore < -3) {
+              minY = -10;
+              yscale+=0.004;
+           }
+        }
+
+        // Is the graph more landscape or portrait?
+        // float latexUnitSize = maxX > (maxY - minY) ? maxX : (maxY - minY);
+        float latexUnitSize = maxX > lastX ? lastX : maxX;
+        // latexUnitSize is how many divisions of the text width, not an absolute measurement
+        latexUnitSize = 1.0/latexUnitSize;
+
+        if (scoresFound) {
+                sprintf(temp, "\\begin{minipage}{\\textwidth}\n");
+                tb->PrintString(temp);
+                tb->PrintString("Analysis Scoregraph:\n{\n\\center\n");
+                sprintf(temp, "\\psset{linewidth=0.7pt, yunit=%0.4f\\paperheight, xunit=%0.4f\\textwidth}\n", yscale, latexUnitSize );
+                tb->PrintString(temp);
+                sprintf(temp, "\\pspicture[](%d,%d)(%d,%d)\n", minX-1, minY, ((lastX > maxX) ? lastX : maxX), maxY);
+                tb->PrintString(temp);
+                sprintf(temp, "\\psframe*[fillstyle=solid,fillcolor=EvenGameColor,linecolor=EvenGameColor](1,-3)(%d,3)\n", lastX);
+                tb->PrintString(temp);
+                sprintf(temp, "\\psgrid[gridwidth=0pt,gridcolor=GridColor,griddots=1,subgriddiv=1,subgridwidth=10,gridlabels=0pt](1,0)(1,%d)(%d,-4)\n", minY, lastX);
+                tb->PrintString(temp);
+                sprintf(temp, "\\psgrid[gridwidth=0pt,gridcolor=GridColor,griddots=1,subgriddiv=1,subgridwidth=10,gridlabels=0pt](1,0)(1,4)(%d,%d)\n", lastX, maxY);
+                tb->PrintString(temp);
+                sprintf(temp, "\\psaxes[linewidth=1pt,linecolor=GridColor,tickstyle=bottom,Dy=5,labels=x,Dx=5,Ox=0](1,0)(1,%d)(%d,%d)\n", minY, lastX, maxY);
+                tb->PrintString(temp);
+                sprintf(temp, "\\rput(0,0){0}\\rput(0,-5){-5}\\rput(0,5){5}");
+                tb->PrintString(temp);
+                if (maxY > 5) {
+                    sprintf(temp, "\\rput(0,10){20}");
+                    tb->PrintString(temp);
+                }
+                if (maxY > 10) {
+                    sprintf(temp, "\\rput(0,15){50}");
+                    tb->PrintString(temp);
+                }
+                if (minY < -5) {
+                    sprintf(temp, "\\rput(0,-10){-20}");
+                    tb->PrintString(temp);
+                }
+                if (maxY < -10) {
+                    sprintf(temp, "\\rput(0,-15){-50}");
+                    tb->PrintString(temp);
+                }
+                if (finalTick) {
+                    sprintf(temp, "\\rput(%d,-1.30){%d}\\psline(%d,0)(%d,-0.5)",lastX,lastX,lastX,lastX);
+                    tb->PrintString(temp);
+                }
+                for (int x = 1; x < NumHalfMoves; x++) {
+                        if (events[x] != ' ') {
+                                if (events[x] == 'B') {
+                                        sprintf(temp, "\n\\pscircle[linecolor=red](%d,%.2f){%0.2f}\n", x/2+1, scores[x], (scores[x] - scores[x - 1]) / 3);
+                                        tb->PrintString(temp);
+                                }
+                        }
+                }
+
+                sprintf(temp, "\n\\psline[linewidth=1.5pt,linecolor=%s](1,0)", (scores[1] > 0) ? "WhitePiecesGraphColor" : "BlackPiecesGraphColor");
+                tb->PrintString(temp);
+                for (int x = 1; x < scoreHalfMoves; x++) {
+                        if ((scores[x - 1] >= 0) && (scores[x] < 0)) {
+                                tb->PrintString("\n\\psline[linewidth=1.5pt,linewidth=1pt,linecolor=BlackPiecesGraphColor]");
+                                sprintf(temp, "(%.1f,%.2f)", ((float)x - 1)/2+1, scores[x - 1]);
+                                tb->PrintString(temp);
+                        }
+                        if ((scores[x - 1] < 0) && (scores[x] >= 0)) {
+                                tb->PrintString("\n\\psline[linewidth=1.5pt,linewidth=1pt,linecolor=WhitePiecesGraphColor]");
+                                sprintf(temp, "(%.1f,%.2f)", ((float)x - 1)/2+1, scores[x - 1]);
+                                tb->PrintString(temp);
+                        }
+                        sprintf(temp, "(%.1f,%.2f)", (float)x/2+1, scores[x]);
+                        tb->PrintString(temp);
+                }
+
+                tb->PrintString("\n\\endpspicture\n\\\\[1ex]}\n");
+                sprintf(temp, "\\end{minipage}\n");
+                tb->PrintString(temp);
+        }
+        tb->PrintString("\\hrulefill\n\\\\\n");
+        tb->PrintString("\\end{@twocolumnfalse}\n]\n");
+
+        return OK;
+}
+
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//      Write a game in PGN to a textbuffer for LaTeX output.  If stopLocation is
+//      non-zero, it indicates a byte count at which the output should
+//      stop, leaving the game at that position. If it is zero, the
+//      entire game is printed and the game position prior to the
+//      WritePGN() call is restored.  So a nonzero stopLocation is used
+//      to move to a position in the game.
+//
+//      There's been an extensive rewrite of the code for writing PGN
+//      to LaTeX in order to capitalise on the features offered by the
+//      xskak package; mostly this involves letting LaTeX do what LaTeX
+//      does best (formatting) and just worrying about dumping the
+//      right content into the right tags in the output file. If the
+//      user wants fancier formatting, LaTeX is pretty much the gold
+//      standard for that - so why reinvent the wheel?
+//
+errorT
+Game::WritePGNtoLaTeX(TextBuffer * tb, uint stopLocation)
+{
+        char temp [255];
+        char dateStr [20];
+//      const char * newline = "\\\\\n";
+        const char * preCommentStr = "";
+        const char * postCommentStr = "\\\\[1ex]\n";
+        const char * preVariationStr = "\\textcolor{VariationColor}{\\variation{";
+        const char * postVariationStr = "}}\n\\\\[1ex]\n";
+        const char * diagramStr = "\\begin{center}\n\\vspace{1ex}\n\\chessboard\n\\vspace{1ex}\n\\end{center}\n";
+        const char * diagramStrStart = "\\begin{center}\n\\vspace{1ex}\n\\chessboard[";
+        const char * diagramStrStop = "]\\vspace{1ex}\n\\end{center}\n";
+
+        bool printDiagrams = true;
+        bool diagramPrinted = false;
+        bool inMainline = false;
+
+        tb->NewlinesToSpaces(false);
+
+        tb->AddTranslation('#', "\\#");
+        tb->AddTranslation('%', "\\%");
+        tb->AddTranslation('<', "$<$");
+        tb->AddTranslation('>', "$>$");
+        tb->AddTranslation('_', "\\_");
+        tb->AddTranslation('&', "\\&");
+        // tb->AddTranslation ('[', "$[$");
+        // tb->AddTranslation (']', "$]$");
+        // tb->AddTranslation ('(', "\\(");
+        // tb->AddTranslation (')', "\\)");
+
+        date_DecodeToString(Date, dateStr);
+        tb->PrintString("\\twocolumn[\n\\begin{@twocolumnfalse}\n");
+        tb->PrintLine("{\n\\center\n\\begin{tabularx}{0.9\\textwidth}{rllXr}\n");
+        tb->PrintString("White:");
+        tb->PauseTranslations();
+        tb->PrintString(" & ");
+        tb->ResumeTranslations();
+        tb->PrintString(WhiteStr);
+        tb->PauseTranslations();
+        tb->PrintString(" & ");
+        tb->ResumeTranslations();
+        if (WhiteElo > 0) {
+                sprintf(temp, "(%u)", WhiteElo);
+                tb->PrintString(temp);
+        }
+        tb->PauseTranslations();
+        tb->PrintString(" & & ");
+        tb->ResumeTranslations();
+        tb->PrintString(EventStr);
+        if (!strEqual(RoundStr, "") && !strEqual(RoundStr, "?")) {
+                tb->PrintString(" (");
+                tb->PrintString(RoundStr);
+                tb->PrintString(")");
+        }
+        tb->PrintString("\\\\\n");
+        tb->PrintString("Black:");
+        tb->PauseTranslations();
+        tb->PrintString(" & ");
+        tb->ResumeTranslations();
+        tb->PrintString(BlackStr);
+        tb->PauseTranslations();
+        tb->PrintString(" & ");
+        tb->ResumeTranslations();
+        if (BlackElo > 0) {
+                sprintf(temp, "(%u)", BlackElo);
+                tb->PrintString(temp);
+        }
+        tb->PauseTranslations();
+        tb->PrintString(" & & ");
+        tb->ResumeTranslations();
+        if (!strEqual(SiteStr, "") && !strEqual(SiteStr, "?")) {
+                tb->PrintString(SiteStr);
+        }
+        tb->PrintString("\\\\\n");
+        if (EcoCode != 0) {
+                tb->PrintString("Opening ECO:");
+                tb->PauseTranslations();
+                tb->PrintString(" & ");
+                tb->ResumeTranslations();
+                ecoStringT ecoStr;
+                eco_ToExtendedString(EcoCode, ecoStr);
+                tb->PrintString(ecoStr);
+                tb->PauseTranslations();
+                tb->PrintString(" & & & ");
+                tb->ResumeTranslations();
+        } else {
+                tb->PauseTranslations();
+                tb->PrintString(" & & & & ");
+                tb->ResumeTranslations();
+        }
+        // Remove ".??" or ".??.??" from end of dateStr, then print it:
+        if (dateStr[4] == '.' && dateStr[5] == '?') {
+                dateStr[4] = 0;
+        }
+        if (dateStr[7] == '.' && dateStr[8] == '?') {
+                dateStr[7] = 0;
+        }
+        tb->PrintString(dateStr);
+        tb->PrintString("\\\\\n");
+        tb->PrintString("Result:");
+        tb->PauseTranslations();
+        tb->PrintString(" & ");
+        tb->ResumeTranslations();
+        tb->PrintString(RESULT_LONGSTR[Result]);
+        tb->PrintString("\\\\\n");
+        tb->PrintString("\\end{tabularx}\n\\\\[1ex]");
+        tb->PrintLine("}\n\\newchessgame\n");
+
+        // Note the current position and
+        // move, so we can reconstruct the game state afterwards:
+        moveT * oldCurrentMove = CurrentMove;
+        if (stopLocation == 0) {
+                SaveState();
+        }
+
+        WritePGNGraphToLatex(tb);
+
+        MoveToPly(0);
+        moveT * m = CurrentMove;
+        moveT * v = NULL;
+
+        // Print FEN if non-standard start:
+        if (NonStandardStart) {
+                char fenStr [256];
+                StartPos->PrintFEN(fenStr, FEN_ALL_FIELDS);
+                tb->PrintString(preCommentStr);
+
+                // Hmm - How do we place this on a single line 
+                uint wrapColumn = tb->GetWrapColumn();
+                tb->SetWrapColumn (99999);
+                tb->PrintString("Fen: ");
+                tb->PrintString(fenStr);
+                tb->PrintString(postCommentStr);
+                tb->SetWrapColumn (wrapColumn);
+
+                sprintf(temp, "moveid=%d%c,setfen=%s",StartPos->GetFullMoveCount(),(StartPos->GetToMove() == WHITE ? 'w' : 'b'),fenStr);
+
+                tb->PrintString("\\newchessgame[");
+                tb->PrintString(temp);
+                tb->PrintString("]\n");
+                tb->PrintString(diagramStr);
+        }
+
+        PgnLastMovePos = PgnNextMovePos = 1;        
+
+        while (m->marker != END_MARKER) {
+                diagramPrinted = false;
+
+                if (m->san[0] == 0) {
+                        CurrentPos->MakeSANString(&(m->moveData), m->san, SAN_MATETEST);
+                }
+
+                // Print the move number and following dots if necessary:
+                if (!inMainline) {
+                        tb->PrintString("\\mainline{");
+                        tb->PrintInt(CurrentPos->GetFullMoveCount(), (CurrentPos->GetToMove() == WHITE ? ". " : "... "));
+                        inMainline = true;
+                } else {
+                        if (CurrentPos->GetToMove() == WHITE) 
+                                tb->PrintInt(CurrentPos->GetFullMoveCount(), "." );
+                }
+
+                strcpy(temp, m->san);
+                transPieces(temp);
+                tb->PrintWord(temp);
+
+                for (uint i = 0; i < (uint)m->nagCount; i++) {
+                        if (printDiagrams && m->nags[i] == NAG_Diagram) {
+                            if (strncmp(m->san, "O-O", 3) == 0) {
+                                printf ("Latex chessboard can't display castling. No diagram.\n");
+                                // The problem is the movefrom and moveto fields, which now both hold two squares
+                            } else {
+				if (inMainline) {
+				    tb->PrintString("}\n");
+				}
+                                inMainline = false;
+                                if (!diagramPrinted) {
+                                        diagramPrinted = true;
+                                        tb->PrintString(diagramStrStart);
+                                        tb->PrintString("lastmoveid,pgfstyle=border,color=gray,");
+                                        tb->PrintString("markfields={\\xskakget{moveto},\\xskakget{movefrom}},");
+                                        tb->PrintString("pgfstyle=straightmove,markmove=\\xskakget{movefrom}-\\xskakget{moveto}");
+                                        tb->PrintString(diagramStrStop);
+                                }
+                                //square_Print(m->moveData.from, from);
+                                //square_Print(m->moveData.to, to);
+                                //if (CurrentPos->GetToMove() == WHITE) {
+                                //        tb->PrintString("\\psset{linecolor=WhitePiecesGraphColor}\n");
+                                //} else {
+                                //        tb->PrintString("\\psset{linecolor=BlackPiecesGraphColor}\n");
+                                //}
+                                //sprintf(temp, "\\highlight{%s,%s}\n", from, to);
+                                //tb->PrintString(temp);
+                                //sprintf(temp, "\\printarrow{%s}{%s}\n", from, to);
+                                //tb->PrintString(temp);
+                                //tb->PrintString("\\psset{linecolor=black}\n");
+                            }
+                        } else {
+                                game_printNag(m->nags[i], temp, true, PGN_FORMAT_Latex);
+                                tb->PrintWord(temp);
+                        }
+                }
+
+                if (m->comment != NULL && ! CommentEmpty(m->comment) ) {
+                        if (inMainline) 
+                                tb->PrintString("}\n");
+                        inMainline = false;
+
+                        if (PgnStyle & PGN_STYLE_INDENT_COMMENTS)
+                                tb->PrintString("\n");
+
+                        WriteComment (tb , preCommentStr, m->comment, postCommentStr);
+
+                } else if (CurrentPos->GetToMove() == WHITE) {
+                        tb->PrintString(" ");
+                } else {
+                        tb->PrintString("  ");
+                }
+
+
+                // Rewrite Richards var processing
+                // One level only - S.A.
+
+                if (m->numVariations > 0) {
+
+                    if (inMainline) {
+                        tb->PrintString("}\n");
+                        inMainline = false;
+                    }
+                    if (strncmp(m->san, "O-O", 3) == 0) {
+                      printf ("Latex chessboard cant't display castling. No diagram.\n");
+                      // The problem is the movefrom and moveto fields, which now both hold two squares
+                    } else {
+                      tb->PrintString(diagramStrStart);
+                      tb->PrintString("lastmoveid,pgfstyle=border,color=gray,");
+                      tb->PrintString("markfields={\\xskakget{moveto},\\xskakget{movefrom}},");
+                      tb->PrintString("pgfstyle=straightmove,markmove=\\xskakget{movefrom}-\\xskakget{moveto}");
+
+/*
+                    // TODO Adding Variation markers to diagram with xskak
+                    for (uint i=0; i < m->numVariations; i++) {
+                                MoveIntoVariation (i);
+
+                                char from[] = "    ";
+                                char to[] = "    ";
+                                square_Print(CurrentMove->moveData.from, from);
+                                square_Print(CurrentMove->moveData.to, to);
+                                tb->PrintString("\\psset{linecolor=VariationColor}\n");
+                                sprintf(temp, "\\highlight{%s,%s}\n", from, to);
+                                tb->PrintString(temp);
+                                sprintf(temp, "\\printarrow{%s}{%s}\n", from, to);
+                                tb->PrintString(temp);
+                                tb->PrintString("\\psset{linecolor=black}\n");
+
+                                MoveExitVariation();
+                    }
+*/
+
+                      tb->PrintString(diagramStrStop);
+                    }
+
+                    for (uint i=0; i < m->numVariations; i++) {
+                                tb->PrintString(preVariationStr);
+                                MoveIntoVariation (i);
+
+                                if (piece_Color(CurrentMove->moveData.movingPiece) == BLACK) {
+                                        tb->PrintInt(CurrentPos->GetFullMoveCount(), "... ");
+                                }
+
+                                while (CurrentMove->marker != END_MARKER) {
+                                        
+                                        int vMoveNo = CurrentPos->GetFullMoveCount();
+                                        v = CurrentMove;
+
+
+                                        if (piece_Color(v->moveData.movingPiece) == WHITE) {
+                                                tb->PrintInt(vMoveNo, ". ");
+                                        }
+
+                                        if (v->san[0] == 0) {
+                                            CurrentPos->MakeSANString (&(v->moveData), v->san, SAN_MATETEST);
+                                        }
+                                        strcpy(temp, v->san);
+                                        transPieces(temp);
+                                        tb->PrintWord(temp);
+
+                                        for (uint i = 0; i < (uint)v->nagCount; i++) {
+                                            game_printNag(v->nags[i], temp, true, PGN_FORMAT_Latex);
+                                            tb->PrintString(temp);
+                                        }
+                                        /*  in-var comments aren't decoded / working
+                                            if (v->comment != NULL && ! CommentEmpty(v->comment) ) {
+                                                if (PgnStyle & PGN_STYLE_INDENT_COMMENTS)
+                                                        tb->PrintString("\n");
+
+                                                WriteComment (tb , preCommentStr, v->comment, postCommentStr);
+                                            }
+                                        */
+
+                                        if (piece_Color(v->moveData.movingPiece) == WHITE) {
+                                                tb->PrintString(" ");
+                                        } else {
+                                                tb->PrintString("  ");
+                                        }
+                                        MoveForward();
+                                }
+                                tb->PrintString(postVariationStr);
+                                MoveExitVariation();
+                    }
+            }
+
+            MoveForward();
+            m = CurrentMove;
+        }
+
+        if (inMainline) {
+                tb->PrintString("}\n");
+                inMainline = false;
+        }
+
+        tb->PrintString("\n{\\textbf ");
+        tb->PrintWord(RESULT_LONGSTR [Result]);
+        tb->PrintString("}\n \\hrule ");
+        tb->NewLine();
+
+        // Reset the current position and move:
+        CurrentMove = oldCurrentMove;
+        if (stopLocation == 0) {
+                RestoreState();
+        }
+        return OK;
+}
+
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Game::WriteToPGN():
 //      Just calls Game::WritePGN() with a zero stopLocation (to print
 //      the entire game).
 //
-std::pair<const char*, unsigned>
-Game::WriteToPGN(uint lineWidth, bool NewLineAtEnd, bool newLineToSpaces)
+errorT
+Game::WriteToPGN (TextBuffer * tb)
 {
-    static TextBuffer tbuf;
-
-    tbuf.Empty();
-    tbuf.SetWrapColumn(lineWidth ? lineWidth : tbuf.GetBufferSize());
-    tbuf.NewlinesToSpaces(newLineToSpaces);
-    WritePGN (&tbuf, 0);
-    if (NewLineAtEnd) tbuf.NewLine();
-    return std::make_pair(tbuf.GetBuffer(), tbuf.GetByteCount());
+    return WritePGN (tb, 0);
 }
 
 errorT
-Game::MoveToLocationInPGN (uint stopLocation)
+Game::MoveToLocationInPGN (TextBuffer * tb, uint stopLocation)
 {
-    static TextBuffer tbuf;
-
-    tbuf.Empty();
-    tbuf.SetWrapColumn(tbuf.GetBufferSize());
-    return WritePGN (&tbuf, stopLocation);
+    return WritePGN (tb, stopLocation);
 }
 
 
@@ -2942,7 +3563,7 @@ Game::CopyStandardTags (Game * fromGame)
 //      player/site/event/round names.
 //
 errorT
-Game::LoadStandardTags (const IndexEntry* ie, const NameBase* nb)
+Game::LoadStandardTags (IndexEntry * ie, NameBase * nb)
 {
     ASSERT (ie != NULL  &&  nb != NULL);
     SetEventStr (ie->GetEventName (nb));
@@ -2972,6 +3593,48 @@ Game::GetAverageElo ()
     if (white == 0) { white = WhiteEstimateElo; }
     if (black == 0) { black = BlackEstimateElo; }
     return (white + black) / 2;
+}
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// setString(): used to set an event/site/white/black/round string.
+//
+static inline void
+setString (char ** toPtr, const char * from)
+{
+    if (*toPtr) { delete[] *toPtr; }
+    *toPtr = strDuplicate (from);
+}
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Game::SetEventStr(), SetSiteStr(), etc:
+//
+void Game::SetEventStr (const char * str)  { setString ( &EventStr, str); }
+void Game::SetSiteStr  (const char * str)  { setString ( &SiteStr, str); }
+void Game::SetWhiteStr (const char * str)  { setString ( &WhiteStr, str); }
+void Game::SetBlackStr (const char * str)  { setString ( &BlackStr, str); }
+void Game::SetRoundStr (const char * str)  { setString ( &RoundStr, str); }
+
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Game::ClearStandardTags():
+//      Clears all of the standard tags.
+//
+void
+Game::ClearStandardTags ()
+{
+    if (WhiteStr) { delete[] WhiteStr; } WhiteStr = strDuplicate ("?");
+    if (BlackStr) { delete[] BlackStr; } BlackStr = strDuplicate ("?");
+    if (EventStr) { delete[] EventStr; } EventStr = strDuplicate ("?");
+    if (SiteStr)  { delete[] SiteStr;  } SiteStr  = strDuplicate ("?");
+    if (RoundStr) { delete[] RoundStr; } RoundStr = strDuplicate ("?");
+    Date = ZERO_DATE;
+    EventDate = ZERO_DATE;
+    EcoCode = 0;
+    Result = RESULT_None;
+    WhiteElo = BlackElo = 0;
+    WhiteEstimateElo = BlackEstimateElo = 0;
+    WhiteRatingType = BlackRatingType = RATING_Elo;
+    ScidFlags[0] = 0;
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3358,6 +4021,7 @@ decodeMove (ByteBuffer * buf, simpleMoveT * sm, byte val, Position * pos)
 
     pieceT * board = pos->GetBoard();
     sm->movingPiece = board[sm->from];
+
     sm->capturedPiece = EMPTY;
     sm->promote = EMPTY;
 
@@ -3393,8 +4057,8 @@ decodeMove (ByteBuffer * buf, simpleMoveT * sm, byte val, Position * pos)
 // Game::EncodeMove():
 //  Encode one move and output it to the bytebuffer.
 //
-void
-Game::encodeMove (ByteBuffer * buf, moveT * m)
+static void
+encodeMove (ByteBuffer * buf, moveT * m)
 {
     simpleMoveT * sm = &(m->moveData);
     pieceT pt = piece_Type(sm->movingPiece);
@@ -3417,14 +4081,14 @@ Game::encodeMove (ByteBuffer * buf, moveT * m)
 // encodeVariation(): Used by Encode() to encode the game's moves.
 //      Recursive; calls itself to encode subvariations.
 //
-errorT
-Game::encodeVariation (ByteBuffer * buf, moveT * m, uint * subVarCount,
-                       uint * nagCount, uint depth)
+static errorT
+encodeVariation (ByteBuffer * buf, moveT * m, uint * subVarCount,
+                 uint * nagCount, uint depth)
 {
     ASSERT (m != NULL);
 
     // Check if there is a pre-game or start-of-variation comment:
-    if (! m->prev->comment.empty()) {
+    if (m->prev->comment != NULL) {
         buf->PutByte (ENCODE_COMMENT);
     }
 
@@ -3435,7 +4099,7 @@ Game::encodeVariation (ByteBuffer * buf, moveT * m, uint * subVarCount,
             buf->PutByte (m->nags[i]);
             *nagCount += 1;
         }
-        if (! m->comment.empty()) {
+        if (m->comment != NULL) {
             buf->PutByte (ENCODE_COMMENT);
         }
         if (m->numVariations > 0) {
@@ -3457,6 +4121,14 @@ Game::encodeVariation (ByteBuffer * buf, moveT * m, uint * subVarCount,
     }
     return buf->Status();
 }
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// defaultComment is what a move's comment is set to when a comment
+// is detected. It is changed to the actual comment later when the
+// comments are decoded.
+
+char* defaultComment = (char *)"";
+
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Game::DecodeVariation():
@@ -3488,7 +4160,7 @@ Game::DecodeVariation (ByteBuffer * buf, byte flags, uint level)
         case ENCODE_COMMENT:
             if (flags & GAME_DECODE_COMMENTS) {
                 // Mark this comment as needing to be read
-                CurrentMove->prev->comment = "*";
+                CurrentMove->prev->comment = defaultComment;
             }
             break;
 
@@ -3647,14 +4319,14 @@ skipTags (ByteBuffer * buf)
 //      Encode the comments of the game. Recurses the moves of the game
 //      and writes the comment whenever a move with a comment is found.
 //
-errorT
-Game::encodeComments (ByteBuffer * buf, moveT * m, uint * commentCounter)
+static errorT
+encodeComments (ByteBuffer * buf, moveT * m, uint * commentCounter)
 {
     ASSERT(buf != NULL  &&  m != NULL);
 
     while (m->marker != END_MARKER) {
-        if (! m->comment.empty()) {
-            buf->PutTerminatedString (m->comment.c_str());
+        if (m->comment != 0) {
+            buf->PutTerminatedString (m->comment);
             *commentCounter += 1;
         }
         if (m->numVariations) {
@@ -3673,26 +4345,26 @@ Game::encodeComments (ByteBuffer * buf, moveT * m, uint * commentCounter)
 // decodeComments():
 //      Decodes the comments of the game. When decoding the moves, the
 //      comment field of each move that has a comment is marked (made
-//      not empty), so this function recurses the movelist and subvariations
+//      non-NULL), so this function recurses the movelist and subvariations
 //      and allocates each comment to its move.
 //
-errorT
-Game::decodeComments (ByteBuffer * buf, moveT * m)
+static errorT
+decodeComments (StrAllocator * strAlloc, ByteBuffer * buf, moveT * m)
 {
     ASSERT (buf != NULL  &&  m != NULL);
 
     while (m->marker != END_MARKER) {
-        if (! m->comment.empty()) {
-            ASSERT (m->comment == "*");
+        if (m->comment != 0) {
+            ASSERT (m->comment == defaultComment);
             char * str;
             buf->GetTerminatedString(&str);
-            m->comment = str;
+            m->comment = strAlloc->Duplicate (str);
         }
 
         if (m->numVariations) {
            moveT * subVar = m->varChild;
             for (uint i=0; i < m->numVariations; i++) {
-                decodeComments (buf, subVar);
+                decodeComments (strAlloc, buf, subVar);
                 subVar = subVar->varChild;
             }
         }
@@ -3737,6 +4409,7 @@ Game::Encode (ByteBuffer * buf, IndexEntry * ie)
         buf->PutTerminatedString (tempStr);
     }
 
+
     // Now the movelist:
     uint varCount = 0;
     uint nagCount = 0;
@@ -3745,7 +4418,7 @@ Game::Encode (ByteBuffer * buf, IndexEntry * ie)
 
     // Now do the comments
     uint commentCount = 0;
-    
+
     err = encodeComments (buf, FirstMove, &commentCount);
 
     // Set the fields in the IndexEntry:
@@ -3759,12 +4432,11 @@ Game::Encode (ByteBuffer * buf, IndexEntry * ie)
         ie->SetWhiteRatingType (WhiteRatingType);
         ie->SetBlackRatingType (BlackRatingType);
 
-        ie->SetFlag(IDX_MASK_ALLFLAGS, false);
         ie->SetStartFlag (NonStandardStart);
         ie->SetCommentCount (commentCount);
         ie->SetVariationCount (varCount);
         ie->SetNagCount (nagCount);
-        ie->SetFlag(IndexEntry::StrToFlagMask(ScidFlags), true);
+        ie->SetFlagStr (ScidFlags);
 
         // Make the home pawn change list:
         MakeHomePawnList (ie->GetHomePawnData());
@@ -3776,22 +4448,25 @@ Game::Encode (ByteBuffer * buf, IndexEntry * ie)
         ie->SetNumHalfMoves (NumHalfMoves);
 
         // Find the longest matching stored line for this game:
-        uint storedLineCode = 0;
+        ushort storedLineCode = 0;
         if (!NonStandardStart) {
             uint longestMatch = 0;
-            for (uint i = 1; i < StoredLine::count(); i++) {
-                moveT* gameMove = FirstMove->next;
+            uint storedLineCount = StoredLine::Count();
+            for (ushort i = 1; i <= storedLineCount; i++) {
+                Game * g = StoredLine::GetGame (i);
+                moveT * gameMove = FirstMove->next;
+                moveT * lineMove = g->FirstMove->next;
                 uint matchLength = 0;
-                FullMove m = StoredLine::getMove(i, matchLength);
-                while (!m.isNull()) {
+                while (lineMove->marker != END_MARKER) {
                     if (gameMove->marker == END_MARKER
-                        ||  gameMove->moveData.from != m.getFrom()
-                        ||  gameMove->moveData.to != m.getTo())
+                        ||  gameMove->moveData.from != lineMove->moveData.from
+                        ||  gameMove->moveData.to != lineMove->moveData.to)
                     {
                         matchLength = 0; break;
                     }
                     gameMove = gameMove->next;
-                    m = StoredLine::getMove(i, ++matchLength);
+                    lineMove = lineMove->next;
+                    matchLength++;
                 }
                 if (matchLength > longestMatch) {
                     longestMatch = matchLength;
@@ -3799,10 +4474,9 @@ Game::Encode (ByteBuffer * buf, IndexEntry * ie)
                 }
             }
         }
-        ASSERT(storedLineCode == static_cast<byte>(storedLineCode));
-        ie->SetStoredLineCode(static_cast<byte>(storedLineCode));
+        ie->SetStoredLineCode (storedLineCode);
     }
-    
+
     // as each game entry length is coded on 17 bits, and game must fit in a block
     // return an error if there is an overflow
     if (buf->GetByteCount() > MAX_GAME_LENGTH || buf->GetByteCount() > GF_BLOCKSIZE) {
@@ -3903,7 +4577,7 @@ Game::DecodeStart (ByteBuffer * buf)
 
     // First the tags: just skip them for speed.
     //--// removed due to Gerds Hints
-    //--// NumTags = 0;
+         //--// NumTags = 0;
     err = skipTags (buf);
     if (err != OK) { return err; }
 
@@ -3984,65 +4658,11 @@ Game::Decode (ByteBuffer * buf, byte flags)
 
     // Last of all, decode the comments:
     if (flags & GAME_DECODE_COMMENTS) {
-        err = decodeComments (buf, FirstMove);
+        err = decodeComments (StrAlloc, buf, FirstMove);
         if (err != OK) { return err; }
     }
 
     return buf->Status();
-}
-
-bool Game::calcAbsPlyNumber_(moveT *m, moveT *s) {
-    while (m != 0) {
-        PgnLastMovePos++;
-        if (m == s) return true;
-        if (PgnStyle & PGN_STYLE_VARS) {
-            moveT* v = m;
-            for (uint i=0; i < m->numVariations; i++) {
-                v = v->varChild;
-                if (calcAbsPlyNumber_(v->next, s)) {
-                    PgnLastMovePos++;
-                    return true;
-                }
-            }
-        }
-        if (m->marker == END_MARKER) break;
-        m = m->next;
-    }
-    return false;
-}
-
-std::vector<int> Game::GetCurrentLocation() {
-    std::vector <int> res;
-    uint n = 0;
-    for (moveT* i = CurrentMove->prev; i != 0; i = i->prev) {
-        if (i->varParent != 0) {
-            if (n != 0) {
-                res.push_back(n);
-                int varNum = 1;
-                for (moveT* j = i;  j->varChild != 0; j = j->varChild) varNum++;
-                res.push_back(i->varParent->numVariations - varNum);
-                n = 0;
-            }
-            i = i->varParent;
-            continue;
-        }
-        if (i->marker == NO_MARKER) n++;
-    }
-    res.push_back(n);
-    return res;
-}
-
-Game* Game::clone() {
-    ByteBuffer bbuf(BBUF_SIZE);
-    Game* g = new Game();
-    SaveState();
-    Encode (&bbuf, NULL);
-    RestoreState();
-    bbuf.BackToStart();
-    g->Decode (&bbuf, GAME_DECODE_ALL);
-    g->CopyStandardTags (this);
-    g->MoveTo(GetCurrentLocation());
-    return g;
 }
 
 //////////////////////////////////////////////////////////////////////

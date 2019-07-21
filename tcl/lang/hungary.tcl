@@ -2,6 +2,8 @@
 # Hungarian text for menu names and status bar help messages for SCID
 # Translated by: Gábor Szõts
 
+addLanguage H Hungarian 0 iso8859-2
+
 proc setLanguage_H {} {
 
 # File menu:
@@ -10,6 +12,11 @@ menuText H FileNew "Új..." 0 {Új SCID-adatbázis létrehozása}
 menuText H FileOpen "Megnyit..." 3 {Meglévõ SCID-adatbázis megnyitása}
 menuText H FileClose "Bezár" 2 {Az aktív SCID-adatbázis bezárása}
 menuText H FileFinder "Fájlkeresõ" 0 {Kinyitja a Fájlkeresõ ablakot.}
+menuText H FileSavePgn "Save Pgn..." 0 {}
+# ====== TODO To be translated ======
+menuText H FileOpenBaseAsTree "Open Base as Tree" 13   {Open a base and use it in Tree window}
+# ====== TODO To be translated ======
+menuText H FileOpenRecentBaseAsTree "Open Recent as Tree" 0   {Open a recent base and use it in Tree window}
 menuText H FileBookmarks "Könyvjelzõk" 0 {Könyvjelzõmenü (gyorsbillentyû: Ctrl+B)}
 menuText H FileBookmarksAdd "Új könyvjelzõ" 0 \
   {Megjelöli az aktuális játszmát és állást.}
@@ -21,52 +28,27 @@ menuText H FileBookmarksList "Megjelenítés listaként" 13 \
   {A könyvjelzõk könyvtárai nem almenüként, hanem listaként jelennek meg.}
 menuText H FileBookmarksSub "Megjelenítés almenüként" 13 \
   {A könyvjelzõk könyvtárai nem listaként, hanem almenüként jelennek meg.}
-menuText H FileMaint "Gondozás" 0 {SCID adatbázisgondozó eszközök}
-menuText H FileMaintWin "Adatbázisgondozó ablak" 0 \
-  {Kinyitja/becsukja az SCID adatbázisgondozó ablakot.}
-menuText H FileMaintCompact "Adatbázis tömörítése..." 10 \
-  {Eltávolítja az adatbázisból a törölt játszmákat és a használaton kívül álló neveket.}
-menuText H FileMaintClass "Osztályba sorolás..." 0 \
-  {Újra kiszámítja az összes játszma ECO-kódját.}
-menuText H FileMaintSort "Rendezés..." 0 \
-  {Rendezi az adatbázis összes játszmáját.}
-menuText H FileMaintDelete "Ikerjátszmák törlése..." 0 \
-  {Megkeresi az ikerjátszmákat, és megjelöli õket törlésre.}
-menuText H FileMaintTwin "Ikerkeresõ ablak" 4 \
-  {Kinyitja/becsukja az ikerkeresõ ablakot.}
-menuText H FileMaintName "Nevek helyesírása" 0 {Névszerkesztõ és helyesírási eszközök}
-menuText H FileMaintNameEditor "Névszerkesztõ" 0 \
-  {Kinyitja/becsukja a névszerkesztõ ablakot.}
-menuText H FileMaintNamePlayer "Játékosnevek ellenõrzése..." 0 \
-  {A helyesírás-ellenõrzõ fájl segítségével ellenõrzi a játékosok nevét.}
-menuText H FileMaintNameEvent "Eseménynevek ellenõrzése..." 0 \
-  {A helyesírás-ellenõrzõ fájl segítségével ellenõrzi események nevét.}
-menuText H FileMaintNameSite "Helynevek ellenõrzése..." 0 \
-  {A helyesírás-ellenõrzõ fájl segítségével ellenõrzi a helyszínek nevét.}
-menuText H FileMaintNameRound "Fordulónevek ellenõrzése..." 0 \
-  {A helyesírás-ellenõrzõ fájl segítségével ellenõrzi a fordulók nevét.}
 menuText H FileReadOnly "Írásvédelem..." 0 \
   {Az aktuális adatbázist csak olvashatóvá teszi, nehogy meg lehessen változtatni.}
 menuText H FileSwitch "Adatbázisváltás" 0 \
   {Átvált egy másik megnyitott adatbázisra.}
 menuText H FileExit "Kilép" 2 {Kilép SCID-bõl.}
-menuText H FileMaintFixBase "Megrongálódott adatbázis javítása" 25 {Megpróbálja megjavítani a megrongálódott adatbázist.}
 
 # Edit menu:
 menuText H Edit "Szerkesztés" 1
 menuText H EditAdd "Új változat" 0 {Ennél a lépésnél új változatot szúr be a játszmába.}
+menuText H EditPasteVar "Beillesztés változása" 0
 menuText H EditDelete "Változat törlése" 9 {Töröl egy változatot ennél a lépésnél.}
 menuText H EditFirst "Elsõ változattá tesz" 0 \
   {Elsõ helyre teszi a változatot a listán.}
 menuText H EditMain "Fõváltozattá tesz" 0 \
   {A változatot fõváltozattá lépteti elõ.}
-menuText H EditTrial "Változat kipróbálása" 0 \
+menuText H EditTrial "Változat kipróbálása" 11 \
   {Elindítja/megállítja a próbaüzemmódot, amellyel egy elgondolást lehet a táblán kipróbálni.}
 menuText H EditStrip "Lecsupaszít" 2 {Eltávolítja a megjegyzéseket vagy a változatokat ebbõl a játszmából.}
 # ====== TODO To be translated ======
 menuText H EditUndo "Undo" 0 {Undo last game change}
-# ====== TODO To be translated ======
-menuText H EditRedo "Redo" 0 {Redo last game change}
+menuText H EditRedo "Redo" 0
 menuText H EditStripComments "Megjegyzések" 0 \
   {Eltávolítja az összes megjegyzést és elemzést ebbõl a játszmából.}
 menuText H EditStripVars "Változatok" 0 {Eltávolítja az összes változatot ebbõl a játszmából.}
@@ -86,6 +68,7 @@ menuText H EditSetup "Kezdõállás felállítása..." 14 \
   {Felállítja a kezdõállást ehhez a játszmához.}
 menuText H EditCopyBoard "Állás másolása FEN-ként" 17 \
   {Az aktuális állást FEN-jelöléssel a vágólapra másolja.}
+menuText H EditCopyPGN "Állás másolása PGN" 0 {}
 menuText H EditPasteBoard "Kezdõállás beillesztése" 13 \
   {Felállítja a kezdõállást kijelölt szöveg (vágólap) alapján.}
 
@@ -106,28 +89,36 @@ menuText H GameReplace "Mentés cserével..." 7 \
   {Elmenti ezt a játszmát; felülírja a régi változatot.}
 menuText H GameAdd "Mentés új játszmaként..." 0 \
   {Elmenti ezt a játszmát; új játszmát hoz létre az adatbázisban.}
+menuText H GameInfo "Set Game Information" 9
+menuText H GameBrowse "Böngésszen játékok" 0
+menuText H GameList "Összes Játék" 0
+# ====== TODO To be translated ======
+menuText H GameDelete "Delete Game" 0
 menuText H GameDeepest "Megnyitás azonosítása" 10 \
   {Az ECO-könyvben szereplõ legnagyobb mélységig megy bele a játszmába.}
 menuText H GameGotoMove "Ugrás megadott sorszámú lépéshez..." 1 \
   {Megadott sorszámú lépéshez ugrik az aktuális játszmában.}
-menuText H GameNovelty "Újítás keresése..." 1 \
+menuText H GameNovelty "Újítás keresése..." 2 \
   {Megkeresi ebben a játszmában az elsõ olyan lépést, amely korábban nem fordult elõ.}
 
 # Search Menu:
 menuText H Search "Keresés" 0
 menuText H SearchReset "Szûrõ törlése" 6 {Alaphelyzetbe hozza a szûrõt, hogy az összes játszma benne legyen.}
 menuText H SearchNegate "Szûrõ negálása" 6 {Negálja a szûrõt, hogy csak a kizárt játszmák legyenek benne.}
+menuText H SearchEnd "Áthelyezés Utolsó Filter" 0
 menuText H SearchCurrent "Aktuális állás..." 0 {A táblán lévõ állást keresi.}
 menuText H SearchHeader "Fejléc..." 0 {Keresés fejléc (játékos, esemény, stb.) alapján}
 menuText H SearchMaterial "Anyag/szerkezet..." 6 {Keresés anyag vagy állásszerkezet alapján}
+menuText H SearchMoves {Lépések} 0 {}
 menuText H SearchUsing "Keresõfájl használata..." 0 {Keresés SearchOptions fájl használatával}
 
 # Windows menu:
 menuText H Windows "Ablakok" 0
+menuText H WindowsGameinfo "A jtszma adatai" 0 {Show/hide the game info panel}
 menuText H WindowsComment "Megjegyzésszerkesztõ" 0 {Megnyitja/bezárja a megjegyzésszerkesztõt.}
 menuText H WindowsGList "Játszmák listája" 9 {Kinyitja/becsukja a játszmák listáját mutató ablakot.}
-menuText H WindowsPGN "PGN" 0 \
-  {Kinyitja/becsukja a PGN-(játszmajegyzés)-ablakot.}
+menuText H WindowsPGN "PGN" 0 {Kinyitja/becsukja a PGN-(játszmajegyzés)-ablakot.}
+menuText H WindowsCross "Versenytáblázat" 0 {Megmutatja az ehhez a játszmához tartozó verseny táblázatát.}
 menuText H WindowsPList "Játékoskeresõ" 0 {Kinyitja/becsukja a játékoskeresõt.}
 menuText H WindowsTmt "Versenykeresõ" 0 {Kinyitja/becsukja a versenykeresõt.}
 menuText H WindowsSwitcher "Adatbázisváltó" 0 \
@@ -140,46 +131,80 @@ menuText H WindowsStats "Statisztika" 0 \
 menuText H WindowsTree "Faszerkezet" 0 {Kinyitja/becsukja a faszerkezet-ablakot.}
 menuText H WindowsTB "Végjátéktáblázatok" 8 \
   {Kinyitja/becsukja a végjátéktáblázatok ablakát.}
-menuText H WindowsBook "Megnyitástárablak" 3 {Kinyitja/becsukja a megnyitástárablakot.}
-menuText H WindowsCorrChess "Levelezési sakk" 14 {Open/close the Correspondence window}
+# ====== TODO To be translated ======
+menuText H WindowsBook "Book Window" 0 {Open/close the Book window}
+# ====== TODO To be translated ======
+menuText H WindowsCorrChess "Correspondence Window" 0 {Open/close the Correspondence window}
 
 # Tools menu:
 menuText H Tools "Eszközök" 0
 menuText H ToolsAnalysis "Elemzõ motor..." 0 \
   {Elindít/leállít egy sakkelemzõ programot.}
-menuText H ToolsAnalysis2 "Második elemzõ motor..." 1 \
-  {Elindítja/leállítja a 2. sakkelemzõ programot.}
-menuText H ToolsCross "Versenytáblázat" 0 {Megmutatja az ehhez a játszmához tartozó verseny táblázatát.}
 menuText H ToolsEmail "Levelezési sakk" 0 \
   {Kinyitja/becsukja az elektronikus sakklevelezés lebonyolítására szolgáló ablakot.}
 menuText H ToolsFilterGraph "Szûrõgrafikon" 0 \
   {Kinyitja/becsukja a szûrõgrafikont mutató ablakot.}
-menuText H ToolsAbsFilterGraph "Abszolút szûrõgrafikon" 0 {Kinyitja/becsukja az abszolút értékeket mutató szûrõgrafikon-ablakot}
+# ====== TODO To be translated ======
+menuText H ToolsAbsFilterGraph "Abs. Filter Graph" 7 {Open/close the filter graph window for absolute values}
 menuText H ToolsOpReport "Megnyitási összefoglaló" 0 \
   {Ismertetõt készít az aktuális álláshoz tartozó megnyitásról.}
-menuText H ToolsOpenBaseAsTree "Adatbázis megnyitása faként" 10   {Faszerkezet-ablakban megnyit egy adatbázist.}
-menuText H ToolsOpenRecentBaseAsTree "Nemrég használt adatbázis megnyitása faként" 7   {Faszerkezet-ablakban megnyit egy nemrég használt adatbázist.}
 menuText H ToolsTracker "Figurakövetõ"  0 {Kinyitja/becsukja a figurakövetõ ablakot.}
-menuText H ToolsTraining "Edzés"  0 {Segédeszközök edzéshez (taktika, megnyitás,...) }
-menuText H ToolsTacticalGame "Taktikai játszma"  0 {Taktikai jellegû játszma kezdése}
-menuText H ToolsSeriousGame "Komoly játszma"  0 {Komoly játszma kezdése}
-menuText H ToolsTrainOpenings "Megnyitás"  0 {Edzés repertoárral}
 # ====== TODO To be translated ======
-menuText H ToolsTrainReviewGame "Review game"  0 {Guess moves played in a game}
-menuText H ToolsTrainTactics "Taktika"  0 {Feladványok megfejtése}
-menuText H ToolsTrainCalvar "Változatszámítás"  0 {Változatszámítás gyakorlása}
-menuText H ToolsTrainFindBestMove "Legjobb lépés"  0 {A legjobb lépés megkeresése}
-menuText H ToolsTrainFics "Internetes játszma"  0 {Játék a freechess.org szerveren}
+menuText H ToolsTraining "Training"  0 {Training tools (tactics, openings,...) }
+menuText H ToolsComp "Tournament" 2 {Chess engine tournament}
 # ====== TODO To be translated ======
-menuText H ToolsEngineTournament "Engine tournament"  0 {Start a tournament between chess engines}
-menuText H ToolsBookTuning "Megnyitástár-hangolás" 13 {Megnyitástár-hangolás}
-menuText H ToolsConnectHardware "Hardver csatlakoztatása" 8 {Külsõ hardver csatlakoztatása}
-menuText H ToolsConnectHardwareConfigure "Beállítás" 0 {Külsõ hardver és kapcsolat beállítása}
-menuText H ToolsConnectHardwareNovagCitrineConnect "Novag Citrine csatlakoztatása" 0 {Novag Citrine csatlakoztatása}
-menuText H ToolsConnectHardwareInputEngineConnect "Bejövõ motor csatlakoztatása" 7 {Bejövõ motor (pl. DGT) csatlakoztatása}
+menuText H ToolsTacticalGame "Tactical game"  0 {Play a game with tactics}
+# ====== TODO To be translated ======
+menuText H ToolsSeriousGame "Serious game"  0 {Play a serious game}
+# ====== TODO To be translated ======
+menuText H ToolsTrainTactics "Tactics"  0 {Solve tactics}
+# ====== TODO To be translated ======
+menuText H ToolsTrainCalvar "Calculation of variations"  0 {Calculation of variations training}
+# ====== TODO To be translated ======
+menuText H ToolsTrainFindBestMove "Find best move"  0 {Find best move}
+# ====== TODO To be translated ======
+menuText H ToolsTrainFics "Internet"  0 {Play on freechess.org}
+# ====== TODO To be translated ======
+menuText H ToolsBookTuning "Book tuning" 0 {Book tuning}
+menuText H ToolsMaint "Gondozás" 0 {SCID adatbázisgondozó eszközök}
+menuText H ToolsMaintWin "Adatbázisgondozó ablak" 0 \
+  {Kinyitja/becsukja az SCID adatbázisgondozó ablakot.}
+menuText H ToolsMaintCompact "Adatbázis tömörítése..." 10 \
+  {Eltávolítja az adatbázisból a törölt játszmákat és a használaton kívül álló neveket.}
+menuText H ToolsMaintClass "Osztályba sorolás..." 0 \
+  {Újra kiszámítja az összes játszma ECO-kódját.}
+menuText H ToolsMaintSort "Rendezés..." 0 \
+  {Rendezi az adatbázis összes játszmáját.}
+menuText H ToolsMaintDelete "Ikerjátszmák törlése..." 0 \
+  {Megkeresi az ikerjátszmákat, és megjelöli õket törlésre.}
+menuText H ToolsMaintTwin "Ikerkeresõ ablak" 4 \
+  {Kinyitja/becsukja az ikerkeresõ ablakot.}
+menuText H ToolsMaintNameEditor "Névszerkesztõ" 0 \
+  {Kinyitja/becsukja a névszerkesztõ ablakot.}
+menuText H ToolsMaintNamePlayer "Játékosnevek ellenõrzése..." 0 \
+  {A helyesírás-ellenõrzõ fájl segítségével ellenõrzi a játékosok nevét.}
+menuText H ToolsMaintNameEvent "Eseménynevek ellenõrzése..." 0 \
+  {A helyesírás-ellenõrzõ fájl segítségével ellenõrzi események nevét.}
+menuText H ToolsMaintNameSite "Helynevek ellenõrzése..." 0 \
+  {A helyesírás-ellenõrzõ fájl segítségével ellenõrzi a helyszínek nevét.}
+menuText H ToolsMaintNameRound "Fordulónevek ellenõrzése..." 0 \
+  {A helyesírás-ellenõrzõ fájl segítségével ellenõrzi a fordulók nevét.}
+# ====== TODO To be translated ======
+menuText H ToolsMaintFixBase "Repair base" 0 {Try to repair a corrupted base}
+# ====== TODO To be translated ======
+menuText H ToolsConnectHardware "Connect Hardware" 0 {Connect external hardware}
+# ====== TODO To be translated ======
+menuText H ToolsConnectHardwareConfigure "Configure..." 0 {Configure external hardware and connection}
+# ====== TODO To be translated ======
+menuText H ToolsConnectHardwareNovagCitrineConnect "Connect Novag Citrine" 0 {Connect Novag Citrine}
+# ====== TODO To be translated ======
+menuText H ToolsConnectHardwareInputEngineConnect "Connect Input Engine" 0 {Connect Input Engine (e.g. DGT)}
+# ====== TODO To be translated ======
+# ====== TODO To be translated ======
+# ====== TODO To be translated ======
 menuText H ToolsPInfo "Játékosinformáció"  0 \
   {Kinyitja/frissíti a játékos adatait tartalmazó ablakot.}
-menuText H ToolsPlayerReport "Összefoglaló játékosról..." 0 \
+menuText H ToolsPlayerReport "Összefoglaló játékosról" 0 \
     {Összefoglalót készít a játékosról}
 menuText H ToolsRating "Értékszám alakulása" 0\
   {Grafikusan ábrázolja, hogyan alakult az aktuális játszma résztvevõinek értékszáma.}
@@ -190,26 +215,36 @@ menuText H ToolsExpCurrentPGN "Exportálás PGN-fájlba..." 11 \
   {PGN-fájlba írja az aktuális játszmát.}
 menuText H ToolsExpCurrentHTML "Exportálás HTML-fájlba..." 11 \
   {HTML-fájlba írja az aktuális játszmát.}
-menuText H ToolsExpCurrentHTMLJS "Játszma exportálása HTML és JavaScript fájlba" 28 {Az aktuális játszmát HTML és JavaScript fájlba írja.}  
+# ====== TODO To be translated ======
+menuText H ToolsExpCurrentHTMLJS "Export Game to HTML and JavaScript File..." 15 {Write current game to a HTML and JavaScript file}  
 menuText H ToolsExpCurrentLaTeX "Exportálás LaTeX-fájlba..." 11 \
   {LaTeX-fájlba írja az aktuális játszmát.}
-menuText H ToolsExpFilter "Az összes szûrt játszma exportálása" 11 \
+# ====== TODO To be translated ======
+menuText H ToolsExpFilter "Az összes szûrt játszma exportálása" 10 \
   {Szövegfájlba írja az összes szûrt játszmát.}
 menuText H ToolsExpFilterPGN "Szûrõ exportálása PGN-fájlba..." 18 \
   {PGN-fájlba írja az összes szûrt játszmát.}
 menuText H ToolsExpFilterHTML "Szûrõ exportálása HTML-fájlba..." 18 \
   {HTML-fájlba írja az összes szûrt játszmát.}
-menuText H ToolsExpFilterHTMLJS "Szûrõ exportálása HTML és JavaScript fájlba" 30 {Az összes kiszûrt játszmát HTML és JavaScript fájlba írja.}  
+# ====== TODO To be translated ======
+menuText H ToolsExpFilterHTMLJS "Export Filter to HTML and JavaScript File..." 17 {Write all filtered games to a HTML and JavaScript file}  
 menuText H ToolsExpFilterLaTeX "Szûrõ exportálása LaTeX-fájlba..." 18 \
   {LaTeX-fájlba írja az összes szûrt játszmát.}
+# ====== TODO To be translated ======
+menuText H ToolsExpFilterEPD "Export Filter to EPD/FEN" 17 {Write all filtered games to an EPD File}
+# ====== TODO To be translated ======
+# ====== TODO To be translated ======
+menuText H ToolsExpFilterGames "Export Gamelist to Text" 19 {Print a formatted Gamelist.}
 menuText H ToolsImportOne "PGN-játszma importálása..." 0 \
   {PGN-formátumú játszma importálása}
 menuText H ToolsImportFile "PGN-fájl importálása..." 2 \
   {PGN-fájl összes játszmájának importálása}
-menuText H ToolsStartEngine1 "Az 1. motor elindítása" 3  {Elindítja az 1. motort.}
-menuText H ToolsStartEngine2 "A 2. motor elindítása" 2  {Elindítja a 2. motort.}
 # ====== TODO To be translated ======
-menuText H ToolsCaptureBoard "Capture Current Board..." 0  {Save the current board as an image.}
+menuText H ToolsStartEngine1 "Start engine 1" 0  {Start engine 1}
+# ====== TODO To be translated ======
+menuText H ToolsStartEngine2 "Start engine 2" 0  {Start engine 2}
+# ====== TODO To be translated ======
+menuText H ToolsScreenshot "Fórum Screenshot" 0
 menuText H Play "Játék" 0
 menuText H CorrespondenceChess "Levelezési sakk" 0 {Segédeszközök eMail vagy Xfcc alapú levelezési sakkhoz}
 menuText H CCConfigure "Beállítások" 0 {Külsõ eszközök és alaptulajdonságok}
@@ -232,24 +267,55 @@ menuText H CCEditCopy "Copy Gamelist to Clipbase" 0 {Copy the games as CSV list 
 # Options menu:
 menuText H Options "Beállítások" 0
 menuText H OptionsBoard "Sakktábla" 0 {Sakktábla megjelenésének megváltoztatása}
-menuText H OptionsBoardSize "Táblaméret" 0 {A tábla méretének megváltoztatása}
-menuText H OptionsBoardPieces "Figurák stílusa" 0 {A figurák megjelenési formájának megváltoztatása}
-menuText H OptionsBoardColors "Színek..." 0 {A tábla színeinek megváltoztatása}
-menuText H OptionsBoardGraphics "Mezõk..." 0 {A mezõk rajzolatának megváltoztatása}
-translate H OptionsBGW {A mezõk rajzolatának kiválasztása}
-translate H OptionsBoardGraphicsText {A világos és sötét mezõk grafikus fájljai:}
-menuText H OptionsBoardNames "Játékosnevek..." 0 {Játékosnevek átszerkesztése}
+menuText H OptionsColour "Background Colour" 0 {Default text widget color}
+# ====== TODO To be translated ======
+menuText H OptionsBackColour "Background" 0 {Default text widget color}
+# ====== TODO To be translated ======
+# ====== TODO To be translated ======
+menuText H OptionsMainLineColour "Mainline Arrows" 0 {Mainline arrows}
+# ====== TODO To be translated ======
+menuText H OptionsVarLineColour "Variation Arrows" 0 {Variation arrows}
+# ====== TODO To be translated ======
+menuText H OptionsEngineLineColour "Engine Arrows" 0 {Engine arrows}
+# ====== TODO To be translated ======
+menuText H OptionsRowColour "Rows" 0 {Default tree/book row color}
+# ====== TODO To be translated ======
+menuText H OptionsSwitcherColour "Switcher" 0 {Default db switcher color}
+# ====== TODO To be translated ======
+menuText H OptionsProgressColour "Progressbar" 0 {Default progressbar color}
+# ====== TODO To be translated ======
+menuText H OptionsScoreColour "Score Graph" 0 {}
+# ====== TODO To be translated ======
+menuText H OptionsScoreBarColour "Score Graph current" 0 {}
+menuText H OptionsNames "Játékosnevek..." 0 {Játékosnevek átszerkesztése}
 menuText H OptionsExport "Exportálás" 1 {Exportálási beállítások változtatása}
 menuText H OptionsFonts "Karakterkészlet" 0 {Karakterkészlet változtatása}
 menuText H OptionsFontsRegular "Szokásos" 0 {A szokásos karakterkészlet változtatása}
 menuText H OptionsFontsMenu "Menü" 0 {A menük karakterkészletének a változtatása}
 menuText H OptionsFontsSmall "Kisbetûs" 0 {A kisbetûs karakterkészlet változtatása}
-# ====== TODO To be translated ======
-menuText H OptionsFontsTiny "Tiny" 0 {Change the tiny font}
 menuText H OptionsFontsFixed "Rögzített" 0 {A rögzített szélességû karakterkészlet változtatása}
 menuText H OptionsGInfo "Játszmainformáció" 0 {Játszmainformáció változtatása}
+menuText H OptionsFics "FICS" 0
+menuText H OptionsFicsAuto "Autopromote Királyno" 0
+# ====== TODO To be translated ======
+menuText H OptionsFicsClk "Store Clock times" 0
+# ====== TODO To be translated ======
+menuText H OptionsFicsColour "Text Colour" 0
+# ====== TODO To be translated ======
+menuText H OptionsFicsSize "Board Size" 0
+# ====== TODO To be translated ======
+menuText H OptionsFicsButtons "User Buttons" 0
+# ====== TODO To be translated ======
+menuText H OptionsFicsCommands "Init Commands" 0
+# ====== TODO To be translated ======
+menuText H OptionsFicsNoRes "No Results" 0
+# ====== TODO To be translated ======
+menuText H OptionsFicsNoReq "No Requests" 0
+# ====== TODO To be translated ======
+menuText H OptionsFicsPremove "Allow Premove" 0
 menuText H OptionsLanguage "Nyelv" 0 {A menü nyelvének kiválasztása}
-menuText H OptionsMovesTranslatePieces "Figurák nevének lefordítása" 0 {Lefordítja a figurák nevének elsõ betûjét.}
+# ====== TODO To be translated ======
+menuText H OptionsMovesTranslatePieces "Translate pieces" 0 {Translate first letter of pieces}
 # ====== TODO To be translated ======
 menuText H OptionsMovesHighlightLastMove "Highlight last move" 0 {Highlight last move}
 # ====== TODO To be translated ======
@@ -259,7 +325,7 @@ menuText H OptionsMovesHighlightLastMoveWidth "Width" 0 {Thickness of line}
 # ====== TODO To be translated ======
 menuText H OptionsMovesHighlightLastMoveColor "Color" 0 {Color of line}
 # ====== TODO To be translated ======
-menuText H OptionsMovesHighlightLastMoveArrow "include Arrow" 0 {Include Arrow with Highlight}
+menuText H OptionsMovesColorSelected "Color Selected Square" 0 {Color move}
 menuText H OptionsMoves "Lépések" 0 {Lépések bevitelének beállításai}
 menuText H OptionsMovesAsk "Lépés cseréje elõtt rákérdez." 6 \
   {Mielõtt átírna egy meglevõ lépést, rákérdez.}
@@ -269,16 +335,13 @@ menuText H OptionsMovesDelay "Automatikus visszajátszás késleltetése..." 0 \
   {Beállítja a késleltetést automatikus visszajátszáshoz.}
 menuText H OptionsMovesCoord "Lépés megadása koordinátákkal" 15 \
   {Koordinátákkal megadott lépést ("g1f3") is elfogad.}
-menuText H OptionsMovesSuggest "Javaslat" 0 \
-  {Be/kikapcsolja a lépésjavaslatot.}
-menuText H OptionsShowVarPopup "Változatok ablaka" 0 {Be- vagy kikapcsolja a változatokat megjelenítõ ablakot.}  
-menuText H OptionsMovesSpace "Szóközök a lépés sorszáma után" 0 {Szóközökkel egészíti ki a lépés sorszámát.}  
+# ====== TODO To be translated ======
+menuText H OptionsShowVarPopup "Show Variation Window" 0 {Turn on/off the display of a variations window}  
+# ====== TODO To be translated ======
+menuText H OptionsMovesSpace "Add spaces after move number" 0 {Add spaces after move number}  
 menuText H OptionsMovesKey "Billentyû-kiegészítés" 0 \
   {Be/kikapcsolja a billentyûzettel részlegesen bevitt lépések automatikus kiegészítését.}
-# ====== TODO To be translated ======
-menuText H OptionsMovesShowVarArrows "Show Arrows for Variations" 0 {Turn on/off arrows showing moves in variations}
-# ====== TODO To be translated ======
-menuText H OptionsMovesGlossOfDanger "Color Coded Gloss of Danger" 0 {Turn on/off color coded gloss of danger}
+menuText H OptionsMovesShowVarArrows "Show Variation Arrows" 0 {Turn on/off arrows showing moves in variations}
 menuText H OptionsNumbers "Számformátum" 1 {Számformátum kiválasztása}
 menuText H OptionsStartup "Indítás" 0 {Az indításkor kinyitandó ablakok kiválasztása}
 menuText H OptionsTheme "Téma" 0 {A program megjelenésének megváltoztatása}
@@ -293,6 +356,10 @@ menuText H OptionsWindowsSaveLayout "Elrendezés mentése" 11 {Ablakelrendezés men
 menuText H OptionsWindowsRestoreLayout "Elrendezés visszaállítása" 11 {Ablakelrendezés visszaállítása}
 menuText H OptionsWindowsShowGameInfo "Játszmainformáció" 0 {Játszma adatainak megjelenítése ablakban}
 menuText H OptionsWindowsAutoLoadLayout "Az elsõ elrendezés automatikus betöltése" 19 {Induláskor automatikusan betölti az elsõ ablakelrendezést.}
+# todo
+menuText H OptionsWindowsAutoResize "Auto resize board" 0 {}
+# ====== TODO To be translated ======
+menuText H OptionsWindowsFullScreen "Fullscreen" 0 {Toggle fullscreen mode}
 menuText H OptionsToolbar "Eszköztár" 0 {A fõ ablak eszköztárának összeállítása}
 menuText H OptionsECO "ECO-fájl betöltése..." 2 {Betölti az ECO-osztályozó fájlt.}
 menuText H OptionsSpell "Helyesírás-ellenõrzõ fájl betöltése..." 0 \
@@ -301,17 +368,23 @@ menuText H OptionsTable "Végjátéktáblázatok könyvtára..." 0 \
   {Végjátéktáblázat-fájl kiválasztása; a könyvtárban levõ összes végjátéktáblázatot használatba veszi.}
 menuText H OptionsRecent "Aktuális fájlok..." 3 \
   {A Fájl menüben megjelenített aktuális fájlok számának megváltoztatása}
-menuText H OptionsBooksDir "A megnyitástár könyvtára" 6 {Kijelöli a megnyitástár könyvtárát.}
-menuText H OptionsTacticsBasesDir "Az adatbázisok könyvtára" 4 {Kijelöli a taktikai (edzés) adatbázisok könyvtárát.}
+# ====== TODO To be translated ======
+menuText H OptionsBooksDir "Books directory..." 0 {Sets the opening books directory}
+# ====== TODO To be translated ======
+menuText H OptionsTacticsBasesDir "Bases directory..." 0 {Sets the tactics (training) bases directory}
+# ====== TODO To be translated ======
+menuText H OptionsInformant "Configure informant values" 0
 menuText H OptionsSave "Beállítások mentése" 12 \
   "Minden beállítható értéket elment a $::optionsFile fájlba."
+# ====== TODO To be translated ======
+menuText H OptionsSaveBases "Save Bases as Default" 0 
 menuText H OptionsAutoSave "Beállítások automatikus mentése kilépéskor." 0 \
   {Automatikusan elment minden beállítást, amikor kilépsz SCID-bõl.}
 
 # Help menu:
 menuText H Help "Segítség" 0
 menuText H HelpContents "Tartalomjegyzék" 0 {Megjeleníti a tartalomjegyzéket}
-menuText H HelpIndex "Tárgymutató" 1 {Megjeleníti a tárgymutatót}
+menuText H HelpIndex "Tárgymutató" 0 {Megjeleníti a tárgymutatót}
 menuText H HelpGuide "Rövid ismertetõ" 0 {Rövid ismertetõt nyújt a program használatáról.}
 menuText H HelpHints "Kérdés-felelet" 0 {Néhány hasznos tanács}
 menuText H HelpContact "Címek" 0 {Fontosabb internetcímek}
@@ -321,50 +394,85 @@ menuText H HelpAbout "SCID-rõl" 0 {Tájékoztatás SCID-rõl}
 
 # Game info box popup menu:
 menuText H GInfoHideNext "Elrejti a következõ lépést." 0
-menuText H GInfoMaterial "Anyagi helyzetet." 0
-menuText H GInfoFEN "FEN-formátum" 0
+# ====== TODO To be translated ======
+menuText H GInfoShow "Side to Move" 0
+# ====== TODO To be translated ======
+menuText H GInfoCoords "Toggle Coords" 0
+menuText H GInfoMaterial "Mutatja az anyagi helyzetet" 11
+menuText H GInfoFEN "FEN-formátum megmutatása" 0
 menuText H GInfoMarks "Mutatja a színes mezõket és nyilakat." 10
 menuText H GInfoWrap "Hosszú sorok tördelése" 0
-menuText H GInfoFullComment "Teljes kommentár" 7
-menuText H GInfoPhotos "Fényképek" 1
+menuText H GInfoFullComment "A teljes kommentárt megmutatja." 9
+menuText H GInfoPhotos "Mutatja a fényképeket" 1
 menuText H GInfoTBNothing "Végjátéktáblázatok: nincs információ" 20
-menuText H GInfoTBResult "Végjátéktáblázatok: csak eredmény" 20
+menuText H GInfoTBResult "Végjátéktáblázatok: csak eredmény" 25
 menuText H GInfoTBAll "Végjátéktáblázatok: eredmény és a legjobb lépések" 42
 menuText H GInfoDelete "Törli/helyreállítja ezt a játszmát." 0
 menuText H GInfoMark "Megjelöli ezt a játszmát/megszünteti a jelölést." 0
-menuText H GInfoInformant "Tájékoztató értékek határainak beállítása" 0
+# ====== TODO To be translated ======
+menuText H GInfoMenuBar "Menu Bar"  0
+# ====== TODO To be translated ======
+menuText H GInfoToolBar "Tool Bar"  0
+# ====== TODO To be translated ======
+menuText H GInfoButtonBar "Button Bar"  0
+# ====== TODO To be translated ======
+menuText H GInfoStatusBar "Status Bar"  0
+# ====== TODO To be translated ======
+translate H FlipBoard {Flip board}
+# ====== TODO To be translated ======
+translate H RaiseWindows {Raise windows}
+# ====== TODO To be translated ======
+translate H AutoPlay {Autoplay}
+# ====== TODO To be translated ======
+translate H TrialMode {Trial mode}
+# ====== TODO To be translated ======
+translate H KeepOpen {Keep open after startup}
 
 # General buttons:
+# ====== TODO To be translated ======
+translate H Apply {Apply}
 translate H Back {Vissza}
-translate H Browse {Tallóz}
+translate H Browse {Browse}
 translate H Cancel {Mégse}
-translate H Continue {Tovább}
+# ====== TODO To be translated ======
+translate H Continue {Continue}
 translate H Clear {Töröl}
 translate H Close {Bezár}
-translate H Contents {Tartalom}
+translate H Contents {Contents}
 translate H Defaults {Alapértékek}
 translate H Delete {Töröl}
 translate H Graph {Grafikon}
 translate H Help {Segítség}
 translate H Import {Import}
-translate H Index {Tárgymutató}
+translate H Index {Tartalom}
 translate H LoadGame {Játszma betöltése}
 translate H BrowseGame {Játszma nézegetése}
 translate H MergeGame {Játszma beolvasztása}
-translate H MergeGames {Játszmák beolvasztása}
+# ====== TODO To be translated ======
+translate H MergeGames {Merge Games}
 translate H Preview {Elõnézet}
 translate H Revert {Elvet}
 translate H Save {Ment}
+# ====== TODO To be translated ======
+translate H DontSave {Don't Save}
 translate H Search {Keres}
 translate H Stop {Állj}
 translate H Store {Tárol}
 translate H Update {Frissít}
 translate H ChangeOrient {Ablak elhelyezkedésének változtatása}
-translate H ShowIcons {Ikonok megjelenítése} ;# ***
+translate H ShowIcons {Show Icons} ;# ***
+# ====== TODO To be translated ======
+translate H ConfirmCopy {Confirm Copy}
 translate H None {Nincs}
 translate H First {Elsõ}
 translate H Current {Aktuális}
 translate H Last {Utolsó}
+# ====== TODO To be translated ======
+translate H Font {Font}
+# ====== TODO To be translated ======
+translate H Change {Change}
+# ====== TODO To be translated ======
+translate H Random {Random}
 
 # General messages:
 translate H game {játszma}
@@ -391,6 +499,8 @@ translate H Event {Esemény}
 translate H Site {Helyszín}
 translate H Country {Ország}
 translate H IgnoreColors {A szín közömbös}
+# ====== TODO To be translated ======
+translate H MatchEnd {End pos only}
 translate H Date {Dátum}
 translate H EventDate {Az esemény dátuma}
 translate H Decade {Évtized}
@@ -409,14 +519,25 @@ translate H SearchResults {A keresés eredménye}
 translate H OpeningTheDatabase {Adatbázis megnyitása}
 translate H Database {Adatbázis}
 translate H Filter {Szûrõ}
+# ====== TODO To be translated ======
+translate H Reset {Reset}
+# todo
+translate H IgnoreCase {Ignore Case}
 translate H noGames {Nincs találat}
 translate H allGames {Összes játszma}
 translate H empty {üres}
 translate H clipbase {vágóasztal}
 translate H score {Eredmény}
+translate H Start {Start}
 translate H StartPos {Kezdõállás}
 translate H Total {Összesen}
 translate H readonly {read-only} ;# ***
+# ====== TODO To be translated ======
+translate H altered {altered}
+# ====== TODO To be translated ======
+translate H tagsDescript {Extra tags (eg: Annotator "Anand")}
+# ====== TODO To be translated ======
+translate H prevTags {Use previous}
 
 # Standard error messages:
 translate H ErrNotOpen {Ez az adatbázis nincs megnyitva.}
@@ -436,18 +557,24 @@ translate H GameEnd {Játszma vége}
 translate H LineEnd {Elágazás vége}
 
 # Player information:
-translate H PInfoAll {Eredmények az <b>összes</b> játszma alapján}
-translate H PInfoFilter {Eredmények a <b>szûrt</b> játszmák alapján}
+translate H PInfoAll {összes játszma alapján}
+translate H PInfoFilter {szûrt játszmák alapján}
 translate H PInfoAgainst {Eredmények, ha az ellenfél}
 translate H PInfoMostWhite {Leggyakoribb megnyitások világosként}
 translate H PInfoMostBlack {Leggyakoribb megnyitások sötétként}
 translate H PInfoRating {Értékszám alakulása}
 translate H PInfoBio {Életrajz}
 translate H PInfoEditRatings {Értékszámok átszerkesztése}
+# ====== TODO To be translated ======
+translate H PinfoEditName {Edit Name}
+# ====== TODO To be translated ======
+translate H PinfoLookupName {Lookup Name}
 
 # Tablebase information:
 translate H Draw {Döntetlen}
 translate H stalemate {patt}
+# ====== TODO To be translated ======
+translate H checkmate {checkmate}
 translate H withAllMoves {az összes lépéssel}
 translate H withAllButOneMove {egy híján az összes lépéssel}
 translate H with {with}
@@ -456,7 +583,6 @@ translate H lose {veszítenek}
 translate H loses {veszít}
 translate H allOthersLose {minden más veszít}
 translate H matesIn {mates in}
-translate H hasCheckmated {mattot adott}
 translate H longest {leghosszabb}
 translate H WinningMoves {Nyerõ lépés}
 translate H DrawingMoves {Döntetlenre vezetõ lépés}
@@ -471,7 +597,6 @@ translate H TipAtStartup {Tipp induláskor}
 menuText H TreeFile "Fájl" 0
 menuText H TreeFileFillWithBase "Adatbázis betöltése a gyorsítótárba" 0 {Betölti a gyorsítótárba a megnyitott adatbázis összes játszmáját.}
 menuText H TreeFileFillWithGame "Játszma betöltése a gyorsítótárba" 0 {Betölti a gyorsítótárba a megnyitott adatbázis aktuális játszmáját.}
-menuText H TreeFileSetCacheSize "A gyorsítótár mérete" 14 {Beállítja a gyorsítótár méretét.}
 menuText H TreeFileCacheInfo "Gyorsítótár-használat" 12 {Tájékoztató a gyorsítótár használatáról}
 menuText H TreeFileSave "Cache-fájl mentése" 11 {Elmenti a faszerkezet-cache-fájlt (.stc)}
 menuText H TreeFileFill "Cache-fájl feltöltése" 14 \
@@ -488,6 +613,8 @@ menuText H TreeMaskOpen "Megnyitás" 0 {Maszk megnyitása}
 menuText H TreeMaskOpenRecent "Open recent" 0 {Open recent mask}
 menuText H TreeMaskSave "Mentés" 5 {Maszk mentése}
 menuText H TreeMaskClose "Bezárás" 0 {Maszk bezárása}
+# ====== TODO To be translated ======
+menuText H TreeMaskFillWithLine "Fill with line" 0 {Fill mask with all previous moves}
 menuText H TreeMaskFillWithGame "Feltöltés játszmával" 1 {Maszk feltöltése játszmával}
 menuText H TreeMaskFillWithBase "Feltöltés adatbázissal" 2 {Maszk feltöltése az adatbázis összes játszmájával}
 menuText H TreeMaskInfo "Információ" 0 {Az aktuális maszk fõbb adatai}
@@ -507,20 +634,32 @@ menuText H TreeOptFastAndSlowmode "Gyors és lassú üzemmód" 1 {Gyors majd lassú f
 menuText H TreeOptStartStop "Automatikus frissítés" 0 {Átváltja a faszerkezet-ablak automatikus frissítését.}
 menuText H TreeOptLock "Rögzítés" 0 {A fát az aktuális adatbázishoz köti ill. a kötést feloldja.}
 menuText H TreeOptTraining "Edzés" 0 {Edzésüzemmód be- vagy kikapcsolása}
+# ====== TODO To be translated ======
+menuText H TreeOptShort "Short Display" 0 {Don't show ELO information}
 menuText H TreeOptAutosave "Cache-fájl automatikus mentése" 11 \
   {A faablak bezárásakor automatikusan elmenti a cache-fájlt.}
+# ====== TODO To be translated ======
+menuText H TreeOptAutomask "Auto-Load Mask" 0 "Auto-Load most recent mask with a tree open."
+menuText H TreeOptCacheSize "A gyorsítótár mérete" 14 {Beállítja a gyorsítótár méretét.}
+# ====== TODO To be translated ======
+menuText H TreeOptShowBar "Show Progress Bar" 0 "Show tree progress bar."
+# ====== TODO To be translated ======
+menuText H TreeOptSortBest "Sort Best Games" 0 "Sort Best Games by ELO."
 menuText H TreeHelp "Segítség" 0
 menuText H TreeHelpTree "Segítség a fához" 0
 menuText H TreeHelpIndex "Tartalom" 0
+
 translate H SaveCache {Cache mentése}
 translate H Training {Edzés}
 translate H LockTree {Rögzítés}
 translate H TreeLocked {rögzítve}
 translate H TreeBest {Legjobb}
 translate H TreeBestGames {A fa legjobb játszmái}
-translate H TreeTitleRow \
-  {    Lépés  ECO       Gyakoriság  Eredm. ÁtlÉlõ Telj. Átl.év}
-translate H TreeTotal {ÖSSZESEN}
+# ====== TODO To be translated ======
+translate H TreeAdjust {Adjust Filter}
+translate H TreeTitleRow {    Lépés    Gyakoriság    Eredm   év ÁtlÉlõ Telj. Átl.  ECO}
+translate H TreeTitleRowShort {    Lépés    Gyakoriság    Eredm   év}
+translate H TreeTotal: {ÖSSZESEN: }
 translate H DoYouWantToSaveFirst {Akarod elõbb menteni?}
 translate H AddToMask {Add hozzá a maszkhoz}
 translate H RemoveFromMask {Vedd ki a maszkból}
@@ -569,7 +708,6 @@ menuText H FinderTypesScid "SCID-adatbázisok" 0
 menuText H FinderTypesOld "Régi formátumú SCID-adatbázisok" 5
 menuText H FinderTypesPGN "PGN-fájlok" 0
 menuText H FinderTypesEPD "EPD-fájlok" 0
-menuText H FinderTypesRep "Repertoárfájlok" 0
 menuText H FinderHelp "Segítség" 0
 menuText H FinderHelpFinder "Segítség a fájlkeresõhöz" 0
 menuText H FinderHelpIndex "Tartalom" 0
@@ -578,11 +716,16 @@ translate H FinderDir {Könyvtár}
 translate H FinderDirs {Könyvtárak}
 translate H FinderFiles {Fájlok}
 translate H FinderUpDir {fel}
-translate H FinderCtxOpen {Megnyit}
-translate H FinderCtxBackup {Biztonsági másolat}
-translate H FinderCtxCopy {Másol}
-translate H FinderCtxMove {Áthelyez}
-translate H FinderCtxDelete {Töröl}
+# ====== TODO To be translated ======
+translate H FinderCtxOpen {Open}
+# ====== TODO To be translated ======
+translate H FinderCtxBackup {Backup}
+# ====== TODO To be translated ======
+translate H FinderCtxCopy {Copy}
+# ====== TODO To be translated ======
+translate H FinderCtxMove {Move}
+# ====== TODO To be translated ======
+translate H FinderCtxDelete {Delete}
 
 # Player finder:
 menuText H PListFile "Fájl" 0
@@ -619,55 +762,108 @@ menuText H GraphFileClose "Ablak bezárása" 8
 menuText H GraphOptions "Beállítások" 0
 menuText H GraphOptionsWhite "Világos" 0
 menuText H GraphOptionsBlack "Sötét" 0
+# ====== TODO To be translated ======
+menuText H GraphOptionsDots "Show Dots" 0
+# ====== TODO To be translated ======
+menuText H GraphOptionsBar "Highlight Current Move" 0
 menuText H GraphOptionsBoth "Mindkettõ" 1
 menuText H GraphOptionsPInfo "A játékosinformáció játékosa" 0
 translate H GraphFilterTitle "Szûrõgrafikon: gyakoriság 1000 játszmánként"
-translate H GraphAbsFilterTitle "Szûrõgrafikon: játszmák gyakorisága"
-translate H ConfigureFilter {Állítsd be az X tengelyt évre, értékszámra vagy lépésre}
-translate H FilterEstimate "Becslés"
-translate H TitleFilterGraph "Scid: Szûrõgrafikon"
+# ====== TODO To be translated ======
+translate H GraphAbsFilterTitle "Filter Graph: frequency of the games"
+# ====== TODO To be translated ======
+translate H ConfigureFilter {Configure X Axis}
+# ====== TODO To be translated ======
+translate H FilterEstimate "Estimate"
+# ====== TODO To be translated ======
+translate H TitleFilterGraph "Scid: Filter Graph"
 
 # Analysis window:
 translate H AddVariation {Változat beszúrása}
-translate H AddAllVariations {Add hozzá az összes változatot}
+# ====== TODO To be translated ======
+translate H AddAllVariations {Add All Variations}
 translate H AddMove {Lépés beszúrása}
-translate H Annotate {Lásd el értékelõ jelekkel}
-translate H ShowAnalysisBoard {Mutasd az elemzõtáblát}
-translate H ShowInfo {Mutasd a motor kiírásait}
-translate H FinishGame {Fejezd be a játszmát}
-translate H StopEngine {Állítsd le a motort}
-translate H StartEngine {Indítsd el a motort}
-translate H LockEngine {Tartsd a motort ennél az állásnál}
+translate H Annotate {Értékelõ jelekkel lát el}
+# ====== TODO To be translated ======
+translate H ShowAnalysisBoard {Show analysis board}
+# ====== TODO To be translated ======
+translate H ShowInfo {Show engine info}
+# ====== TODO To be translated ======
+translate H FinishGame {Finish game}
+# ====== TODO To be translated ======
+translate H StopEngine {Stop engine}
+# ====== TODO To be translated ======
+translate H StartEngine {Start engine}
+# ====== TODO To be translated ======
+translate H ExcludeMove {Exclude Move}
+# ====== TODO To be translated ======
+translate H LockEngine {Lock engine to current position}
 translate H AnalysisCommand {Elemzésparancs}
 translate H PreviousChoices {Korábbi választások}
 translate H AnnotateTime {Két lépés közötti idõ másodpercben}
 translate H AnnotateWhich {Változatok hozzáadása}
 translate H AnnotateAll {Mindkét fél lépéseihez}
-translate H AnnotateAllMoves {Értékeld az összes lépést}
+# ====== TODO To be translated ======
+translate H AnnotateAllMoves {Annotate all moves}
 translate H AnnotateWhite {Csak világos lépéseihez}
 translate H AnnotateBlack {Csak sötét lépéseihez}
-translate H AnnotateBlundersOnly {Ha a tett lépés nyilvánvalóan durva hiba}
-translate H AnnotateBlundersOnlyScoreChange {Az elemzés durva hibának tekinti a lépést, ha az értékelés megváltozása: }
-translate H BlundersThreshold {Küszöb}
-# TODO: Translate
-translate H ScoreAllMoves {Score all moves}
+translate H AnnotateNotBest {Ha a játszmában nem a legjobbat lépték}
+# ====== TODO To be translated ======
+translate H AnnotateBlundersOnly {When game move is an obvious blunder}
+# ====== TODO To be translated ======
+translate H BlundersNotBest {Blunders/Not Best}
+# ====== TODO To be translated ======
+# ====== TODO To be translated ======
+translate H AnnotateTitle {Állítsa Jegyzet}
+# ====== TODO To be translated ======
+translate H AnnotateMissedMates {Missed/shorter mates}
+translate H BlundersThreshold {Threshold}
+# ====== TODO To be translated ======
+translate H ScoreFormat {Score format}
+# ====== TODO To be translated ======
+translate H CutOff {Cut Off}
 translate H LowPriority {Alacsony CPU-prioritás}
-translate H ClickHereToSeeMoves {Kattints ide, hogy lásd a lépéseket}
-translate H ConfigureInformant {Értékelõ jelek definiálása}
-translate H Informant!? {Érdekes lépés}
-translate H Informant? {Gyatra lépés}
-translate H Informant?? {Durva hiba}
-translate H Informant?! {Kétes lépés}
-translate H Informant+= {Világosnak némi elõnye van}
-translate H Informant+/- {Világosnak jelentõs elõnye van}
-translate H Informant+- {Világosnak döntõ elõnye van}
-translate H Informant++- {A játszma eldõlt}
-translate H Book {Megnyitástár}
-translate H OtherBookMoves {Az ellenfél megnyitástára}
-translate H OtherBookMovesTooltip {Azok a lépések, amelyekre az ellenfélnek van válasza}
+# ====== TODO To be translated ======
+translate H LogEngines {Log Size}
+# ====== TODO To be translated ======
+translate H LogName {Add Name}
+# ====== TODO To be translated ======
+translate H MaxPly {Max Ply}
+# ====== TODO To be translated ======
+translate H ClickHereToSeeMoves {Click here to see moves}
+# ====== TODO To be translated ======
+translate H ConfigureInformant {Configure Informant}
+# ====== TODO To be translated ======
+translate H Informant!? {Interesting move}
+# ====== TODO To be translated ======
+translate H Informant? {Poor move}
+# ====== TODO To be translated ======
+translate H Informant?? {Blunder}
+# ====== TODO To be translated ======
+translate H Informant?! {Dubious move}
+# ====== TODO To be translated ======
+translate H Informant+= {White has a slight advantage}
+# ====== TODO To be translated ======
+translate H Informant+/- {White has a moderate advantage}
+# ====== TODO To be translated ======
+translate H Informant+- {White has a decisive advantage}
+# ====== TODO To be translated ======
+translate H Informant++- {The game is considered won}
+# ====== TODO To be translated ======
+translate H Book {Book}
+# ====== TODO To be translated ======
+translate H OtherBook {Other Moves}
+# ====== TODO To be translated ======
+translate H Alphabetical {Alphabetical}
+# ====== TODO To be translated ======
+translate H TwoBooks {Two Books}
 
 # Analysis Engine open dialog:
 translate H EngineList {Elemzõ motorok listája}
+# ====== TODO To be translated ======
+translate H EngineKey {Key}
+# ====== TODO To be translated ======
+translate H EngineType {Type}
 translate H EngineName {Név}
 translate H EngineCmd {Parancssor}
 translate H EngineArgs {Paraméterek}
@@ -698,6 +894,8 @@ menuText H PgnOptIndentV "Változatok behúzása" 0
 menuText H PgnOptColumn "Oszlopok stílusa (soronként egy lépés)" 0
 menuText H PgnOptSpace "Szóköz a lépés sorszáma után" 3
 menuText H PgnOptStripMarks "Színes mezõk és nyilak kifejtése" 2
+menuText H PgnOptChess "Sakk darabok" 0
+menuText H PgnOptScrollbar "Görgetosav" 0
 menuText H PgnOptBoldMainLine "A fõváltozat lépései vastag betûvel" 21
 menuText H PgnColor "Színek" 1
 menuText H PgnColorHeader "Fejléc..." 0
@@ -705,8 +903,12 @@ menuText H PgnColorAnno "Értékelõ jelek..." 0
 menuText H PgnColorComments "Megjegyzések..." 0
 menuText H PgnColorVars "Változatok..." 0
 menuText H PgnColorBackground "Háttér..." 0
-menuText H PgnColorMain "Fõváltozat..." 1
-menuText H PgnColorCurrent "Az aktuális lépés háttérszíne..." 3
+# ====== TODO To be translated ======
+menuText H PgnColorMain "Main line..." 0
+# ====== TODO To be translated ======
+menuText H PgnColorCurrent "Current move background..." 1
+# ====== TODO To be translated ======
+menuText H PgnColorNextMove "Next move background..." 0
 menuText H PgnHelp "Segítség" 0
 menuText H PgnHelpPgn "Segítség PGN-hez" 9
 menuText H PgnHelpIndex "Tartalom" 0
@@ -723,26 +925,40 @@ menuText H CrosstabEditEvent "Esemény" 0
 menuText H CrosstabEditSite "Helyszín" 0
 menuText H CrosstabEditDate "Dátum" 0
 menuText H CrosstabOpt "Megjelenítés" 0
-menuText H CrosstabOptAll "Körmérkõzés" 0
-menuText H CrosstabOptSwiss "Svájci" 0
-menuText H CrosstabOptKnockout "Kieséses" 1
-menuText H CrosstabOptAuto "Találd ki!" 0
+menuText H CrosstabOptColorPlain "Közönséges szöveg" 0
+menuText H CrosstabOptColorHyper "Hypertext" 0
+# ====== TODO To be translated ======
+menuText H CrosstabOptTieWin "Tie-Break by wins" 1
+# ====== TODO To be translated ======
+menuText H CrosstabOptTieHead "Tie-Break by head-head" 1
+# todo
+menuText H CrosstabOptThreeWin "3 Points for Win" 1
 menuText H CrosstabOptAges "Életkor évben" 0
 menuText H CrosstabOptNats "Nemzetiség" 0
+# todo
+menuText H CrosstabOptTallies "Win/Loss/Draw" 0
 menuText H CrosstabOptRatings "Értékszámok" 1
 menuText H CrosstabOptTitles "Címek" 0
 menuText H CrosstabOptBreaks "Pontszám holtverseny eldöntéséhez" 0
 menuText H CrosstabOptDeleted "Törölt játszmákkal együtt" 0
 menuText H CrosstabOptColors "Színek (csak svájci rendszer esetén)" 2
+# ====== TODO To be translated ======
+menuText H CrosstabOptColorRows "Color Rows" 0
+# ====== TODO To be translated ======
+menuText H CrosstabOptRowsColor "Row Color" 0 {Default crosstable row color}
 menuText H CrosstabOptColumnNumbers "Számozott oszlopok (csak körmérkõzéshez)" 2
 menuText H CrosstabOptGroup "Pontcsoportok" 1
 menuText H CrosstabSort "Rendezés" 0
 menuText H CrosstabSortName "Név" 0
 menuText H CrosstabSortRating "Értékszám" 0
 menuText H CrosstabSortScore "Pontszám" 0
-menuText H CrosstabColor "Szín" 2
-menuText H CrosstabColorPlain "Közönséges szöveg" 0
-menuText H CrosstabColorHyper "Hypertext" 0
+menuText H CrosstabSortCountry "Ország" 0
+# todo
+menuText H CrosstabType "Format" 0
+menuText H CrosstabTypeAll "Körmérkõzés" 0
+menuText H CrosstabTypeSwiss "Svájci" 0
+menuText H CrosstabTypeKnockout "Kieséses" 1
+menuText H CrosstabTypeAuto "Találd ki!" 0
 menuText H CrosstabHelp "Segítség" 0
 menuText H CrosstabHelpCross "Segítség versenytáblázathoz" 0
 menuText H CrosstabHelpIndex "Tartalom" 0
@@ -774,6 +990,8 @@ translate H GameLength {Játszmahossz}
 translate H FindGamesWith {Megjelölt játszmák}
 translate H StdStart {Különleges kezdés}
 translate H Promotions {Gyalogátváltozások}
+# ====== TODO To be translated ======
+translate H UnderPromo {Under Prom.}
 translate H Comments {Megjegyzések}
 translate H Variations {Változatok}
 translate H Annotations {Értékelõ jelek}
@@ -792,9 +1010,9 @@ translate H BlunderFlag {Elnézés}
 translate H UserFlag {Felhasználó}
 translate H PgnContains {Szöveg a PGN-ben}
 # ====== TODO To be translated ======
-translate H Annotator {Annotator}
+translate H PreComment {Pre-game Comment}
 # ====== TODO To be translated ======
-translate H Cmnts {Annotated games only}
+translate H PostComment {End Comment}
 
 # Game list window:
 translate H GlistNumber {Szám}
@@ -807,7 +1025,7 @@ translate H GlistSite {Helyszín}
 translate H GlistRound {Forduló}
 translate H GlistDate {Dátum}
 translate H GlistYear {Év}
-translate H GlistEDate {Az esemény dátuma}
+translate H GlistEventDate {Az esemény dátuma}
 translate H GlistResult {Eredmény}
 translate H GlistLength {Hossz}
 translate H GlistCountry {Ország}
@@ -816,98 +1034,41 @@ translate H GlistOpening {Megnyitás}
 translate H GlistEndMaterial {Végsõ anyagi helyzet}
 translate H GlistDeleted {Törölt}
 translate H GlistFlags {Megjelölések}
-translate H GlistVars {Variations}
+translate H GlistVariations {Variations}
 translate H GlistComments {Megjegyzések}
 translate H GlistAnnos {Értékelõ jelek}
 translate H GlistStart {Kezdet}
 translate H GlistGameNumber {A játszma sorszáma}
-# ====== TODO To be translated ======
-translate H GlistAverageElo {Average Elo}
-# ====== TODO To be translated ======
-translate H GlistRating {Rating}
 translate H GlistFindText {Szöveg keresése}
 translate H GlistMoveField {Lépés}
 translate H GlistEditField {Konfigurálás}
 translate H GlistAddField {Hozzáad}
 translate H GlistDeleteField {Eltávolít}
-translate H GlistWidth {Szélesség}
-translate H GlistAlign {Igazít}
-# ====== TODO To be translated ======
-translate H GlistAlignL {Align: left}
-# ====== TODO To be translated ======
-translate H GlistAlignR {Align: right}
-# ====== TODO To be translated ======
-translate H GlistAlignC {Align: center}
 translate H GlistColor {Szín}
-translate H GlistSep {Elválasztó}
 # ====== TODO To be translated ======
-translate H GlistCurrentSep {-- Current --}
+translate H GlistSort {Sort database}
 # ====== TODO To be translated ======
-translate H GlistNewSort {New}
+translate H GlistRemoveThisGameFromFilter  {Remove}
 # ====== TODO To be translated ======
-translate H GlistAddToSort {Add}
+translate H GlistRemoveGameAndAboveFromFilter  {Remove all above}
 # ====== TODO To be translated ======
-translate H GsortSort {Sort...}
+translate H GlistRemoveGameAndBelowFromFilter  {Remove all below}
 # ====== TODO To be translated ======
-translate H GsortDate {Date}
+translate H GlistDeleteGame {(Un)Delete this game} 
 # ====== TODO To be translated ======
-translate H GsortYear {Year}
+translate H GlistDeleteAllGames {Delete all games in filter} 
 # ====== TODO To be translated ======
-translate H GsortEvent {Event}
+translate H GlistUndeleteAllGames {Undelete all games in filter} 
 # ====== TODO To be translated ======
-translate H GsortSite {Site}
+translate H GlistAlignL {Align left}
 # ====== TODO To be translated ======
-translate H GsortRound {Round}
+translate H GlistAlignR {Align right}
 # ====== TODO To be translated ======
-translate H GsortWhiteName {White Name}
-# ====== TODO To be translated ======
-translate H GsortBlackName {Black Name}
-# ====== TODO To be translated ======
-translate H GsortECO {ECO}
-# ====== TODO To be translated ======
-translate H GsortResult {Result}
-# ====== TODO To be translated ======
-translate H GsortMoveCount {Move Count}
-# ====== TODO To be translated ======
-translate H GsortAverageElo {Average Elo}
-# ====== TODO To be translated ======
-translate H GsortCountry {Country}
-# ====== TODO To be translated ======
-translate H GsortDeleted {Deleted}
-# ====== TODO To be translated ======
-translate H GsortEventDate {Event Date}
-# ====== TODO To be translated ======
-translate H GsortWhiteElo {White Elo}
-# ====== TODO To be translated ======
-translate H GsortBlackElo {Black Elo}
-# ====== TODO To be translated ======
-translate H GsortComments {Comments}
-# ====== TODO To be translated ======
-translate H GsortVariations {Variations}
-# ====== TODO To be translated ======
-translate H GsortNAGs {NAGs}
-# ====== TODO To be translated ======
-translate H GsortAscending {Ascending}
-# ====== TODO To be translated ======
-translate H GsortDescending {Descending}
-# ====== TODO To be translated ======
-translate H GsortAdd {Add}
-# ====== TODO To be translated ======
-translate H GsortStore {Store}
-# ====== TODO To be translated ======
-translate H GsortLoad {Load}
-translate H GlistRemoveThisGameFromFilter  {Vedd ki ezt a játszmát a szûrõbõl}
-translate H GlistRemoveGameAndAboveFromFilter  {Vedd ki a játszmát és az összes fölötte lévõt a szûrõbõl}
-translate H GlistRemoveGameAndBelowFromFilter  {Vedd ki a játszmát és az összes alatta lévõt a szûrõbõl}
-translate H GlistDeleteGame {Töröld/állítsd helyre ezt a játszmát} 
-translate H GlistDeleteAllGames {Töröld a szûrõ összes játszmáját} 
-translate H GlistUndeleteAllGames {Állítsd helyre a szûrõ összes játszmáját} 
-# ====== TODO To be translated ======
-translate H GlistMergeGameInBase {Merge Game in other base} 
+translate H GlistAlignC {Align center}
 
 # Maintenance window:
 translate H DatabaseName {Az adatbázis neve:}
-translate H TypeIcon {Típusikon:}
+translate H TypeIcon {Típusikon}
 translate H NumOfGames {Játszmák:}
 translate H NumDeletedGames {Törölt játszmák:}
 translate H NumFilterGames {Szûrt játszmák:}
@@ -931,6 +1092,12 @@ translate H UnmarkCurrent {Eltávolítja az aktuális játszma megjelölését.}
 translate H UnmarkFilter {Eltávolítja a szûrt játszmák megjelölését.}
 translate H UnmarkAll {Minden játszma megjelölését eltávolítja.}
 translate H Spellchecking {Helyesírás-ellenõrzés}
+# ====== TODO To be translated ======
+translate H MakeCorrections {Make Corrections}
+# ====== TODO To be translated ======
+translate H Ambiguous {Ambiguous}
+# ====== TODO To be translated ======
+translate H Surnames {Surnames}
 translate H Players {Játékosok}
 translate H Events {Események}
 translate H Sites {Helyszínek}
@@ -944,6 +1111,8 @@ translate H AutoloadGame {Játszmasorszám automatikus betöltése}
 #Igaz ez?
 translate H StripTags {PGN-címkék eltüntetése}
 translate H StripTag {Címke eltüntetése}
+# ====== TODO To be translated ======
+translate H CheckGames {Check games}
 translate H Cleaner {Takarító}
 translate H CleanerHelp {
 SCID Takarítója el fogja végezni az aktuális adatbázison az összes olyan gondozási feladatot, amelyet az alábbi listáról kijelölsz.
@@ -957,27 +1126,48 @@ Nagy adatbázison a kiválasztott feladatoktól és aktuális beállításaiktól függõen
 
 Biztos, hogy neki akarsz látni a kijelölt gondozási feladatoknak?
 }
-translate H TwinCheckUndelete {váltás; "u" mindkettõt helyreállítja)}
-translate H TwinCheckprevPair {Elõzõ pár}
-translate H TwinChecknextPair {Következõ pár}
-translate H TwinChecker {Scid: Ikerjátszma-ellenõrzés}
-translate H TwinCheckTournament {E verseny játszmái:}
-translate H TwinCheckNoTwin {Nem ikrek  }
-translate H TwinCheckNoTwinfound {Ennek a játszmának nincs ikertestvére.\nEbben az ablakban akkor lehet megjeleníteni az ikreket, ha elõbb az "Ikerjátszmák törlése..." funkciót használod. }
-translate H TwinCheckTag {Címkék ellenõrzése...}
-translate H TwinCheckFound1 {Scid $result ikerjátszmát talált,}
-translate H TwinCheckFound2 { és megjelölte õket törlésre.}
-translate H TwinCheckNoDelete {Ebben az adatbázisban nincsenek törlendõ játszmák.}
-translate H TwinCriteria1 {Ikerjátszmák megtalálását célzó beállításaid azzal a veszéllyel járnak,\nhogy hasonló lépéseket tartalmazó (nem-iker) játszmákat is megjelölök törlésre..}
-translate H TwinCriteria2 {Ha "azonos lépések"-nél "Nem"-et választottad, akkor célszerû "Igen"-t választani a színek, az esemény, a helyszín, a forduló, az év és a hónap beállításainál.\nAkarod folytatni, és mindenképpen törölni az ikreket?}
-translate H TwinCriteria3 {Ajánlatos "azonos helyszín", "azonos forduló" és "azonos év" beállításai közül legalább kettõt "Igen"-nek választani.\nAkarod folytatni, és mindenképpen törölni az ikreket?}
-translate H TwinCriteriaConfirm {Scid: Erõsítsd meg az ikerbeállításokat}
-translate H TwinChangeTag "Változtasd meg a következõ játszmacímkéket:\n\n"
-translate H AllocRatingDescription "Ez a parancs a jelenlegi helyesírásellenõrzõ fájl felhasználásával Élõ-pontokkal látja el az adatbázis játszmáit. Ha egy játékosnak jelenleg nincs Élõje, de a játszma idején érvényes Élõje benne van a helyesírásellenõrzõ fájlban, azt az Élõt fogja kapni."
-translate H RatingOverride "Felülírjam a meglévõ 0-tól különbözõ Élõket?"
-translate H AddRatings "Adj Élõket ehhez:"
-translate H AddedRatings {Scid $r Élõ-értékszámot adott $g játszmához.}
-translate H NewSubmenu "Új almenü"
+# ====== TODO To be translated ======
+translate H TwinCheckUndelete {to flip; "u" undeletes both)}
+# ====== TODO To be translated ======
+translate H TwinCheckprevPair {Previous pair}
+# ====== TODO To be translated ======
+translate H TwinChecknextPair {Next pair}
+# ====== TODO To be translated ======
+translate H TwinChecker {Scid: Twin game checker}
+# ====== TODO To be translated ======
+translate H TwinCheckTournament {Games in tournament:}
+# ====== TODO To be translated ======
+translate H TwinCheckNoTwin {No twin  }
+# ====== TODO To be translated ======
+translate H TwinCheckNoTwinfound {No twin was detected for this game.\nTo show twins using this window, you must first use the "Delete twin games..." function. }
+# ====== TODO To be translated ======
+translate H TwinCheckTag {Share tags...}
+# ====== TODO To be translated ======
+translate H TwinCheckFound1 {Scid found $result twin games}
+# ====== TODO To be translated ======
+translate H TwinCheckFound2 { and set their delete flags}
+# ====== TODO To be translated ======
+translate H TwinCheckNoDelete {There are no games in this database to delete.}
+# ====== TODO To be translated ======
+translate H TwinCriteria1 { Your settings for finding twin games are potentially likely to\ncause non-twin games with similar moves to be marked as twins.}
+# ====== TODO To be translated ======
+translate H TwinCriteria2 {It is recommended that if you select "No" for "same moves", you should select "Yes" for the colors, event, site, round, year and month settings.\nDo you want to continue and delete twins anyway? }
+# ====== TODO To be translated ======
+translate H TwinCriteria3 {It is recommended that you specify "Yes" for at least two of the "same site", "same round" and "same year" settings.\nDo you want to continue and delete twins anyway?}
+# ====== TODO To be translated ======
+translate H TwinCriteriaConfirm {Scid: Confirm twin settings}
+# ====== TODO To be translated ======
+translate H TwinChangeTag "Change the following game tags:\n\n"
+# ====== TODO To be translated ======
+translate H AllocRatingDescription "This command will use the current spellcheck file to add Elo ratings to games in this database. Wherever a player has no currrent rating but his/her rating at the time of the game is listed in the spellcheck file, that rating will be added."
+# ====== TODO To be translated ======
+translate H RatingOverride "Overwrite existing non-zero ratings?"
+# ====== TODO To be translated ======
+translate H AddRatings "Add ratings to:"
+# ====== TODO To be translated ======
+translate H AddedRatings {Scid added $r Elo ratings in $g games.}
+# ====== TODO To be translated ======
+translate H NewSubmenu "New submenu"
 
 # Comment editor:
 translate H AnnotationSymbols  {Értékelõ szimbólumok:}
@@ -1019,6 +1209,12 @@ translate H SearchBoardAny {Bármi (azonos anyag, gyalogok és figurák bárhol)}
 # ====== TODO To be translated ======
 translate H SearchInRefDatabase { Search in base }
 translate H LookInVars {Változatokban is keres.}
+# ====== TODO To be translated ======
+translate H CQLLabel {CQL Script}
+# ====== TODO To be translated ======
+translate H CQLComments {Allow Comments}
+# ====== TODO To be translated ======
+translate H CQLStrip {Strip Match Comments}
 
 # Material search:
 translate H MaterialSearch {Keresés anyagra}
@@ -1082,14 +1278,18 @@ translate H Castling {Sáncolás}
 translate H EnPassantFile {"en passant"-vonal}
 translate H ClearFen {FEN törlése}
 translate H PasteFen {FEN beillesztése}
-translate H SaveAndContinue {Mentés és folytatás}
-translate H DiscardChangesAndContinue {Változtatások elvetése\nés folytatás}
-translate H GoBack {Vissza}
+# ====== TODO To be translated ======
+translate H SaveAndContinue {Save and continue}
+# ====== TODO To be translated ======
+translate H DiscardChangesAndContinue {Discard Changes}
+# ====== TODO To be translated ======
+translate H GoBack {Go back}
 
 # Replace move dialog:
 translate H ReplaceMove {Lépés cseréje}
 translate H AddNewVar {Új változat beszúrása}
-translate H NewMainLine {Új fõváltozat}
+# ====== TODO To be translated ======
+translate H NewMainLine {New Main Line}
 translate H ReplaceMoveMessage {Itt már van lépés.
 
 Kicserélheted, miáltal az összes õt követõ lépés elvész, vagy lépésedet beszúrhatod új változatként.
@@ -1103,21 +1303,18 @@ Könnyen újra írhatóvá teheted az adatbázist, ha bezárod, majd újból megnyitod.
 
 Tényleg kizárólag olvashatóvá akarod tenni ezt az adatbázist?}
 
-# Clear game dialog:
-translate H ClearGameDialog {Ez a játszma megváltozott.
-
-Tényleg folytatni akarod, és elvetni a létrehozott változtatásokat?
-}
-
 # Exit dialog:
 translate H ExitDialog {Tényleg ki akarsz lépni SCID-bõl?}
+# ====== TODO To be translated ======
+translate H ClearGameDialog {This game has been altered.\nDo you wish to save it?}
 translate H ExitUnsaved {A következõ adatbázisokban elmentetlen játszmaváltoztatások vannak. Ha most kilépsz, ezek a változtatások elvesznek.}
 
 # Import window:
 translate H PasteCurrentGame {Beilleszti az aktuális játszmát.}
 translate H ImportHelp1 {Bevisz vagy beilleszt egy PGN-formátumú játszmát a fenti keretbe.}
 translate H ImportHelp2 {Itt jelennek meg az importálás közben fellépõ hibák.}
-translate H OverwriteExistingMoves {Felülírjam a meglévõ lépéseket?}
+# ====== TODO To be translated ======
+translate H OverwriteExistingMoves {Overwrite existing moves ?}
 
 # ECO Browser:
 translate H ECOAllSections {összes ECO-osztály}
@@ -1202,6 +1399,8 @@ translate H OprepViewLaTeX {LaTeX megtekintése}
 translate H PReportTitle {Összefoglaló játékosról}
 translate H PReportColorWhite {világossal}
 translate H PReportColorBlack {sötéttel}
+# ====== TODO To be translated ======
+translate H PReportBeginning {Beginning with}
 translate H PReportMoves {%s után}
 translate H PReportOpenings {Megnyitások}
 translate H PReportClipbase {Kiüríti a vágólapot, és odamásolja a feltételnek megfelelõ játszmákat}
@@ -1259,8 +1458,6 @@ translate H NameEditReplace {Cserél}
 translate H NameEditWith {Erre}
 translate H NameEditMatches {Egyezések: Ctrl+1...Ctrl+9 választ.}
 # ====== TODO To be translated ======
-translate H CheckGames {Check games}
-# ====== TODO To be translated ======
 translate H CheckGamesWhich {Check games}
 # ====== TODO To be translated ======
 translate H CheckAll {All games}
@@ -1288,9 +1485,14 @@ translate H CurrentState {Jelenlegi állapot}
 translate H AfterCompaction {Tömörítés után}
 translate H CompactNames {Névfájl tömörítése}
 translate H CompactGames {Játszmafájl tömörítése}
-translate H NoUnusedNames "Nincsenek nem használt nevek, úgyhogy a névfájl már teljesen tömör."
-translate H NoUnusedGames "A névfájl már teljesen tömör."
-translate H GameFileCompacted {Az adatbázis játszmafájlja tömörítve van.}
+# ====== TODO To be translated ======
+translate H NoUnusedNames "There are no unused names, so the name file is already fully compacted."
+# ====== TODO To be translated ======
+translate H NoUnusedGames "The game file is already fully compacted."
+# ====== TODO To be translated ======
+translate H NameFileCompacted {The name file for "[file tail [sc_base filename]]" was compacted.}
+# ====== TODO To be translated ======
+translate H GameFileCompacted {The game file for "[file tail [sc_base filename]]" was compacted.}
 
 # Sorting:
 translate H SortCriteria {Kritériumok}
@@ -1307,6 +1509,8 @@ translate H IndentVariations {Változatok igazítása?}
 translate H ExportColumnStyle {Oszlop stílusa (soronként egy lépés)?}
 translate H ExportSymbolStyle {Szimbólumok stílusa:}
 translate H ExportStripMarks {Kivegye a megjegyzésekbõl a mezõ- és nyílmegjelöléseket?}
+# ====== TODO To be translated ======
+translate H ExportFlags {Export Scid Flags}
 
 # Goto game/move dialogs:
 translate H LoadGameNumber {A betöltendõ játszma sorszáma:}
@@ -1331,11 +1535,17 @@ translate H CopyErrNotOpen {nincs megnyitva.}
 translate H LightSquares {Világos mezõk}
 translate H DarkSquares {Sötét mezõk}
 translate H SelectedSquares {Kiválasztott mezõk}
-translate H SuggestedSquares {Javasolt lépések mezõi}
+# todo
+translate H Grid {Grid}
+translate H Previous {Korábbi}
 translate H WhitePieces {Világos figurák}
 translate H BlackPieces {Sötét figurák}
 translate H WhiteBorder {Világos körvonal}
 translate H BlackBorder {Sötét körvonal}
+translate H ArrowMain   {Main Arrow}
+translate H ArrowVar    {Var Arrows}
+# ====== TODO To be translated ======
+translate H ShowArrows  {Show Arrows}
 
 # Novelty window:
 translate H FindNovelty {Újítás keresése}
@@ -1357,12 +1567,12 @@ translate H SoundsAnnounceBack {Lépés bemondása amikor visszaveszünk vagy egy lé
 # Upgrading databases:
 translate H Upgrading {Felújítás}
 translate H ConfirmOpenNew {
-Ez régi formátumú (SCID 3) adatbázis, amelyet SCID 4 nem tud megnyitni, de már létrehozott egy új formátumú (SCID 4) verziót.
+Ez régi formátumú (SCID 2) adatbázis, amelyet SCID 3 nem tud megnyitni, de már létrehozott egy új formátumú (SCID 3) verziót.
 
 Szeretnéd megnyitni az adatbázis új formátumú verzióját?
 }
 translate H ConfirmUpgrade {
-Ez régi formátumú (SCID 3) adatbázis. Új formátumú verziót kell létrehozni belõle, hogy SCID 4 használni tudja.
+Ez régi formátumú (SCID 2) adatbázis. Új formátumú verziót kell létrehozni belõle, hogy SCID 3 használni tudja.
 
 A felújítás új verziót hoz létre az adatbázisból. Az eredeti fájlok sértetlenül megmaradnak.
 
@@ -1381,204 +1591,382 @@ Add meg az általad kedvelt játékosok nevét, soronként egyet. Helyettesítõ karakt
 
 Amikor betöltöd egy a listán szereplõ játékos játszmáját, a fõablak sakktáblája szükség esetén elfordul, hogy a játszmát annak a játékosnak a szemszögébõl mutassa.
 }
-translate H showblunderexists {Jelezd a durva hibát}
-translate H showblundervalue {Mutasd a durva hiba mértékét}
-translate H showscore {Mutasd az értékelést}
-translate H coachgame {Edzõ bekapcsolása}
-translate H configurecoachgame {Edzõs üzemmód beállításai}
-translate H configuregame {Játszmabeállítások}
-translate H Phalanxengine {Phalanx}
-translate H Coachengine {Edzõmotor}
-translate H difficulty {Nehézség}
-translate H hard {nehéz}
-translate H easy {könnyû}
-translate H Playwith {Színed}
-translate H white {világos}
-translate H black {sötét}
-translate H both {mindkettõ}
-translate H Play {Játék}
-translate H Noblunder {Nincs durva hiba}
-translate H blunder {durva hiba}
-translate H Noinfo {-- Nincs adat --}
-translate H PhalanxOrTogaMissing {Phalanx vagy Toga nincs meg}
-translate H moveblunderthreshold {egy lépés durva hiba, ha a veszteség nagyobb mint}
-translate H limitanalysis {A motor ennyi ideig elemezhet}
-translate H seconds {másodperc}
-translate H Abort {Elég}
-translate H Resume {Folytasd}
-translate H OutOfOpening {Vége a megnyitástárnak}
-translate H NotFollowedLine {Eltértél a változattól}
-translate H DoYouWantContinue {Akarod folytatni?}
-translate H CoachIsWatching {Az edzõ figyel}
-translate H Ponder {Folyamatos gondolkodás}
-translate H LimitELO {Élõ korlátozása}
-translate H DubiousMovePlayedTakeBack {Kétes lépés, visszaveszed?}
-translate H WeakMovePlayedTakeBack {Gyenge lépés, visszaveszed?}
-translate H BadMovePlayedTakeBack {Rossz lépés, visszaveszed?}
-translate H Iresign {Feladom.}
-translate H yourmoveisnotgood {Ez nem jó lépés.}
-translate H EndOfVar {A változatnak vége.}
-translate H Openingtrainer {Megnyitásgyakorlás}
-translate H DisplayCM {Mutasd a szóba jövõ lépéseket}
-translate H DisplayCMValue {Mutasd a szóba jövõ lépések értékelését}
-translate H DisplayOpeningStats {Mutasd a statisztikát}
-translate H ShowReport {Mutasd a jelentést}
-translate H NumberOfGoodMovesPlayed {a jó lépések száma}
-translate H NumberOfDubiousMovesPlayed {a kétes lépések száma}
-translate H NumberOfMovesPlayedNotInRepertoire {a repertoárban nem szereplõ lépések száma}
-translate H NumberOfTimesPositionEncountered {az állás elõfordulásainak a száma}
-translate H PlayerBestMove  {Csak a legjobb lépéseket engedélyezi}
-translate H OpponentBestMove {Az ellenfél a legjobbakat lépi}
-translate H OnlyFlaggedLines {Csak megjelölt változatokat játszhatsz meg}
-translate H resetStats {Statisztika törlése}
-translate H Repertoiretrainingconfiguration {Repertoárgyakorlás beállításai}
-translate H Loadingrepertoire {Repertoár betöltése}
-translate H Movesloaded {Betöltött lépések}
-translate H Repertoirenotfound {A repertoár nincs meg.}
-translate H Openfirstrepertoirewithtype {Elõbb nyiss meg egy repertoár-adatbázist a jobb oldali ikon segítségével.}
-translate H Movenotinrepertoire {A lépés nincs a repertoárban.}
-translate H PositionsInRepertoire {A repertoárban szereplõ állások}
-translate H PositionsNotPlayed {A nem játszott állások}
-translate H PositionsPlayed {A megjátszott állások}
-translate H Success {Siker}
-translate H DubiousMoves {Kétes lépések}
-translate H OutOfRepertoire {A repertoár kimerült.}
-translate H ConfigureTactics {Taktika beállításai}
-translate H ResetScores {Eredmények törlése}
-translate H LoadingBase {Adatbázis betöltése}
-translate H Tactics {Taktika}
-translate H ShowSolution {Mutasd meg a megfejtést.}
 # ====== TODO To be translated ======
-translate H NextExercise {Next exercise}
+translate H showblunderexists {show blunder exists}
 # ====== TODO To be translated ======
-translate H PrevExercise {previous exercise}
+translate H showblundervalue {show blunder value}
 # ====== TODO To be translated ======
-translate H StopTraining {Stop training}
-translate H Next {Következõ}
-translate H ResettingScore {Eredmények törlése}
-translate H LoadingGame {Játszma betöltése}
-translate H MateFound {Megvan a matt.}
-translate H BestSolutionNotFound {Nincs meg a legjobb megoldás!}
-translate H MateNotFound {Nincs meg a matt.}
-translate H ShorterMateExists {Van rövidebb matt.}
-translate H ScorePlayed {A megtett lépés értékelése}
-translate H Expected {várt}
-translate H ChooseTrainingBase {Válaszd ki az edzésadatbázist.}
-translate H Thinking {Gondolkodom...}
-translate H AnalyzeDone {Az elemzés kész.}
-translate H WinWonGame {Nyert játszma megnyerése}
-translate H Lines {Változatok}
-translate H ConfigureUCIengine {UCI-motor beállítása}
-translate H SpecificOpening {Meghatározott megnyitás}
-translate H StartNewGame {Új játszma}
-translate H FixedLevel {Megadott szint}
-translate H Opening {Megnyitás}
-translate H RandomLevel {Véletlen szint}
-translate H StartFromCurrentPosition {Ez legyen a kezdõállás}
-translate H FixedDepth {Adott mélység}
-translate H Nodes {Csomópont} 
-translate H Depth {Mélység}
-translate H Time {Idõ} 
-translate H SecondsPerMove {Másodperc lépésenként}
-translate H Engine {Motor}
-translate H TimeMode {Idõbeosztás}
-translate H TimeBonus {Idõalap + növekmény}
-translate H TimeMin {perc}
-translate H TimeSec {másodperc}
-translate H AllExercisesDone {Minden gyakorlat kész.}
-translate H MoveOutOfBook {A lépés nem szerepel a megnyitástárban.}
-translate H LastBookMove {Utolsó lépés a megnyitástárban}
-translate H AnnotateSeveralGames {Több játszma kommentálása\na jelenlegitõl eddig:}
-translate H FindOpeningErrors {Megnyitási hibák keresése}
-translate H MarkTacticalExercises {Taktikai gyakorlatok megjelölése}
-translate H UseBook {Megnyitástár-használat}
-translate H MultiPV {Több változat}
-translate H Hash {Hesmemória}
-translate H OwnBook {A motor megnyitástárának használata}
-translate H BookFile {Megnyitástár}
-translate H AnnotateVariations {Változatok kommentálása}
-translate H ShortAnnotations {Rövid kommentár}
-translate H addAnnotatorTag {Értékelõ jel hozzáadása}
-translate H AddScoreToShortAnnotations {Rövid kommentár kiegészítése értékeléssel}
+translate H showscore {show score}
+# ====== TODO To be translated ======
+translate H coachgame {coach game}
+# ====== TODO To be translated ======
+translate H configurecoachgame {configure coach game}
+# ====== TODO To be translated ======
+translate H configuregame {Game configuration}
+# ====== TODO To be translated ======
+translate H Phalanxengine {Phalanx engine}
+# ====== TODO To be translated ======
+translate H Coachengine {Coach engine}
+# ====== TODO To be translated ======
+translate H difficulty {difficulty}
+# ====== TODO To be translated ======
+translate H hard {hard}
+# ====== TODO To be translated ======
+translate H easy {easy}
+# ====== TODO To be translated ======
+translate H Playwith {Play with}
+# ====== TODO To be translated ======
+translate H white {white}
+# ====== TODO To be translated ======
+translate H black {black}
+# ====== TODO To be translated ======
+translate H both {both}
+# ====== TODO To be translated ======
+translate H Play {Play}
+# ====== TODO To be translated ======
+translate H Noblunder {No blunder}
+# ====== TODO To be translated ======
+translate H blunder {blunder}
+# ====== TODO To be translated ======
+translate H Noinfo {-- No info --}
+# ====== TODO To be translated ======
+# ====== TODO To be translated ======
+# ====== TODO To be translated ======
+# ====== TODO To be translated ======
+translate H moveblunderthreshold {move is a blunder if loss is greater than}
+# ====== TODO To be translated ======
+translate H limitanalysis {limit engine analysis time}
+# ====== TODO To be translated ======
+translate H seconds {seconds}
+# ====== TODO To be translated ======
+translate H Abort {Abort}
+# ====== TODO To be translated ======
+translate H Resume {Resume}
+# ====== TODO To be translated ======
+translate H Restart {Restart}
+# ====== TODO To be translated ======
+translate H OutOfOpening {Out of opening}
+# ====== TODO To be translated ======
+translate H NotFollowedLine {You did not follow the line}
+# ====== TODO To be translated ======
+translate H DoYouWantContinue {Do you want yo continue ?}
+# ====== TODO To be translated ======
+translate H CoachIsWatching {Coach is watching}
+# ====== TODO To be translated ======
+translate H Ponder {Permanent thinking}
+# ====== TODO To be translated ======
+translate H LimitELO {Limit ELO strength}
+# ====== TODO To be translated ======
+translate H DubiousMovePlayedTakeBack {Dubious move played, do you want to take back ?}
+# ====== TODO To be translated ======
+translate H WeakMovePlayedTakeBack {Weak move played, do you want to take back ?}
+# ====== TODO To be translated ======
+translate H BadMovePlayedTakeBack {Bad move played, do you want to take back ?}
+# ====== TODO To be translated ======
+translate H Iresign {I resign}
+# ====== TODO To be translated ======
+translate H yourmoveisnotgood {your move is not good}
+# ====== TODO To be translated ======
+translate H EndOfVar {End of variation}
+# ====== TODO To be translated ======
+translate H Openingtrainer {Opening trainer}
+# ====== TODO To be translated ======
+translate H DisplayCM {Display candidate moves}
+# ====== TODO To be translated ======
+translate H DisplayCMValue {Display candidate moves value}
+# ====== TODO To be translated ======
+translate H DisplayOpeningStats {Show statistics}
+# ====== TODO To be translated ======
+translate H ShowReport {Show report}
+# ====== TODO To be translated ======
+translate H NumberOfGoodMovesPlayed {good moves played}
+# ====== TODO To be translated ======
+translate H NumberOfDubiousMovesPlayed {dubious moves played}
+# ====== TODO To be translated ======
+translate H NumberOfTimesPositionEncountered {times position encountered}
+# ====== TODO To be translated ======
+translate H PlayerBestMove  {Allow only best moves}
+# ====== TODO To be translated ======
+translate H OpponentBestMove {Opponent plays best moves}
+# ====== TODO To be translated ======
+translate H OnlyFlaggedLines {Only flagged lines}
+# ====== TODO To be translated ======
+translate H resetStats {Reset statistics}
+# ====== TODO To be translated ======
+translate H Movesloaded {Moves loaded}
+# ====== TODO To be translated ======
+translate H PositionsNotPlayed {Positions not played}
+# ====== TODO To be translated ======
+translate H PositionsPlayed {Positions played}
+# ====== TODO To be translated ======
+translate H Success {Success}
+# ====== TODO To be translated ======
+translate H DubiousMoves {Dubious moves}
+# ====== TODO To be translated ======
+translate H ConfigureTactics {Configure tactics}
+# ====== TODO To be translated ======
+translate H ResetScores {Reset scores}
+# ====== TODO To be translated ======
+translate H LoadingBase {Loading base}
+# ====== TODO To be translated ======
+translate H Tactics {Tactics}
+# ====== TODO To be translated ======
+translate H ShowSolution {Show solution}
+# ====== TODO To be translated ======
+translate H Next {Next}
+# ====== TODO To be translated ======
+translate H ResettingScore {Resetting score}
+# ====== TODO To be translated ======
+translate H LoadingGame {Loading game}
+# ====== TODO To be translated ======
+translate H MateFound {Mate found}
+# ====== TODO To be translated ======
+translate H BestSolutionNotFound {Best solution NOT found !}
+# ====== TODO To be translated ======
+translate H MateNotFound {Mate not found}
+# ====== TODO To be translated ======
+translate H ShorterMateExists {Shorter mate exists}
+# ====== TODO To be translated ======
+translate H ScorePlayed {Score played}
+# ====== TODO To be translated ======
+translate H Expected {expected}
+# ====== TODO To be translated ======
+translate H ChooseTrainingBase {Choose training base}
+# ====== TODO To be translated ======
+translate H Thinking {Thinking}
+# ====== TODO To be translated ======
+translate H AnalyzeDone {Analyze done}
+# ====== TODO To be translated ======
+translate H WinWonGame {Win won game}
+# ====== TODO To be translated ======
+translate H Lines {Lines}
+# ====== TODO To be translated ======
+translate H ConfigureUCIengine {Configure UCI engine}
+# ====== TODO To be translated ======
+translate H SpecificOpening {Specific opening}
+# ====== TODO To be translated ======
+translate H StartNewGame {Start new game}
+# ====== TODO To be translated ======
+translate H FixedLevel {Fixed level}
+# ====== TODO To be translated ======
+translate H Opening {Opening}
+# ====== TODO To be translated ======
+translate H RandomLevel {Random level}
+# ====== TODO To be translated ======
+translate H StartFromCurrentPosition {Start from current position}
+# ====== TODO To be translated ======
+translate H FixedDepth {Fixed depth}
+# ====== TODO To be translated ======
+translate H Nodes {Nodes} 
+# ====== TODO To be translated ======
+translate H Depth {Depth}
+# ====== TODO To be translated ======
+translate H Time {Time} 
+# ====== TODO To be translated ======
+translate H Auto {Auto}
+# ====== TODO To be translated ======
+translate H Score {Score}
+# ====== TODO To be translated ======
+translate H {Score Combo} {Score Combo}
+# ====== TODO To be translated ======
+translate H {Time Combo} {Time Combo}
+# ====== TODO To be translated ======
+translate H SecondsPerMove {Seconds per move}
+# ====== TODO To be translated ======
+translate H DepthPerMove {Depth per move}
+# ====== TODO To be translated ======
+translate H MoveControl {Move Control}
+# ====== TODO To be translated ======
+translate H TimeLabel {Time per move}
+# ====== TODO To be translated ======
+translate H AddVars {Add Variations}
+# ====== TODO To be translated ======
+translate H AddScores {Add Score}
+# ====== TODO To be translated ======
+translate H Engine {Engine}
+# ====== TODO To be translated ======
+translate H TimeMode {Time mode}
+# ====== TODO To be translated ======
+translate H TimeBonus {Time + bonus}
+# ====== TODO To be translated ======
+# ====== TODO To be translated ======
+translate H TimeMin {min}
+# ====== TODO To be translated ======
+translate H TimeSec {sec}
+# ====== TODO To be translated ======
+# ====== TODO To be translated ======
+# ====== TODO To be translated ======
+translate H AllExercisesDone {All exercises done}
+# ====== TODO To be translated ======
+translate H MoveOutOfBook {Move out of book}
+# ====== TODO To be translated ======
+translate H LastBookMove {Last book move}
+# ====== TODO To be translated ======
+translate H AnnotateSeveralGames {Annotate several games\nfrom current to :}
+# ====== TODO To be translated ======
+translate H FindOpeningErrors {Find opening errors}
+# ====== TODO To be translated ======
+translate H MarkTacticalExercises {Mark tactical exercises}
+# ====== TODO To be translated ======
+translate H UseBook {Use book}
+# ====== TODO To be translated ======
+translate H MultiPV {Multiple variations}
+# ====== TODO To be translated ======
+translate H Hash {Hash memory}
+# ====== TODO To be translated ======
+translate H OwnBook {Use engine book}
+# ====== TODO To be translated ======
+translate H BookFile {Opening book}
+# ====== TODO To be translated ======
+translate H AnnotateVariations {Annotate variations}
+# ====== TODO To be translated ======
+translate H ShortAnnotations {Short annotations}
+# ====== TODO To be translated ======
+translate H addAnnotatorTag {Add annotator tag}
+# ====== TODO To be translated ======
+translate H AddScoreToShortAnnotations {Add score to short annotations}
+# ====== TODO To be translated ======
 translate H Export {Export}
-translate H BookPartiallyLoaded {Megnyitástár részlegesen betöltve}
-translate H Calvar {Változatok számítása}
-translate H ConfigureCalvar {Beállítás}
-translate H Reti {Réti}
-translate H English {Angol}
-translate H d4Nf6Miscellaneous {1.d4 Nf6 vegyes}
+# ====== TODO To be translated ======
+translate H BookPartiallyLoaded {Book partially loaded}
+# ====== TODO To be translated ======
+translate H AddLine {Add Line}
+# ====== TODO To be translated ======
+translate H RemLine {Remove Line}
+# ====== TODO To be translated ======
+translate H Calvar {Calculation of variations}
+# ====== TODO To be translated ======
+translate H ConfigureCalvar {Configuration}
+# ====== TODO To be translated ======
+# ====== TODO To be translated ======
+translate H Reti {Reti}
+# ====== TODO To be translated ======
+translate H English {English}
+# ====== TODO To be translated ======
+translate H d4Nf6Miscellaneous {1.d4 Nf6 Miscellaneous}
+# ====== TODO To be translated ======
 translate H Trompowsky {Trompowsky}
+# ====== TODO To be translated ======
 translate H Budapest {Budapest}
-translate H OldIndian {Óindiai}
-translate H BenkoGambit {Benkõ-csel}
+# ====== TODO To be translated ======
+translate H OldIndian {Old Indian}
+# ====== TODO To be translated ======
+translate H BenkoGambit {Benko Gambit}
+# ====== TODO To be translated ======
 translate H ModernBenoni {Modern Benoni}
-translate H DutchDefence {Holland védelem}
-translate H Scandinavian {Skandináv}
-translate H AlekhineDefence {Aljechin-védelem}
+# ====== TODO To be translated ======
+translate H DutchDefence {Dutch Defence}
+# ====== TODO To be translated ======
+translate H Scandinavian {Scandinavian}
+# ====== TODO To be translated ======
+translate H AlekhineDefence {Alekhine Defence}
+# ====== TODO To be translated ======
 translate H Pirc {Pirc}
+# ====== TODO To be translated ======
 translate H CaroKann {Caro-Kann}
-translate H CaroKannAdvance {Betolós Caro-Kann}
-translate H Sicilian {Szicíliai}
-translate H SicilianAlapin {Szicíliai Alapin}
-translate H SicilianClosed {Zárt szicíliai}
-translate H SicilianRauzer {Szicíliai Rauzer}
-translate H SicilianDragon {Szicíliai sárkány}
-translate H SicilianScheveningen {Szicíliai Scheveningen}
-translate H SicilianNajdorf {Szicíliai Najdorf}
-translate H OpenGame {Nyílt megnyitások}
-translate H Vienna {Bécsi játék}
-translate H KingsGambit {Királycsel}
-translate H RussianGame {Orosz védelem}
-translate H ItalianTwoKnights {Olasz megnyitás/Kettõs huszárjáték}
-translate H Spanish {Spanyol}
-translate H SpanishExchange {Cserespanyol}
-translate H SpanishOpen {Nyílt spanyol}
-translate H SpanishClosed {Zárt spanyol}
-translate H FrenchDefence {Francia védelem}
-translate H FrenchAdvance {Betolós francia}
-translate H FrenchTarrasch {Francia Tarrasch}
-translate H FrenchWinawer {Francia Winawer}
-translate H FrenchExchange {Cserefrancia}
-translate H QueensPawn {Vezérgyalog megnyitás}
-translate H Slav {Szláv}
-translate H QGA {Elfogadott vezércsel}
-translate H QGD {Elhárított vezércsel}
-translate H QGDExchange {Elhárított vezércsel - csereváltozat}
-translate H SemiSlav {Félszláv}
-translate H QGDwithBg5 {Elhárított vezércsel Fg5-tel}
-translate H QGDOrthodox {Orthodox vezércsel}
+# ====== TODO To be translated ======
+translate H CaroKannAdvance {Caro-Kann Advance}
+# ====== TODO To be translated ======
+translate H Sicilian {Sicilian}
+# ====== TODO To be translated ======
+translate H SicilianAlapin {Sicilian Alapin}
+# ====== TODO To be translated ======
+translate H SicilianClosed {Sicilian Closed}
+# ====== TODO To be translated ======
+translate H SicilianRauzer {Sicilian Rauzer}
+# ====== TODO To be translated ======
+translate H SicilianDragon {Sicilian Dragon}
+# ====== TODO To be translated ======
+translate H SicilianScheveningen {Sicilian Scheveningen}
+# ====== TODO To be translated ======
+translate H SicilianNajdorf {Sicilian Najdorf}
+# ====== TODO To be translated ======
+translate H OpenGame {Open Game}
+# ====== TODO To be translated ======
+translate H Vienna {Vienna}
+# ====== TODO To be translated ======
+translate H KingsGambit {King's Gambit}
+# ====== TODO To be translated ======
+translate H RussianGame {Russian Game}
+# ====== TODO To be translated ======
+translate H ItalianTwoKnights {Italian/Two Knights}
+# ====== TODO To be translated ======
+translate H Spanish {Spanish}
+# ====== TODO To be translated ======
+translate H SpanishExchange {Spanish Exchange}
+# ====== TODO To be translated ======
+translate H SpanishOpen {Spanish Open}
+# ====== TODO To be translated ======
+translate H SpanishClosed {Spanish Closed}
+# ====== TODO To be translated ======
+translate H FrenchDefence {French Defence}
+# ====== TODO To be translated ======
+translate H FrenchAdvance {French Advance}
+# ====== TODO To be translated ======
+translate H FrenchTarrasch {French Tarrasch}
+# ====== TODO To be translated ======
+translate H FrenchWinawer {French Winawer}
+# ====== TODO To be translated ======
+translate H FrenchExchange {French Exchange}
+# ====== TODO To be translated ======
+translate H QueensPawn {Queen's Pawn}
+# ====== TODO To be translated ======
+translate H Slav {Slav}
+# ====== TODO To be translated ======
+translate H QGA {QGA}
+# ====== TODO To be translated ======
+translate H QGD {QGD}
+# ====== TODO To be translated ======
+translate H QGDExchange {QGD Exchange}
+# ====== TODO To be translated ======
+translate H SemiSlav {Semi-Slav}
+# ====== TODO To be translated ======
+translate H QGDwithBg5 {QGD with Bg5}
+# ====== TODO To be translated ======
+translate H QGDOrthodox {QGD Orthodox}
+# ====== TODO To be translated ======
 translate H Grunfeld {Grünfeld}
-translate H GrunfeldExchange {Grünfeld - csereváltozat}
-translate H GrunfeldRussian {Grünfeld - orosz változat}
-translate H Catalan {Katalán}
-translate H CatalanOpen {Nyílt katalán}
-translate H CatalanClosed {Zárt katalán}
-translate H QueensIndian {Vezérindiai}
-translate H NimzoIndian {Nimzo-indiai}
-translate H NimzoIndianClassical {Klasszikus Nimzo-indiai}
-translate H NimzoIndianRubinstein {Nimzo-indiai - Rubinstein}
-translate H KingsIndian {Királyindiai}
-translate H KingsIndianSamisch {Királyindiai - Sämisch}
-translate H KingsIndianMainLine {Királyindiai - fõváltozat}
+# ====== TODO To be translated ======
+translate H GrunfeldExchange {Grünfeld Exchange}
+# ====== TODO To be translated ======
+translate H GrunfeldRussian {Grünfeld Russian}
+# ====== TODO To be translated ======
+translate H Catalan {Catalan}
+# ====== TODO To be translated ======
+translate H CatalanOpen {Catalan Open}
+# ====== TODO To be translated ======
+translate H CatalanClosed {Catalan Closed}
+# ====== TODO To be translated ======
+translate H QueensIndian {Queen's Indian}
+# ====== TODO To be translated ======
+translate H NimzoIndian {Nimzo-Indian}
+# ====== TODO To be translated ======
+translate H NimzoIndianClassical {Nimzo-Indian Classical}
+# ====== TODO To be translated ======
+translate H NimzoIndianRubinstein {Nimzo-Indian Rubinstein}
+# ====== TODO To be translated ======
+translate H KingsIndian {King's Indian}
+# ====== TODO To be translated ======
+translate H KingsIndianSamisch {King's Indian Sämisch}
+# ====== TODO To be translated ======
+translate H KingsIndianMainLine {King's Indian Main Line}
+# ====== TODO To be translated ======
+
 translate H ConfigureFics {FICS beállítása}
+translate H FICSLogin {Belépés}
 translate H FICSGuest {Belépés vendégként}
 translate H FICSServerPort {Szerverport}
 # ====== TODO To be translated ======
 translate H FICSServerAddress {IP Address}
 # ====== TODO To be translated ======
 translate H FICSRefresh {Refresh}
+translate H FICSTimeseal {Idõbélyeg}
 translate H FICSTimesealPort {Idõbélyegport}
 translate H FICSSilence {Csend}
 translate H FICSOffers {Ajánlatok}
 # ====== TODO To be translated ======
-translate H FICSConsole {Console}
+translate H FICSMakeOffer {Make Offer}
 translate H FICSGames {Játszmák}
-# ====== TODO To be translated ======
-translate H FICSUnobserve {Stop observing game}
-# ====== TODO To be translated ======
-translate H FICSProfile {Display your history and profile}
-# ====== TODO To be translated ======
-translate H FICSRelayedGames {Relayed games}
 translate H FICSFindOpponent {Ellenfélkeresõ}
 translate H FICSTakeback {Visszavétel}
 translate H FICSTakeback2 {Visszavétel 2}
@@ -1589,56 +1977,29 @@ translate H FICSAutoColour {automatikus}
 translate H FICSManualConfirm {kézi megerõsítés}
 translate H FICSFilterFormula {Szûrõformula}
 translate H FICSIssueSeek {Keresés}
-translate H FICSChallenge {Kihívás}
 translate H FICSAccept {elfogad}
 translate H FICSDecline {elutasít}
 translate H FICSColour {Szín}
 translate H FICSSend {küld}
 translate H FICSConnect {Csatlakozás}
 # ====== TODO To be translated ======
-translate H FICSdefaultuservars {Use default variables}
+translate H FICSShouts {Shouts}
 # ====== TODO To be translated ======
-translate H FICSObserveconfirm {Do you want to observe game}
+translate H FICSTells {Tells}
 # ====== TODO To be translated ======
-translate H FICSpremove {Enable premove}
+translate H FICSOpponent {Opponent Info}
 # ====== TODO To be translated ======
-translate H GameReview {Game review}
+translate H FICSInfo {Info}
 # ====== TODO To be translated ======
-translate H GameReviewTimeExtended {Time extended}
+translate H FICSDraw {Offer Draw}
 # ====== TODO To be translated ======
-translate H GameReviewMargin {Error margin}
+translate H FICSRematch {Rematch}
 # ====== TODO To be translated ======
-translate H GameReviewAutoContinue {Auto continue when move is correct}
+translate H FICSQuit {Quit FICS}
 # ====== TODO To be translated ======
-translate H GameReviewReCalculate {Use extended time}
-# ====== TODO To be translated ======
-translate H GameReviewAnalyzingMovePlayedDuringTheGame {Analyzing move played during the game}
-# ====== TODO To be translated ======
-translate H GameReviewAnalyzingThePosition {Analyzing the position}
-# ====== TODO To be translated ======
-translate H GameReviewEnterYourMove {Enter your move}
-# ====== TODO To be translated ======
-translate H GameReviewCheckingYourMove {Checking your move}
-# ====== TODO To be translated ======
-translate H GameReviewYourMoveWasAnalyzed {Your move was analyzed}
-# ====== TODO To be translated ======
-translate H GameReviewYouPlayedSameMove {You played the same move as in match}
-# ====== TODO To be translated ======
-translate H GameReviewScoreOfYourMove {Score of your move}
-# ====== TODO To be translated ======
-translate H GameReviewGameMoveScore {Game move's score}
-# ====== TODO To be translated ======
-translate H GameReviewEngineScore {Engine's score}
-# ====== TODO To be translated ======
-translate H GameReviewYouPlayedLikeTheEngine {You played like the engine}
-# ====== TODO To be translated ======
-translate H GameReviewNotEngineMoveButGoodMove {Not the engine move, but is also a good move}
-# ====== TODO To be translated ======
-translate H GameReviewMoveNotGood {This move is not good, score is}
-# ====== TODO To be translated ======
-translate H GameReviewMovesPlayedLike {Moves played like}
-# ====== TODO To be translated ======
-translate H GameReviewMovesPlayedEngine {Moves played like engine}
+translate H FICSCensor {Censor}
+
+
 translate H CCDlgConfigureWindowTitle {Levelezési sakk beállításai}
 translate H CCDlgCGeneraloptions {Általános lehetõségek}
 translate H CCDlgDefaultDB {Alapértelmezésû adatbázis:}
@@ -1695,8 +2056,6 @@ translate H CCHelpBtn {Segítség ikonokhoz és állapotjelzõkhöz\nÁltalános segítsé
 translate H CCDlgServerName {Szervernév:}
 translate H CCDlgLoginName  {Bejelentkezõ név:}
 translate H CCDlgPassword   {Jelszó:}
-# ====== TODO To be translated ======
-translate H CCDlgShowPassword {Show password}
 translate H CCDlgURL        {Xfcc-URL:}
 translate H CCDlgRatingType {Értékszám típusa:}
 translate H CCDlgDuplicateGame {Nem egyedi játszmaazonosító}
@@ -1719,23 +2078,37 @@ translate H CCOrderOppTimeTxt {Opponents Clock}
 translate H CCDlgConfigRelay {Configure ICCF observations}
 # ====== TODO To be translated ======
 translate H CCDlgConfigRelayHelp {Go to the games page on http://www.iccf-webchess.com and display the game to be observed.  If you see the chessboard copy the URL from your browser to the list below. One URL per line only!\nExample: http://www.iccf-webchess.com/MakeAMove.aspx?id=266452}
-translate H ExtHWConfigConnection {Külsõ hardver beállítása}
-translate H ExtHWPort {Port}
-translate H ExtHWEngineCmd {Motorparancs}
-translate H ExtHWEngineParam {Motorparaméter}
-translate H ExtHWShowButton {Mutasd meg a nyomógombot.}
-translate H ExtHWHardware {Hardver}
-translate H ExtHWNovag {Novag Citrine}
-translate H ExtHWInputEngine {Bemeneti motor}
-translate H ExtHWNoBoard {Nincs sakktábla}
+
 # ====== TODO To be translated ======
-translate H NovagReferee {Referee}
-translate H IEConsole {Bemeneti motor kezelõszerve}
-translate H IESending {Lépések bekérve}
-translate H IESynchronise {Szinkronizálás}
-translate H IERotate  {Forgatás}
-translate H IEUnableToStart {Nem tudom elindítani ezt a bemeneti motort:}
-translate H DoneWithPosition {Állás kész}
+translate H ExtHWConfigConnection {Configure external hardware}
+# ====== TODO To be translated ======
+translate H ExtHWPort {Port}
+# ====== TODO To be translated ======
+translate H ExtHWEngineCmd {Engine command}
+# ====== TODO To be translated ======
+translate H ExtHWEngineParam {Engine parameter}
+# ====== TODO To be translated ======
+translate H ExtHWShowButton {Show button}
+# ====== TODO To be translated ======
+translate H ExtHWHardware {Hardware}
+# ====== TODO To be translated ======
+translate H ExtHWNovag {Novag Citrine}
+# ====== TODO To be translated ======
+translate H ExtHWInputEngine {Input Engine}
+# ====== TODO To be translated ======
+translate H ExtHWNoBoard {No board}
+# ====== TODO To be translated ======
+translate H IEConsole {Input Engine Console}
+# ====== TODO To be translated ======
+translate H IESending {Moves sent for}
+# ====== TODO To be translated ======
+translate H IESynchronise {Synchronise}
+# ====== TODO To be translated ======
+translate H IERotate  {Rotate}
+# ====== TODO To be translated ======
+translate H IEUnableToStart {Unable to start Input Engine:}
+# ====== TODO To be translated ======
+translate H DoneWithPosition {Done with position}
 translate H Board {Sakktábla}
 translate H showGameInfo {A játszma adatai}
 translate H autoResizeBoard {A sakktábla automatikus átméretezése}
@@ -1745,7 +2118,24 @@ translate H DockLeft {Mozgatás balra}
 translate H DockRight {Mozgatás jobbra}
 translate H Undock {Feloldás}
 # ====== TODO To be translated ======
-translate H ChangeIcon {Change icon...}
+translate H ChangeIcon {Change icon}
+# ====== TODO To be translated ======
+translate H More {More}
+
+# Drag & Drop
+# ====== TODO To be translated ======
+translate H CannotOpenUri {Cannot open the following URI:}
+# ====== TODO To be translated ======
+translate H InvalidUri {Drop content is not a valid URI list.}
+# ====== TODO To be translated ======
+translate H UriRejected	{The following files are rejected:}
+# ====== TODO To be translated ======
+translate H UriRejectedDetail {Only the listed file types can be handled:}
+# ====== TODO To be translated ======
+translate H EmptyUriList {Drop content is empty.}
+# ====== TODO To be translated ======
+translate H SelectionOwnerDidntRespond {Timeout during drop action: selection owner didn't respond.}
+
 }
 
 # Tips of the day in Hungarian
@@ -1784,13 +2174,6 @@ set tips(H) {
   {
     A bal egérgomb révén áthúzással egyik adatbázisból a másikba
     másolhatsz játszmákat az <a Switcher>adatbázisváltó</a> ablakban.
-  }
-  {
-    Scid meg tud nyitni PGN-fájlokat, még akkor is, ha Gzip útján
-    tömörítve vannak (.gz fájlnév-kiterjesztéssel). A megnyitott PGN-fájlok
-    csak olvashatóak, ezért ha egy PGN-fájlt Scidben akarsz átszerkeszteni,
-    hozz létre új Scid-adatbázist, és az <a Switcher>adatbázisváltó</a>
-    segítségével másold bele a PGN-fájl játszmáit.
   }
   {
     Ha egy nagy adatbázist gyakran használsz a <a Tree>faszerkezet</a>-ablakkal,
@@ -1936,14 +2319,6 @@ set tips(H) {
     Ha meg akarod nézni egy fájl méretét vagy utolsó módosításának
     idõpontját, mielõtt megnyitnád, használd megnyitására a
     <a Finder>fájlkeresõ</a>t.
-  }
-  {
-    A <a Repertoire>repertoár</a>fájl remek mód kedvelt megnyitásaid
-    nyilvántartására, emellett meg lehet vele keresni azokat a játszmákat,
-    amelyekben e megnyitások elõfordultak. Ha megnyitásaidat repertoárfájlban
-    tartod, minden új játszmagyûjteményt átszûrhetsz vele,
-    és végignézheted azokat a játszmákat, amelyekben kedvelt megnyitásaid
-    elõfordulnak.
   }
   {
     A <a OpReport>megnyitási összefoglaló</a> nagyszerû lehetõséget nyújt

@@ -7,19 +7,15 @@
 //  Version:    3.5
 //
 //  Notice:     Copyright (c) 2001-2003  Shane Hudson.  All rights reserved.
-//              Copyright (C) 2015 Fulvio Benini
+//
+//  Author:     Shane Hudson (sgh@users.sourceforge.net)
 //
 //////////////////////////////////////////////////////////////////////
 
 
 #include "pgnparse.h"
-#include "game.h"
-#include <stdio.h>
-
-#if defined(_MSC_VER) && _MSC_VER <= 1800
-    #define snprintf _snprintf
-#endif
-
+#include "charsetdetector.h"
+#include "charsetconverter.h"
 
 const uint MAX_COMMENT_SIZE = 16000;
 
@@ -28,62 +24,23 @@ const uint MAX_COMMENT_SIZE = 16000;
 //
 #define ADDCHAR(buf,ch)  *(buf) = (ch); (buf)++; *(buf) = 0
 
-/**
- * charIsSpace() - Checks whether @c is a white-space character.
- *
- * Return false for non-breaking spaces (ASCII-160 or A0 hex) because
- * they can be part of a multi-byte utf-8 character.
- */
-bool charIsSpace (unsigned char c) {
-    return (c == ' '    ||
-            c == '\t'   ||
-            c == '\n'   ||
-            c == '\v'   ||
-            c == '\f'   ||
-            c == '\r');
-}
 
-/**
- * pgnLatin1_to_utf8() - convert a char to utf-8 enconding
- * @c: pointer to a null terminated string
- *
- * The PGN standard use a subset of ISO 8859/1 (Latin 1):
- * Code value from 0 to 126 are the standard ASCII character set
- * Code value from 127 to 191 are not used for PGN data representation.
- * Code value from 192 to 255 are mostly alphabetic printing characters with
- * various diacritical marks; their use is encouraged for those languages
- * that require such characters.
- */
-std::string pgnLatin1_to_utf8 (const char* c) {
-    std::string res;
-    res = *c;
-    uint8_t v = *c;
-    if (v >= 192) {
-        // Because @c is required to be a null terminated string, it is safe
-        // to access the next char (if @c is the last char, next will be 0)
-        uint8_t next = *(c+1);
-        if ((next >> 6) != 0x02) {
-            //Not a valid utf-8 sequence
-            //Assume it's Latin1 and convert it to utf-8
-            res = static_cast<uint8_t>(0xC3);
-            res += static_cast<uint8_t>(v & 0xBF);
-        }
-    }
-    return res;
+PgnParser::~PgnParser()
+{
+    delete ErrorBuffer;
+    delete CharConverter;
+    ClearIgnoredTags();
 }
 
 
-errorT CodecPgn::open(const char* filename) {
-    errorT res = file_.Open(filename, FMODE_ReadOnly);
-    if (res == OK) {
-        parser_.Reset(&file_);
-        fileSize_ = fileSize (filename, "");
-        if (fileSize_ < 1) { fileSize_ = 1; }
-        parser_.IgnorePreGameText();
-    }
-    return res;
+void
+PgnParser::Init ()
+{
+    ErrorBuffer = new DString;
+    CharConverter = NULL;
+    CharDetector = NULL;
+    Reset();
 }
-
 
 void
 PgnParser::Reset()
@@ -91,12 +48,24 @@ PgnParser::Reset()
     UnGetCount = 0;
     NumErrors = 0;
     BytesSeen = 0;
+    ErrorFile = NULL;
     LineCounter = 0;
     GameCounter = 0;
     StorePreGameText = true;
     EndOfInputWarnings = true;
     ResultWarnings = true;
+    NewlinesToSpaces = true;
     NumIgnoredTags = 0;
+}
+
+void
+PgnParser::Init (MFile * infile)
+{
+    Init();
+    InFile = infile;
+    InBuffer = InCurrent = NULL;
+    EndChar = EOF;
+    CreateCharsetDetector();
 }
 
 void
@@ -106,15 +75,42 @@ PgnParser::Reset (MFile * infile)
     InFile = infile;
     InBuffer = InCurrent = NULL;
     EndChar = EOF;
+
+    if (CheckUTF8BOM())
+    {
+        delete CharConverter;
+        CharConverter = NULL;
+        CharDetector = NULL;
+    }
+    else
+    {
+        CreateCharsetDetector();
+    }
+}
+
+void
+PgnParser::CreateCharsetDetector ()
+{
+    if (CharConverter)
+    {
+        CharConverter->reset();
+        CharDetector->reset();
+    }
+    else
+    {
+        CharConverter = new CharsetConverter;
+        CharDetector = &CharConverter->detector();
+    }
 }
 
 void
 PgnParser::Init (const char * inbuffer)
 {
-    Reset();
+    Init();
     InFile = NULL;
     InBuffer = InCurrent = inbuffer;
     EndChar = 0;
+    CreateCharsetDetector();
 }
 
 void
@@ -124,34 +120,34 @@ PgnParser::Reset (const char * inbuffer)
     InFile = NULL;
     InBuffer = InCurrent = inbuffer;
     EndChar = 0;
+    CreateCharsetDetector();
 }
 
-int
-PgnParser::GetChar ()
+bool
+PgnParser::CheckUTF8BOM()
 {
-    int ch = 0;
-    BytesSeen++;
-    if (UnGetCount > 0) {
-        UnGetCount--;
-        ch = UnGetCh[UnGetCount];
-    } else if (InFile != NULL) {
-        ch =  InFile->ReadOneByte();
-    } else {
-        ch = *InCurrent;
-        if (ch != 0) { InCurrent++; }
+    int ch = GetChar();
+
+    if (ch == 0xEF)
+    {
+        if ((ch = GetChar()) == 0xBB)
+        {
+            if ((ch = GetChar()) == 0xBF)
+                return true;
+
+            UnGetChar(ch);
+        }
+        else
+        {
+            UnGetChar(ch);
+        }
     }
-    if (ch == '\n') { LineCounter++; }
-    return ch;
-}
+    else
+    {
+        UnGetChar(ch);
+    }
 
-void
-PgnParser::UnGetChar (int ch)
-{
-    if (UnGetCount == MAX_UNGETCHARS) { return; }
-    UnGetCh[UnGetCount] = ch;
-    UnGetCount++;
-    BytesSeen--;
-    if (ch == '\n') { LineCounter--; }
+    return false;
 }
 
 void
@@ -167,7 +163,11 @@ void
 PgnParser::ClearIgnoredTags ()
 {
     for (uint i = 0; i < NumIgnoredTags; i++) {
+#ifdef WINCE
+        my_Tcl_Free( IgnoredTags[i] );
+#else
         delete[] IgnoredTags[i];
+#endif
     }
     NumIgnoredTags = 0;
 }
@@ -185,11 +185,17 @@ void
 PgnParser::LogError (const char * errMessage, const char * text)
 {
     NumErrors++;
-    ErrorBuffer += "(game " + to_string(GameCounter);
-    ErrorBuffer += ", line " + to_string(LineCounter) + ") ";
-    ErrorBuffer += errMessage;
-    ErrorBuffer += text;;
-    ErrorBuffer += "\n";
+    if (ErrorFile != NULL) {
+        //fprintf (ErrorFile, "%s%s [line %u]\n", errMessage, text, LineCounter);
+        if (InFile != NULL) {
+            fprintf (ErrorFile, "%s:", InFile->GetFileName());
+        }
+        fprintf (ErrorFile, "(game %u, line %u) %s%s\n", GameCounter, LineCounter, errMessage, text);
+        return;
+    }
+    ErrorBuffer->Append ("(game ", GameCounter);
+    ErrorBuffer->Append (", line ", LineCounter, ") ");
+    ErrorBuffer->Append (errMessage, text, "\n");
 }
 
 void
@@ -240,7 +246,7 @@ PgnParser::GetLine (char * buffer, uint bufSize)
 // standardDutchName(): standardises various combinations of upper
 //       and lower case "v" and "d" in the common Dutch name
 //       prefixes "van der", "van de" and "van den" to a capital
-//       V and small d, for consistency to avoid multiple names.
+//       V and small d, for consisitency to avoid multiple names.
 //
 static void
 standardDutchName (char * s)
@@ -298,7 +304,7 @@ standardPlayerName (char * source)
     }
     *to = 0;
 
-    // Now trim any trailing spaces, tabs :
+    // Now trim any trailling spaces, tabs :
     strTrimRight (source, " \t");
 
     // Now standardise the capital letters of Dutch/etc prefix names:
@@ -309,9 +315,9 @@ standardPlayerName (char * source)
 errorT
 PgnParser::ExtractPgnTag (const char * buffer, Game * game)
 {
-    const uint maxTagLength = 255;
-    char tag [255];
-    char value [255];
+    static const uint maxTagLength = 255;
+    char tag [maxTagLength + 1]; // need more space for nul byte
+    char value [maxTagLength + 1];
 
     // Skip any initial whitespace:
     while (charIsSpace(*buffer)  &&  *buffer != 0) { buffer++; }
@@ -323,9 +329,9 @@ PgnParser::ExtractPgnTag (const char * buffer, Game * game)
     // Now at the start of the tag name:
     uint length = 0;
     while (!charIsSpace(*buffer)  &&  *buffer != 0) {
+        if (length == maxTagLength) { return ERROR_PGNTag; }
         tag[length] = *buffer++;
         length++;
-        if (length == maxTagLength) { return ERROR_PGNTag; }
     }
     if (*buffer == 0) { return ERROR_PGNTag; }
     tag[length] = 0;
@@ -339,39 +345,40 @@ PgnParser::ExtractPgnTag (const char * buffer, Game * game)
     length = 0;
     uint lastQuoteIndex = 0;
     bool seenEndQuote = false;
-    while (*buffer != 0) {
+    while (*buffer != 0 && !seenEndQuote) {
         if (*buffer == '"') {
             lastQuoteIndex = length;
             seenEndQuote = true;
+        } else {
+            if (length == maxTagLength)
+                return ERROR_PGNTag;
+            value[length] = *buffer;
+            length++;
         }
-        value[length] = *buffer;
         buffer++;
-        length++;
-        if (length == maxTagLength) { return ERROR_PGNTag; }
     }
     if (! seenEndQuote) { return ERROR_PGNTag; }
     value[lastQuoteIndex] = 0;
 
-    std::string tmpUft8;
-    for (const char* i = value; i != value + lastQuoteIndex; i++) {
-        tmpUft8 += pgnLatin1_to_utf8(i);
-    }
-    std::copy(tmpUft8.c_str(), tmpUft8.c_str() + tmpUft8.length() + 1, value);
+    if (CharDetector)
+        CharDetector->detect(value, length);
 
     // Now decide what to add to the game based on this tag:
     if (strEqual (tag, "White")) {
+        // The White, Black, Site, Event, Round tags should not be empty
+        // (Date and Result should also have values, but these will be set after ExtractPgnTag returns)
+        if (length == 0) { return ERROR_PGNTagNull; }
 #ifdef STANDARD_PLAYER_NAMES
         standardPlayerName (value);
 #endif
         // Check for a rating in parentheses at the end of the player name:
         uint elo = 0;
-        uint len = strLength (value);
-        if (len > 7  &&  value[len-1] == ')'
-            &&  isdigit(value[len-2])  &&  isdigit(value[len-3])
-            &&  isdigit(value[len-4])  &&  isdigit(value[len-5])
-            &&  value[len-6] == '('  &&  value[len-7] == ' ') {
-            value[len-7] = 0;
-            elo = strGetUnsigned (&(value[len-5]));
+        if (length > 7  &&  value[length-1] == ')'
+            &&  isdigit(value[length-2])  &&  isdigit(value[length-3])
+            &&  isdigit(value[length-4])  &&  isdigit(value[length-5])
+            &&  value[length-6] == '('  &&  value[length-7] == ' ') {
+            value[length-7] = 0;
+            elo = strGetUnsigned (&(value[length-5]));
             if (elo > MAX_ELO) {
                 LogError ("Warning: rating too large: ", value);
                 elo = MAX_ELO;
@@ -382,18 +389,18 @@ PgnParser::ExtractPgnTag (const char * buffer, Game * game)
         game->SetWhiteStr (value);
 
     } else if (strEqual (tag, "Black")) {
+        if (length == 0) { return ERROR_PGNTagNull; }
 #ifdef STANDARD_PLAYER_NAMES
         standardPlayerName (value);
 #endif
         // Check for a rating in parentheses at the end of the player name:
         uint elo = 0;
-        uint len = strLength (value);
-        if (len > 7  &&  value[len-1] == ')'
-            &&  isdigit(value[len-2])  &&  isdigit(value[len-3])
-            &&  isdigit(value[len-4])  &&  isdigit(value[len-5])
-            &&  value[len-6] == '('  &&  value[len-7] == ' ') {
-            value[len-7] = 0;
-            elo = strGetUnsigned (&(value[len-5]));
+        if (length > 7  &&  value[length-1] == ')'
+            &&  isdigit(value[length-2])  &&  isdigit(value[length-3])
+            &&  isdigit(value[length-4])  &&  isdigit(value[length-5])
+            &&  value[length-6] == '('  &&  value[length-7] == ' ') {
+            value[length-7] = 0;
+            elo = strGetUnsigned (&(value[length-5]));
             if (elo > MAX_ELO) {
                 LogError ("Warning: rating too large: ", value);
                 elo = MAX_ELO;
@@ -404,12 +411,15 @@ PgnParser::ExtractPgnTag (const char * buffer, Game * game)
         game->SetBlackStr (value);
 
     } else if (strEqual (tag, "Event")) {
+        if (length == 0) { return ERROR_PGNTagNull; }
         game->SetEventStr (value);
 
     } else if (strEqual (tag, "Site")) {
+        if (length == 0) { return ERROR_PGNTagNull; }
         game->SetSiteStr (value);
 
     } else if (strEqual (tag, "Round")) {
+        if (length == 0) { return ERROR_PGNTagNull; }
         game->SetRoundStr (value);
 
     } else if (strEqual (tag, "Result")) {
@@ -502,36 +512,29 @@ PgnParser::EndOfInput()
     return false;
 }
 
-// Modifies the parameter string in-place, trimming all
-// whitespace at the start and end of the string, and reducing
-// all other sequences of whitespace to a single space.
-//
-// Example: "\t\n   A  \t\n   B   C  "  (where \t and \n are tabs
-// and newlines) becomes "A B C".
-std::string PgnParser::GetComment()
+void
+PgnParser::GetComment (char * buffer, uint bufSize)
 {
-    std::string res;
+    char * outPtr = buffer;
+    int ch;
+    int startLine = LineCounter;
+    ch = GetChar();
 
-    int ch = GetChar();
-    for (; ch != EndChar  &&  ch != '}'; ch = GetChar()) {
-        if (charIsSpace(ch)) {
-            if (res.length() == 0) continue;
-            if (*(res.rbegin()) == ' ') continue;
-            ch = ' ';
-        }
-        res += ch;
-    }
-    if (res.length() != 0 && *(res.rbegin()) == ' ') {
-        res.resize(res.length() -1);
-    }
+    ASSERT(bufSize > 0);
 
+    while (ch != EndChar  &&  ch != '}') {
+        if (NewlinesToSpaces  &&  ch == '\n') { ch = ' '; }
+        if (bufSize > 1) { *outPtr++ = (char) ch; bufSize--; }
+        ch = GetChar();
+    }
+    *outPtr = 0; // must be nul-terminated
     if (ch == EndChar) {
         char tempStr[80];
-        sprintf (tempStr, "started on line %u\n", LineCounter);
+        sprintf (tempStr, "started on line %u\n", startLine);
         LogError ("Error: Open Comment at end of input", tempStr);
     }
-
-    return res;
+    if (CharDetector)
+        CharDetector->detect(buffer, outPtr - buffer);
 }
 
 void
@@ -962,7 +965,7 @@ PgnParser::GetGameToken (char * buffer, uint bufSize)
 static inline char *
 firstNonBlank (char * s)
 {
-    char *x = s;
+    register char *x = s;
     while (*x) {
         if (! charIsSpace(*x))  { return x; }
         x++;
@@ -1034,9 +1037,15 @@ PgnParser::GetNextToken (char * buffer, uint bufSize)
 errorT
 PgnParser::ParseMoves (Game * game)
 {
+#ifdef WINCE
+    char * buffer = my_Tcl_Alloc(sizeof( char [MAX_COMMENT_SIZE]));
+    errorT err = ParseMoves (game, buffer, MAX_COMMENT_SIZE);
+    my_Tcl_Free( buffer );
+#else
     char * buffer = new char [MAX_COMMENT_SIZE];
     errorT err = ParseMoves (game, buffer, MAX_COMMENT_SIZE);
     delete[] buffer;
+#endif
     return err;
 }
    
@@ -1106,7 +1115,7 @@ PgnParser::ParseMoves (Game * game, char * buffer, uint bufSize)
                     char tempStr [500];
                     // Add an error comment to the game:
                     snprintf (tempStr, sizeof(tempStr), "Error reading move: %s", buffer);
-                    game->SetMoveComment (tempStr);
+                    game->AppendMoveComment (tempStr);
                     snprintf (tempStr, sizeof(tempStr), "Error reading move in game %s - %s, %u: ",
                              game->GetWhiteStr(), game->GetBlackStr(),
                              date_GetYear (game->GetDate()));
@@ -1149,18 +1158,14 @@ PgnParser::ParseMoves (Game * game, char * buffer, uint bufSize)
             game->MoveForward();
             break;
 
-        case TOKEN_Comment: {
-            std::string comment = GetComment();
-
-            std::string tmpUft8;
-            const char* end = comment.c_str() + comment.length();
-            for (const char* i = comment.c_str(); i != end; i++) {
-                tmpUft8 += pgnLatin1_to_utf8(i);
-            }
-
-            game->SetMoveComment(tmpUft8.c_str());
-
-            } break;
+        case TOKEN_Comment:
+            GetComment (buffer, bufSize);
+            // We remove extra spaces from comments.
+            // Problem is, this is fine for indented comments (as we'd find in column formatted pgn)
+            // , but not desirable for non-indented comments, where we want to preserve newlines (for eg)
+            strSingleSpace (buffer);
+            game->AppendMoveComment (buffer);
+            break;
 
         case TOKEN_LineComment:
             break;  // Line comments inside a game are just ignored.
@@ -1251,32 +1256,13 @@ PgnParser::ParseGame (Game * game)
                 }
                 ParseMode = PARSE_Header;
             }
-            if (ExtractPgnTag (buffer, game) != OK) {
+            errorT pgnRes = ExtractPgnTag (buffer, game);
+            // Don't throw errors for null pgn tags - too verbose
+            if (pgnRes != OK && pgnRes != ERROR_PGNTagNull) {
                 LogError ("Error reading tag: ", buffer);
             }
 
         } else if (token == TOKEN_LineComment) {
-            static Position epd;
-            if (epd.ReadFromFEN(buffer) == OK) {
-                //EPD line
-                game->Clear();
-                game->SetStartFen(buffer);
-                uint spaces = 0;
-                const char* buffer_end = buffer + MAX_COMMENT_SIZE;
-                for (const char* i = buffer; *i != 0 && i != buffer_end; i++) {
-                    if (*i == ' ') {
-                        spaces++;
-                        continue;
-                    }
-                    if (spaces >= 4) {
-                        game->SetMoveComment(i);
-                        break;
-                    }
-                }
-                ParseMode = PARSE_Game;
-                err = OK;
-                break;
-            }
             // Add the line to the pre-game text if necessary:
             if (preGameTextLength > 0  ||  buffer[0] != 0) {
                 uint len = strLength (buffer);
@@ -1290,7 +1276,7 @@ PgnParser::ParseGame (Game * game)
 
         } else if (token == TOKEN_Comment) {
             // Get, but ignore, this comment:
-            GetComment();
+            GetComment (NULL, 0);
 
         } else if (token == TOKEN_TagEnd) {
             // A blank line after the PGN header tags:
@@ -1307,6 +1293,17 @@ PgnParser::ParseGame (Game * game)
     delete[] buffer;
     delete[] preGameTextBuffer;
 
+    if (err != ERROR_NotFound && CharDetector)
+    {
+        CharDetector->finish();
+
+        if (CharDetector->charset() != CharsetDetector::UTF8)
+            DoCharsetConversion(game);
+
+        CharDetector->reset();
+        CharConverter->reset();
+    }
+
     if (ParseMode == PARSE_Header) {
         if (EndOfInputWarnings) {
             LogError ("Warning: End of input in PGN header tags section", "");
@@ -1316,6 +1313,120 @@ PgnParser::ParseGame (Game * game)
         }
     }
     return err;
+}
+
+
+std::string
+PgnParser::ConvertToUTF8(char * str)
+{
+    std::string tmp(str);
+
+    if (tmp.empty())
+        return tmp;
+
+    std::string res;
+
+    if (CharDetector->isASCII() && !CharConverter->fixLatin1(tmp, res))
+        res.clear();
+
+    if (res.empty())
+        CharConverter->convertToUTF8(tmp, res);
+
+    return res;
+}
+
+
+typedef char* (Game::*GetTag)();
+typedef void (Game::*SetTag)(const char *);
+
+struct Pair
+{
+  GetTag getter;
+  SetTag setter;
+  Pair(GetTag g, SetTag s) :getter(g), setter(s) {}
+};
+
+static Pair GetSetTbl[5] =
+{
+  Pair(&Game::GetEventStr, &Game::SetEventStr ),
+  Pair(&Game::GetSiteStr,  &Game::SetSiteStr  ),
+  Pair(&Game::GetWhiteStr, &Game::SetWhiteStr ),
+  Pair(&Game::GetBlackStr, &Game::SetBlackStr ),
+  Pair(&Game::GetRoundStr, &Game::SetRoundStr ),
+};
+
+
+void
+PgnParser::DoCharsetConversion(Game * game)
+{
+    CharConverter->setupDetected();
+
+    // Convert standard tags.
+
+    for (unsigned i = 0; i < sizeof(::GetSetTbl)/sizeof(::GetSetTbl[0]); ++i)
+    {
+        Pair const& p = ::GetSetTbl[i];
+
+        char * str((game->*p.getter)());
+
+        if (!CharsetConverter::isAscii(str))
+            (game->*p.setter)(ConvertToUTF8(str).c_str());
+    }
+
+    // Convert extra tags.
+
+    tagT * tag = game->GetExtraTags();
+    tagT * end = tag + game->GetNumExtraTags();
+
+    for ( ; tag < end; ++tag)
+    {
+        if (!CharsetConverter::isAscii(tag->value))
+        {
+            std::string res(ConvertToUTF8(tag->value));
+            delete [] tag->value;
+            tag->value = strDuplicate(res.c_str());
+        }
+    }
+
+    // Convert comments.
+    game->MoveToPly(0);
+    ConvertComments(game);
+}
+
+
+void
+PgnParser::ConvertComments(Game * game)
+{
+    if (game->GetMoveComment())
+    {
+        char * str(game->GetMoveComment());
+
+        if (!CharsetConverter::isAscii(str))
+            game->SetMoveComment(ConvertToUTF8(str).c_str());
+    }
+
+    while (game->GetCurrentMove())
+    {
+        if (uint n = game->GetNumVariations())
+        {
+            for (uint i = 0; i < n; ++i)
+            {
+                game->MoveIntoVariation(i);
+                ConvertComments(game);
+                game->MoveExitVariation();
+            }
+        }
+
+        game->MoveForward();
+
+        if (game->GetMoveComment())
+        {
+            char * str(game->GetMoveComment());
+
+            if (!CharsetConverter::isAscii(str))
+                game->SetMoveComment(ConvertToUTF8(str).c_str());
+        }
+    }
 }
 
 

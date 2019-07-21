@@ -1,8 +1,12 @@
 ### francais.tcl:
-#
+
 # French language support for Scid.
 # Translations contributed by:
-# Gilles Maire, Vincent Serisier, Joel Rivat, and Pascal Heisel.
+# Gilles Maire, Vincent Serisier, Joel Rivat, Pascal Heisel, Dale J.H Cannon and Francois Paget
+
+# Untranslated messages are marked with a "TODO To be translated" comment.
+
+addLanguage F Francais 0 iso8859-1
 
 proc setLanguage_F {} {
 
@@ -12,6 +16,9 @@ menuText F FileNew "Nouvelle..." 0 {Créer une nouvelle base de données Scid}
 menuText F FileOpen "Ouvrir..." 0 {Ouvrir une base de données Scid existante}
 menuText F FileClose "Fermer" 0 {Fermer la base de données Scid active}
 menuText F FileFinder "Trouver" 0 {Ouvrir la fenêtre de recherche de fichier}
+menuText F FileSavePgn "Save Pgn..." 0 {}
+menuText F FileOpenBaseAsTree "Ouvrir base dans arbre" 0   {Ouvrir une base dans la fenêtre d'arbre}
+menuText F FileOpenRecentBaseAsTree "Ouvrir base récente dans arbre" 0   {Ouvrir une base récente dans la fenêtre d'arbre}
 menuText F FileBookmarks "Signets" 0 {Menu des signets (raccourci: Ctrl+B)}
 menuText F FileBookmarksAdd "Ajouter un signet" 0 \
   {Poser un signet pour la position et partie courante}
@@ -23,38 +30,16 @@ menuText F FileBookmarksList "Afficher les dossiers comme une simple liste" 0 \
   {Afficher les dossiers comme une simple liste et non comme des sous-menus}
 menuText F FileBookmarksSub "Afficher les dossiers comme des sous-menus" 0 \
   {Afficher les dossiers comme des sous-menus et non comme une simple liste}
-menuText F FileMaint "Maintenance" 0 {Maintenance de la base}
-menuText F FileMaintWin "Fenêtre de maintenance" 0 \
-  {Ouvrir/Fermer la fenêtre de maintenance}
-menuText F FileMaintCompact "Compacter la base..." 0 \
-  {Compacter la base: supprimer les parties effacées et les noms non utilisés}
-menuText F FileMaintClass "Classer les parties suivant ECO" 2 \
-  {Recalculer le code ECO de toutes les parties}
-menuText F FileMaintSort "Trier la base..." 0 {Trier toutes les parties de la base}
-menuText F FileMaintDelete "Purger les doublons..." 0 \
-  {Trouver les parties en doublons et les marquer pour l'effacement}
-menuText F FileMaintTwin "Trouver les doublons" 0 \
-  {Ouvrir/Actualiser la fenêtre de recherche de doublons}
-menuText F FileMaintName "Orthographie des noms" 0 {Édition des noms et outils orthographiques}
-menuText F FileMaintNameEditor "Éditeur de noms" 11 {Ouvrir/Fermer l'éditeur de noms}
-menuText F FileMaintNamePlayer "Corriger les noms de joueurs..." 21 \
-  {Vérifier l'orthographe des noms de joueurs}
-menuText F FileMaintNameEvent "Corriger les événements..." 14 \
-  {Vérifier l'orthographe des noms d'événements}
-menuText F FileMaintNameSite "Corriger les noms de lieux.." 21 \
-  {Vérifier l'orthographe des noms de lieux}
-menuText F FileMaintNameRound "Corriger les noms des rondes..." 22 \
-  {Vérifier l'orthographe des noms de rondes}
 menuText F FileReadOnly "Lecture seule..." 0 \
   {Traiter la base courante en lecture seule, en empêchant les changements}
 menuText F FileSwitch "Changer de base" 0 \
   {Changer vers une base ouverte différente}
 menuText F FileExit "Quitter" 0 {Quitter Scid}
-menuText F FileMaintFixBase "Réparer base" 0 {Essaie de réparer une base corrompue}
 
 # Edit menu:
 menuText F Edit "Éditer" 0
 menuText F EditAdd "Ajouter variante" 0 {Ajouter une variante}
+menuText F EditPasteVar "Variation Coller" 0
 menuText F EditDelete "Effacer variante" 0 {Effacer cette variante}
 menuText F EditFirst "Déplacer en tête" 0 \
   {Déplacer cette variante en tête de liste}
@@ -64,8 +49,7 @@ menuText F EditTrial "Essayer une variante" 0 \
   {Démarrer/Stopper mode d'essai, pour tester une idée sur l'échiquier}
 menuText F EditStrip "Épurer" 2 {Épurer les commentaires ou les variantes de cette partie}
 menuText F EditUndo "Annuler" 0 {Annuler la dernière modification de la partie}
-# ====== TODO To be translated ======
-menuText F EditRedo "Redo" 0 {Redo last game change}
+menuText F EditRedo "Refaire" 0
 menuText F EditStripComments "Commentaires" 0 \
   {Épurer cette partie de tous les commentaires et annotations}
 menuText F EditStripVars "Variantes" 0 {Épurer cette partie des variantes}
@@ -74,16 +58,17 @@ menuText F EditStripBegin "Coups depuis le début" 1 \
 menuText F EditStripEnd "Coups jusqu'à la fin" 0 \
   {Épurer cette partie des coups jusqu'à la fin}
 menuText F EditReset "Vider le presse-papier" 0 {Vider le presse-papier}
-menuText F EditCopy "Copier dans la base presse-papier" 0 \
-  {Copier la partie en cours dans la base clipbase (9)}
-menuText F EditPaste "Coller depuis la base presse-papier" 1 \
-  {Copier la partie contenue dans la base clipbase (9) à cet emplacement}
+menuText F EditCopy "Copier dans le presse-papier" 0 \
+  {Copier la partie en cours dans le presse-papier}
+menuText F EditPaste "Coller depuis le presse-papier" 1 \
+  {Copier la partie contenue dans le presse-papier à cet emplacement}
 menuText F EditPastePGN "Coller le presse-papier comme partie PGN..." 10 \
   {Interpréter le texte du presse-papiers comme de la notation PGN et le coller ici}
 menuText F EditSetup "Position de départ" 0 \
   {Choisir une position de départ pour cette partie}
 menuText F EditCopyBoard "Copier la position" 6 \
   {Copier la position en cours en notation FEN vers la sélection de texte (presse-papier)}
+menuText F EditCopyPGN "Copier PGN" 0 {}
 menuText F EditPasteBoard "Coller la position de départ" 12 \
   {Initialiser la position de départ à partir de la sélection de texte courante(presse-papier)}
 
@@ -105,6 +90,10 @@ menuText F GameReplace "Enregistrer: Remplacer la partie..." 13 \
   {Enregistrer cette partie, en écrasant l'ancienne version}
 menuText F GameAdd "Enregistrer: Ajouter nouvelle partie..." 13 \
   {Enregistrer cette partie en tant que nouvelle partie dans la base}
+menuText F GameInfo "Informations sur les jeux Set" 0
+menuText F GameBrowse "Parcourir les jeux" 0
+menuText F GameList "Liste Tous les jeux" 0
+menuText F GameDelete "Effacer la partie" 0
 menuText F GameDeepest "Identifier ouverture" 11 \
   {Trouver la partie la plus proche dans la nomenclature ECO}
 menuText F GameGotoMove "Coup numéro..." 6 \
@@ -116,24 +105,27 @@ menuText F GameNovelty "Trouver la nouveauté..." 7 \
 menuText F Search "Rechercher" 0
 menuText F SearchReset "Réinitialiser le filtre" 0 \
   {Remettre à zéro le filtre (inclusion de toutes les parties)}
-menuText F SearchNegate "Inverser le filtre" 0 \
-  {Inverser le filtre}
+menuText F SearchNegate "Inverser le filtre" 0 {Inverser le filtre}
+menuText F SearchEnd "Déplacer vers le dernier filtre" 0
 menuText F SearchCurrent "Position..." 0 \
   {Rechercher la position en cours}
 menuText F SearchHeader "Entête..." 0 \
   {Rechercher par entête (joueur, tournoi, etc) information}
 menuText F SearchMaterial "Motifs" 0 \
   {Rechercher des motifs ou un matériel particulier sur l'échiquier}
+menuText F SearchMoves {Coups} 0 {}
 menuText F SearchUsing "En utilisant un fichier d'options..." 0 \
   {Rechercher en utilisant un fichier d'options de recherche}
 
 # Windows menu:
 menuText F Windows "Fenêtres" 2
+menuText F WindowsGameinfo {Montrer le panneau d'info} 0 {Montrer le panneau d'info}
 menuText F WindowsComment "Éditeur de commentaires" 0 \
   {Ouvrir/fermer l'éditeur de commentaires}
 menuText F WindowsGList "Liste des parties" 0 \
   {Ouvrir/fermer la liste des parties}
 menuText F WindowsPGN "Fenêtre PGN" 8 {Ouvrir/fermer la fenêtre PGN}
+menuText F WindowsCross "Classement du tournoi" 0 {Montrer le classement du tournoi}
 menuText F WindowsPList "Chercher un joueur" 2 {Ouvrir/fermer la recherche de joueur}
 menuText F WindowsTmt "Recherche de tournois" 0 {Ouvrir/fermer la recherche de tournois}
 menuText F WindowsSwitcher "Changer de base" 0 \
@@ -154,37 +146,50 @@ menuText F WindowsCorrChess "Jeu par correspondance" 0 {Ouvrir/Fermer la fenêtre
 menuText F Tools "Outils" 2
 menuText F ToolsAnalysis "Moteur d'analyse..." 9 \
   {Démarrer/Arrêter un moteur d'analyses}
-menuText F ToolsAnalysis2 "Moteur d'analyse #2..." 18 \
-  {Démarrer/Arrêter un moteur d'analyses}
-menuText F ToolsCross "Classement du tournoi" 0 \
-  {Montrer le classement du tournoi}
 menuText F ToolsEmail "Gestion des messages" 0 \
   {Ouvrir/Fermer la fenêtre de gestion des messages électroniques}
 menuText F ToolsFilterGraph "Graphique de filtre" 7 {Ouvrir/Fermer la fenêtre du graphique de filtre}
 menuText F ToolsAbsFilterGraph "Graphique de filtre absolu" 7 {Ouvrir/Fermer la fenêtre du graphique de filtre absolu}
 menuText F ToolsOpReport "Rapport d'ouverture" 0 {Générer un rapport d'ouvertures à partir de la position courante}
-menuText F ToolsOpenBaseAsTree "Ouvrir base dans arbre" 0   {Ouvrir une base dans la fenêtre d'arbre}
-menuText F ToolsOpenRecentBaseAsTree "Ouvrir base récente dans arbre" 0   {Ouvrir une base récente dans la fenêtre d'arbre}
 menuText F ToolsTracker "Suivi de pièce"  0 {Ouvrir la fenêtre de suivi de pièce}
 menuText F ToolsTraining "Entrainement"  0 {Entrainement (tactique, ouvertures, ...) }
+menuText F ToolsComp "Tournoi" 2 {Tournoi entre moteurs d'analyse}
 menuText F ToolsTacticalGame "Partie tactique"  0 {Jouer une partie tactique}
 menuText F ToolsSeriousGame "Partie sérieuse"  0 {Jouer une partie sans handicap}
-menuText F ToolsTrainOpenings "Ouvertures"  0 {Entrainement sur un répertoire}
-menuText F ToolsTrainReviewGame "Revoir partie"  0 {Deviner les coups joués dans la partie}
 menuText F ToolsTrainTactics "Tactique"  0 {Résoudre des problèmes tactiques}
 menuText F ToolsTrainCalvar "Calcul de variantes"  0 {Entrainement au calcul de variantes}
 menuText F ToolsTrainFindBestMove "Trouver le meilleur coup"  0 {Trouver le meilleur coup}
 menuText F ToolsTrainFics "Jouer sur internet"  0 {Jouer sur freechess.org}
-# ====== TODO To be translated ======
-menuText F ToolsEngineTournament "Engine tournament"  0 {Start a tournament between chess engines}
 menuText F ToolsBookTuning "Config. bibliothèque" 0 {Configuration fine d'une bibliothèque}
-menuText F ToolsConnectHardware "Connecter matériel" 0 {Connecter un échiquier externe}
-menuText F ToolsConnectHardwareConfigure "Configurer..." 0 {Configurer un échiquier externe et connection}
-menuText F ToolsConnectHardwareNovagCitrineConnect "Connecter Novag Citrine" 0 {Connecter Novag Citrine}
-menuText F ToolsConnectHardwareInputEngineConnect "Connecter entrée" 0 {Connecter un moteur en entrée (p.e. DGT)}
+menuText F ToolsMaint "Maintenance" 0 {Maintenance de la base}
+menuText F ToolsMaintWin "Fenêtre de maintenance" 0 \
+  {Ouvrir/Fermer la fenêtre de maintenance}
+menuText F ToolsMaintCompact "Compacter la base..." 0 \
+  {Compacter la base: supprimer les parties effacées et les noms non utilisés}
+menuText F ToolsMaintClass "Classer les parties suivant ECO" 2 \
+  {Recalculer le code ECO de toutes les parties}
+menuText F ToolsMaintSort "Trier la base..." 0 {Trier toutes les parties de la base}
+menuText F ToolsMaintDelete "Purger les doublons..." 0 \
+  {Trouver les parties en doublons et les marquer pour l'effacement}
+menuText F ToolsMaintTwin "Trouver les doublons" 0 \
+  {Ouvrir/Actualiser la fenêtre de recherche de doublons}
+menuText F ToolsMaintNameEditor "Éditeur de noms" 11 {Ouvrir/Fermer l'éditeur de noms}
+menuText F ToolsMaintNamePlayer "Corriger les noms de joueurs..." 21 \
+  {Vérifier l'orthographe des noms de joueurs}
+menuText F ToolsMaintNameEvent "Corriger les événements..." 14 \
+  {Vérifier l'orthographe des noms d'événements}
+menuText F ToolsMaintNameSite "Corriger les noms de lieux.." 21 \
+  {Vérifier l'orthographe des noms de lieux}
+menuText F ToolsMaintNameRound "Corriger les noms des rondes..." 22 \
+  {Vérifier l'orthographe des noms de rondes}
+menuText F ToolsMaintFixBase "Réparer base" 0 {Essaie de réparer une base corrompue}
+menuText F ToolsConnectHardware "Brancher hardware" 0 {Brancher hardware extérieur}
+menuText F ToolsConnectHardwareConfigure "Configurer..." 0 {Configurer la connexion au hardware extérieur}
+menuText F ToolsConnectHardwareNovagCitrineConnect "Brancher Novag Citrine" 0 {Brancher Novag Citrine}
+menuText F ToolsConnectHardwareInputEngineConnect "Brancher périphérique d'entrée" 0 {Brancher ériphérique d'entrée (par ex. DGT)}
 menuText F ToolsPInfo "Information sur les joueurs"  0 \
   {Ouvrir/Mettre à jour la fenêtre d'information sur les joueurs}
-menuText F ToolsPlayerReport "Rapport pour le joueur..." 3 \
+menuText F ToolsPlayerReport "Rapport pour le joueur" 3 \
   {Générer un rapport pour le joueur}
 menuText F ToolsRating "Elo graphique" 0 \
   {Tracer un graphique du classement Elo des joueurs de cette partie}
@@ -207,19 +212,20 @@ menuText F ToolsExpFilterHTML "Dans un fichier HTML..." 16 \
 menuText F ToolsExpFilterHTMLJS "Dans un fichier HTML et JavaScript..." 16 {Écrire le filtre dans un fichier HTML et JavaScript}  
 menuText F ToolsExpFilterLaTeX "Dans un fichier LaTeX..." 16 \
   {Écrire le filtre dans un fichier LaTeX}
+# ====== TODO To be translated ======
+menuText F ToolsExpFilterEPD "Export Filter to EPD/FEN" 17 {Write all filtered games to an EPD File}
+menuText F ToolsExpFilterGames "Exporter une liste de parties vers un fichier texte" 19 {Écrire une liste de parties vers un fichier texte formaté}
 menuText F ToolsImportOne "Importer une partie en PGN..." 0 \
   {Importer une partie à partir d'un texte PGN}
 menuText F ToolsImportFile "Importer un fichier en PGN..." 12 \
   {Importer des parties à partir d'un fichier PGN}
 menuText F ToolsStartEngine1 "Démarrer moteur 1" 0  {Démarrer moteur 1}
 menuText F ToolsStartEngine2 "Démarrer moteur 2" 0  {Démarrer moteur 2}
-# ====== TODO To be translated ======
-menuText F ToolsCaptureBoard "Capture Current Board..." 0  {Save the current board as an image.}
+menuText F ToolsScreenshot "Capture conseil" 0
 menuText F Play "Jouer" 0
 menuText F CorrespondenceChess "Echecs par correspondance" 0 {eMail et Xfcc échecs par correspondance}
 menuText F CCConfigure "Configurer..." 0 {Configurer outils externes et config générale}
-# ====== TODO To be translated ======
-menuText F CCConfigRelay "Configure observations..." 10 {Configure games to be observed}
+menuText F CCConfigRelay "Configurer observations..." 10 {Configurer quelles parties pour les observer}
 menuText F CCOpenDB "Ouvrir base..." 0 {Ouvrir la base de jeu par correspondance par défaut}
 menuText F CCRetrieve "Récupérer parties" 0 {Récupérer les parties via Xfcc}
 menuText F CCInbox "Analyser boîte" 0 {Analyser tous les fichiers dans la boîte de réception de Scid}
@@ -233,33 +239,47 @@ menuText F CCMailMove "eMailer le coup..." 0 {Envoyer le coup par eMail à l'adve
 menuText F CCGamePage "Page partie..." 0 {Ouvrir la partie dans navigateur web}
 menuText F CCEditCopy "Copier parties dans Clipbase" 0 {Copy the games as CSV list to clipbase}
 
+
 # Options menu:
 menuText F Options "Options" 0
 menuText F OptionsBoard "Echiquier" 0 {Options d'aspect de l'échiquier}
-menuText F OptionsBoardSize "Taille échiquier" 0 {Changer la taille de l'échiquier}
-menuText F OptionsBoardPieces "Style des pièces" 6 {Changer le style des pièces}
-menuText F OptionsBoardColors "Couleurs..." 0 {Changer les couleurs}
-menuText F OptionsBoardGraphics "Images de cases..." 0 {Select textures for squares}
-translate F OptionsBGW {Sélectionner les textures des cases}
-translate F OptionsBoardGraphicsText {Sélection des images pour les cases blanches et noires:}
-menuText F OptionsBoardNames "Mes noms de joueurs..." 0 {Editer mes noms de joueurs}
+menuText F OptionsColour "Couleurs" 0 {Default text widget color}
+menuText F OptionsBackColour "Arrière-plan" 0 {Default text widget color}
+menuText F OptionsMainLineColour "Flèche coup principal" 0 {Mainline arrows}
+menuText F OptionsVarLineColour "Flèche coup variante" 0 {Variation arrows}
+# ====== TODO To be translated ======
+menuText F OptionsEngineLineColour "Engine Arrows" 0 {Engine arrows}
+menuText F OptionsRowColour "Surlignage coup bibliothèque" 0 {Default tree/book row color}
+menuText F OptionsSwitcherColour "Surlignage db switcher" 0 {Default db switcher color}
+menuText F OptionsProgressColour "Barre de progression" 0 {Default progressbar color}
+menuText F OptionsScoreColour "Barres graphiques de score" 0 {}
+menuText F OptionsScoreBarColour "Barre du score courant" 0 {}
+menuText F OptionsNames "Mes noms de joueurs..." 0 {Editer mes noms de joueurs}
 menuText F OptionsExport "Exportation" 0 {Changer les options d'exportation}
 menuText F OptionsFonts "Polices" 0 {Changer les polices}
 menuText F OptionsFontsRegular "Normales" 0 {Changer les polices normales}
 menuText F OptionsFontsMenu "Menu" 0 {Changer la police des menus}
 menuText F OptionsFontsSmall "Petites" 0 {Changer les petites polices}
-# ====== TODO To be translated ======
-menuText F OptionsFontsTiny "Tiny" 0 {Change the tiny font}
 menuText F OptionsFontsFixed "Fixe" 0 {Changer les polices de chasse fixe}
 menuText F OptionsGInfo "Informations de la partie" 7 {Options d'information de la partie}
+menuText F OptionsFics "FICS" 0
+menuText F OptionsFicsAuto "Autopromote Reine" 0
+# ====== TODO To be translated ======
+menuText F OptionsFicsClk "Store Clock times" 0
+menuText F OptionsFicsColour "Couleur du texte" 0
+menuText F OptionsFicsSize "Taille de l'échiquier" 0
+menuText F OptionsFicsButtons "Boutons paramétrables" 0
+menuText F OptionsFicsCommands "Script d'initialisation" 0
+menuText F OptionsFicsNoRes "Sans résultats" 0
+menuText F OptionsFicsNoReq "Sans requêtes" 0
+menuText F OptionsFicsPremove "Pré-move accepté" 0
 menuText F OptionsLanguage "Langue" 0 {Sélectionner le menu de choix des langues}
 menuText F OptionsMovesTranslatePieces "Traduction des pièces" 0 {Convertit la première lettre des pièces}
 menuText F OptionsMovesHighlightLastMove "Surbrillance dernier coup" 0 {Surbrillance du dernier coup}
 menuText F OptionsMovesHighlightLastMoveDisplay "Afficher" 0 {Afficher la surbrillance du dernier coup}
 menuText F OptionsMovesHighlightLastMoveWidth "Epaisseur" 0 {Epaisseur de la ligne}
 menuText F OptionsMovesHighlightLastMoveColor "Couleur" 0 {Couleur de la ligne}
-# ====== TODO To be translated ======
-menuText F OptionsMovesHighlightLastMoveArrow "include Arrow" 0 {Include Arrow with Highlight}
+menuText F OptionsMovesColorSelected "Couleur sélectionnée Carré" 0 {Color move}
 menuText F OptionsMoves "Coups" 2 {Gestion des coups}
 menuText F OptionsMovesAsk "Demander avant d'écraser les coups" 0 \
   {Demander avant d'écraser un coup existant}
@@ -269,15 +289,11 @@ menuText F OptionsMovesDelay "Délai entre les coups" 3 \
   {Positionner le délai entre deux coups en mode automatique}
 menuText F OptionsMovesCoord "Coordonnées entre les coups" 0 \
   {Accepter l'entrée des coups par coordonnées ("g1f3")}
-menuText F OptionsMovesSuggest "Montrer les coups suggérés" 0 \
-  {Activer/Désactiver le mode de suggestion de coup}
 menuText F OptionsShowVarPopup "Montrer fenêtre des variantes" 0 {Affichage automatique des variantes}  
 menuText F OptionsMovesSpace "Ajouter un espace après le numéro du coup" 0 {Espace après numéro du coup}  
 menuText F OptionsMovesKey "Complétion clavier" 0 \
   {Activer/Désactiver le mode de complétion du clavier}
 menuText F OptionsMovesShowVarArrows "Montrer flêches pour les variations" 0 {Montrer des flêches pour les variations existantes}
-# ====== TODO To be translated ======
-menuText F OptionsMovesGlossOfDanger "Color Coded Gloss of Danger" 0 {Turn on/off color coded gloss of danger}
 menuText F OptionsNumbers "Format numérique" 7 {Sélectionner le format des nombres}
 menuText F OptionsStartup "Démarrage" 3 {Sélectionner les fenêtres à ouvrir au démarrage}
 menuText F OptionsTheme "Apparence" 0 {Change l'apparence de l'interface}
@@ -292,6 +308,8 @@ menuText F OptionsWindowsSaveLayout "Enregistrer disposition" 0 {Enregistrer dis
 menuText F OptionsWindowsRestoreLayout "Remettre disposition" 0 {Remettre disposition}
 menuText F OptionsWindowsShowGameInfo "Montrer le panneau d'info" 0 {Montrer le panneau d'info}
 menuText F OptionsWindowsAutoLoadLayout "Chargement auto 1ère disposition" 0 {Chargement auto de la première disposition au démarrage}
+menuText F OptionsWindowsAutoResize "Redimensionnement automatique" 0 {}
+menuText F OptionsWindowsFullScreen "Plein écran" 0 {Basculer en mode plein écran}
 menuText F OptionsToolbar "Barre d'outils de la fenêtre principale" 12 \
   {Montrer/Cacher dans la barre d'outils de la fenêtre principale}
 menuText F OptionsECO "Charger le fichier ECO..." 20 \
@@ -304,7 +322,9 @@ menuText F OptionsRecent "Fichiers récents..." 0 \
   {Changer le nombre de fichiers récents affichés dans le menu Fichier}
 menuText F OptionsBooksDir "Répertoire des bibliothèques..." 0 {Répertoire des bibliothèques d'ouverture}
 menuText F OptionsTacticsBasesDir "Répertoire des bases d'entrainement..." 0 {Répertoire des bases pour l'entrainement tactique}
+menuText F OptionsInformant "Configurer les valeurs de notation" 0
 menuText F OptionsSave "Sauver les options" 0 "Sauver les options dans le fichier $::optionsFile"
+menuText F OptionsSaveBases "Mémorisation des bases ouvertes" 0 
 menuText F OptionsAutoSave "Sauvegarde automatique des options" 0 \
   {Sauvegarder automatiquement toutes les options en quittant Scid}
 
@@ -321,6 +341,8 @@ menuText F HelpAbout "A propos de Scid" 2 {Information au sujet de Scid}
 
 # Game info box popup menu:
 menuText F GInfoHideNext "Cacher le coup suivant" 0
+menuText F GInfoShow "Le joueur au trait" 0
+menuText F GInfoCoords "Coordonnées" 0
 menuText F GInfoMaterial "Montrer les valeurs de matériel" 0
 menuText F GInfoFEN "Montrer la notation FEN" 5
 menuText F GInfoMarks "Montrer les cases colorées et les flèches" 5
@@ -332,9 +354,18 @@ menuText F GInfoTBResult "Tables de finales: Seulement le résultat" 12
 menuText F GInfoTBAll "Tables de finales: résultat et meilleurs coups" 19
 menuText F GInfoDelete "(Récupérer)Effacer cette partie" 4
 menuText F GInfoMark "(Dé)Marquer cette partie" 4
-menuText F GInfoInformant "Configurer les valeurs de notation" 0
+menuText F GInfoMenuBar "Barre de Menu"  0
+menuText F GInfoToolBar "Barre d'outils"  0
+menuText F GInfoButtonBar "Barre à boutons"  0
+menuText F GInfoStatusBar "Barre d'état"  0
+translate F FlipBoard {Retourner l'échiquier}
+translate F RaiseWindows {Fenêtre d'arbitrage}
+translate F AutoPlay {Lecture automatique}
+translate F TrialMode {Mode d'essai}
+translate F KeepOpen {Afficher au démarrage}
 
 # General buttons:
+translate F Apply {Appliquer}
 translate F Back {Retour}
 translate F Browse {Parcourir}
 translate F Cancel {Annuler}
@@ -355,16 +386,21 @@ translate F MergeGames {Fusionner les parties}
 translate F Preview {Prévisualiser}
 translate F Revert {Revenir}
 translate F Save {Enregistrer}
+translate F DontSave {Ne pas sauve}
 translate F Search {Rechercher}
 translate F Stop {Arrêter}
 translate F Store {Enregistrer}
 translate F Update {Mettre à jour}
 translate F ChangeOrient {Changer l'orientation de la fenêtre}
 translate F ShowIcons {Montrer les icones}
+translate F ConfirmCopy {Confirmer la copie}
 translate F None {Aucun}
 translate F First {Premier}
 translate F Current {En cours}
 translate F Last {Dernier}
+translate F Font {Police}
+translate F Change {Changer}
+translate F Random {Aléatoire}
 
 # General messages:
 translate F game {partie}
@@ -391,6 +427,7 @@ translate F Event {Événement}
 translate F Site {Lieux}
 translate F Country {Pays}
 translate F IgnoreColors {Ignorer les couleurs}
+translate F MatchEnd {Positon finale uniquement}
 translate F Date {Date}
 translate F EventDate {Événement date}
 translate F Decade {Décennie}
@@ -409,14 +446,20 @@ translate F SearchResults {Résultats de la recherche}
 translate F OpeningTheDatabase {Ouverture de la base}
 translate F Database {Base}
 translate F Filter {Filtre}
+translate F Reset {Réinitialiser}
+translate F IgnoreCase {Ignorer la Casse}
 translate F noGames {pas de parties}
 translate F allGames {toutes les parties}
 translate F empty {vide}
 translate F clipbase {presse-papier}
 translate F score {score}
+translate F Start {Position}
 translate F StartPos {Position de départ}
 translate F Total {Total}
 translate F readonly {lecture seule}
+translate F altered {changé}
+translate F tagsDescript {Extra tags (ex: Annotator "Anand")}
+translate F prevTags {Précédent}
 
 # Standard error messages:
 translate F ErrNotOpen {Ceci n'est pas une base ouverte.}
@@ -436,18 +479,21 @@ translate F GameEnd {Fin de partie}
 translate F LineEnd {Fin de ligne}
 
 # Player information:
-translate F PInfoAll {Résultats pour <b>toutes</b> les parties}
-translate F PInfoFilter {Résultats pour les parties <b>filtrées</b>}
+translate F PInfoAll {toutes les parties}
+translate F PInfoFilter {les parties filtrées}
 translate F PInfoAgainst {Résultats contre}
 translate F PInfoMostWhite {Ouvertures les plus fréquentes avec les blancs}
 translate F PInfoMostBlack {Ouvertures les plus fréquentes avec les noirs}
 translate F PInfoRating {Historique du classement}
 translate F PInfoBio {Biographie}
 translate F PInfoEditRatings {Editer les Classements}
+translate F PinfoEditName {Editer nom}
+translate F PinfoLookupName {Chercher nom}
 
 # Tablebase information:
 translate F Draw {Nulle}
 translate F stalemate {pat}
+translate F checkmate {mat}
 translate F withAllMoves {avec tous les coups}
 translate F withAllButOneMove {avec tous les coups sauf le dernier}
 translate F with {avec}
@@ -456,7 +502,6 @@ translate F lose {perte}
 translate F loses {pertes}
 translate F allOthersLose {toutes les autres pertes}
 translate F matesIn {mat en}
-translate F hasCheckmated {a maté}
 translate F longest {le plus long}
 translate F WinningMoves {Coups gagnants}
 translate F DrawingMoves {Coups faisant nulle}
@@ -471,7 +516,6 @@ translate F TipAtStartup {Conseil au démarrage}
 menuText F TreeFile "Fichier" 0
 menuText F TreeFileFillWithBase "Remplir cache avec base" 0 {Remplir le cache avec toutes les parties de la base courante}
 menuText F TreeFileFillWithGame "Remplir cache avec partie" 0 {Remplir le cache avec la partie de la base courante}
-menuText F TreeFileSetCacheSize "Taille du cache" 0 {Taille du cache}
 menuText F TreeFileCacheInfo "Info cache" 0 {Afficher information sur l'utilisation du cache}
 menuText F TreeFileSave "Sauver le cache" 0
 menuText F TreeFileFill "Remplir le cache" 0
@@ -485,6 +529,7 @@ menuText F TreeMaskOpen "Ouvrir" 0 {Ouvrir masque}
 menuText F TreeMaskOpenRecent "Ouvrir récent" 0 {Ouvrir un masque récent}
 menuText F TreeMaskSave "Sauver" 0 {Sauver masque}
 menuText F TreeMaskClose "Fermer" 0 {Fermer masque}
+menuText F TreeMaskFillWithLine "Remplir avec ligne" 0 {Remplir le masque avec toutes les coups précédents}
 menuText F TreeMaskFillWithGame "Remplir avec partie" 0 {Remplir le masque avec partie}
 menuText F TreeMaskFillWithBase "Remplir avec base" 0 {Remplir le masque avec les parties de la base}
 menuText F TreeMaskInfo "Info" 0 {Statistiques du masque}
@@ -502,21 +547,29 @@ menuText F TreeOptFastAndSlowmode "Mode rapide puis lent" 0 {Mode rapide puis le
 menuText F TreeOptStartStop "Rafraîchissement auto" 0 {Rafraîchissement automatique de la fenêtre}
 menuText F TreeOptLock "Verrouille" 0 {Dé/verrouiller l'arbre à la base en cours}
 menuText F TreeOptTraining "Entraînement" 0 {Démarrer/Arrêter l'arbre du mode d'entraînement}
+menuText F TreeOptShort "Affichage court" 0 {Affichage sans données ELO}
 menuText F TreeOptAutosave "Sauver le cache automatiquement" 0
+menuText F TreeOptAutomask "Auto-chargement Mask" 0 "Auto-Load most recent mask with a tree open."
+menuText F TreeOptCacheSize "Taille du cache" 0 {Taille du cache}
+menuText F TreeOptShowBar "Affichage barre de progression" 0 "Show tree progress bar."
+menuText F TreeOptSortBest "Tri des meilleurs jeux" 0 "Tri des meilleurs jeux selon ELO."
 menuText F TreeHelp "Aide" 0
 menuText F TreeHelpTree "Aide Arbre" 0
 menuText F TreeHelpIndex "Index" 0
+
+
 translate F SaveCache {Sauver le cache}
 translate F Training {Entraînement}
 translate F LockTree {Verrouiller}
 translate F TreeLocked {verrouillé}
 translate F TreeBest {Meilleur}
 translate F TreeBestGames {Arbre des meilleures parties}
+translate F TreeAdjust {Ajuster filtre}
 # Note: the next message is the tree window title row. After editing it,
 # check the tree window to make sure it lines up with the actual columns.
-translate F TreeTitleRow \
-  {    Coup   ECO        Fréquence   Score EloMoy Perf AnnéeMoy %Nulle}
-translate F TreeTotal {TOTAL}
+translate F TreeTitleRow      {    Coup       Fréquence   Score Nulle EloMoy Perf Année ECO}
+translate F TreeTitleRowShort {    Coup       Fréquence   Score Nulle}
+translate F TreeTotal: {TOTAL:}
 translate F DoYouWantToSaveFirst {voulez-vous d'abord sauvegarder}
 translate F AddToMask {Ajouter au masque}
 translate F RemoveFromMask {Enlever du masque}
@@ -563,7 +616,6 @@ menuText F FinderTypesScid "Bases Scid" 0
 menuText F FinderTypesOld "Bases Scid à l'ancien format" 0
 menuText F FinderTypesPGN "fichiers PGN" 0
 menuText F FinderTypesEPD "fichiers EPD (théorie)" 0
-menuText F FinderTypesRep "fichiers des répertoires" 0
 menuText F FinderHelp "Aide" 0
 menuText F FinderHelpFinder "Aide de l'explorateur de fichiers" 0
 menuText F FinderHelpIndex "Index" 0
@@ -613,6 +665,8 @@ menuText F GraphFileClose "Fermer la fenêtre" 0
 menuText F GraphOptions "Options" 0
 menuText F GraphOptionsWhite "Blancs" 0
 menuText F GraphOptionsBlack "Noirs" 0
+menuText F GraphOptionsDots "Montrer les points connus" 0
+menuText F GraphOptionsBar "Surbrillance de la position actuelle" 0
 menuText F GraphOptionsBoth "Les deux" 4
 menuText F GraphOptionsPInfo "Informations joueurs" 0
 translate F GraphFilterTitle "Graphique de filtre: fréquence pour 1000 parties"
@@ -631,6 +685,7 @@ translate F ShowInfo {Montrer infos moteur}
 translate F FinishGame {Continuer la partie}
 translate F StopEngine {Arrêter le moteur}
 translate F StartEngine {Démarrer le moteur}
+translate F ExcludeMove {Exclure coup}
 translate F LockEngine {Verrouiller moteur à la position actuelle}
 translate F AnalysisCommand {Commande d'analyse}
 translate F PreviousChoices {Choix précédents}
@@ -640,12 +695,18 @@ translate F AnnotateAll {Pour les coups des deux cotés}
 translate F AnnotateAllMoves {Annoter tous les coups}
 translate F AnnotateWhite {Pour les coups des blancs seulement}
 translate F AnnotateBlack {Pour les coups des noirs seulement}
+translate F AnnotateNotBest {Quand le coup de la partie n'est pas le meilleur}
 translate F AnnotateBlundersOnly {Quand le coup est une erreur}
-translate F AnnotateBlundersOnlyScoreChange {Coup faible, le score varie de/à: }
+translate F BlundersNotBest {Erreurs/Imprécissions}
+translate F AnnotateTitle {Configurer Annotation}
+translate F AnnotateMissedMates {Occasion manquée/Mat en moins de coups}
 translate F BlundersThreshold {Seuil de l'erreur}
-# TODO: Translate
-translate F ScoreAllMoves {Valider tous les coups}
+translate F ScoreFormat {Format du score}
+translate F CutOff {Interruption}
 translate F LowPriority {Priorité processeur basse}
+translate F LogEngines {Taille du journal}
+translate F LogName {Ajouter nom}
+translate F MaxPly {Demi-coups fixes}
 translate F ClickHereToSeeMoves {Cliquer ici pour afficher les coups}
 translate F ConfigureInformant {Configurer les valeurs des notations}
 translate F Informant!? {Coup intéressant}
@@ -659,11 +720,14 @@ translate F Informant++- {La partie est gagnée}
 
 # Book window
 translate F Book {Bibliothèque}
-translate F OtherBookMoves {Bibliothèque de l'adversaire}
-translate F OtherBookMovesTooltip {Coups pour lesquels l'adversaire a une réponse}
+translate F OtherBook {Autres mouvements}
+translate F Alphabetical {Alphabétique}
+translate F TwoBooks {Deux livres}
 
 # Analysis Engine open dialog:
 translate F EngineList {Liste des moteurs d'analyse}
+translate F EngineKey {Touche}
+translate F EngineType {Protocole}
 translate F EngineName {Nom}
 translate F EngineCmd {Commande}
 translate F EngineArgs {Paramètres}
@@ -694,6 +758,8 @@ menuText F PgnOptIndentV "Indentation des variantes" 16
 menuText F PgnOptColumn "Style en colonne (un coup par ligne)" 1
 menuText F PgnOptSpace "Espace après numéro des coups" 0
 menuText F PgnOptStripMarks "Enlever les codes de flèches et de coloration de cases" 1
+menuText F PgnOptChess "Echecs Pièces" 0
+menuText F PgnOptScrollbar "Barre de défilement" 0
 menuText F PgnOptBoldMainLine "Mettre en gras les coups de la ligne principale" 4
 menuText F PgnColor "Couleur" 0
 menuText F PgnColorHeader "Entête..." 0
@@ -701,12 +767,13 @@ menuText F PgnColorAnno "Annotations..." 0
 menuText F PgnColorComments "Commentaires..." 0
 menuText F PgnColorVars "Variantes..." 0
 menuText F PgnColorBackground "Couleur du fond..." 11
-menuText F PgnColorMain "Main line..." 0
-menuText F PgnColorCurrent "Dernier coup..." 1
+menuText F PgnColorMain "Ligne principale..." 0
+menuText F PgnColorCurrent "Surbrillance du coup joué..." 1
+menuText F PgnColorNextMove "Surbrillance du coup suivant..." 0
 menuText F PgnHelp "Aide" 0
 menuText F PgnHelpPgn "Aide PGN" 0
 menuText F PgnHelpIndex "Index" 0
-translate F PgnWindowTitle {Notation - partie %u}
+translate F PgnWindowTitle {Notation partie - partie %u}
 
 # Crosstable window menus:
 menuText F CrosstabFile "Fichier" 0
@@ -719,26 +786,33 @@ menuText F CrosstabEditEvent "Événement" 0
 menuText F CrosstabEditSite "Lieux" 0
 menuText F CrosstabEditDate "Date" 0
 menuText F CrosstabOpt "Affichage" 0
-menuText F CrosstabOptAll "Toutes rondes" 0
-menuText F CrosstabOptSwiss "Suisse" 0
-menuText F CrosstabOptKnockout "KO" 0
-menuText F CrosstabOptAuto "Auto" 0
+menuText F CrosstabOptColorPlain "Texte normal" 0
+menuText F CrosstabOptColorHyper "Hypertexte" 0
+menuText F CrosstabOptTieWin "Départage par nombre de victoires" 1
+menuText F CrosstabOptTieHead "Départage par confrontation directe" 1
+menuText F CrosstabOptThreeWin "3 Points pour une victoire" 1
 menuText F CrosstabOptAges "Ages en années" 8
 menuText F CrosstabOptNats "Nationalités" 0
+menuText F CrosstabOptTallies "Victoires/Défaites/Nulles" 0
 menuText F CrosstabOptRatings "Classements" 0
 menuText F CrosstabOptTitles "Titres" 0
 menuText F CrosstabOptBreaks "Scores du départage" 4
 menuText F CrosstabOptDeleted "Inclure les parties effacées" 8
 menuText F CrosstabOptColors "Couleurs (système suisse uniquement)" 1
+menuText F CrosstabOptColorRows "Lignes colorées" 0
+menuText F CrosstabOptRowsColor "Couleur de la ligne" 0 {Default crosstable row color}
 menuText F CrosstabOptColumnNumbers "Colonnes numérotées (Toutes rondes seulement)" 2
 menuText F CrosstabOptGroup "Scores du groupe" 0
 menuText F CrosstabSort "Trier" 0
 menuText F CrosstabSortName "Nom" 0
 menuText F CrosstabSortRating "Elo" 0
 menuText F CrosstabSortScore "Score" 0
-menuText F CrosstabColor "Couleur" 0
-menuText F CrosstabColorPlain "Texte normal" 0
-menuText F CrosstabColorHyper "Hypertexte" 0
+menuText F CrosstabSortCountry "Pays" 0
+menuText F CrosstabType "Système" 0
+menuText F CrosstabTypeAll "Toutes rondes" 0
+menuText F CrosstabTypeSwiss "Suisse" 0
+menuText F CrosstabTypeKnockout "KO" 0
+menuText F CrosstabTypeAuto "Auto" 0
 menuText F CrosstabHelp "Aide" 0
 menuText F CrosstabHelpCross "Aide tableau" 0
 menuText F CrosstabHelpIndex "Index" 0
@@ -771,6 +845,7 @@ translate F GameLength {Longueur de la partie}
 translate F FindGamesWith {Chercher les parties avec}
 translate F StdStart {Pos. départ non standard}
 translate F Promotions {Promotions}
+translate F UnderPromo {Promotions mineures}
 translate F Comments {Commentaires}
 translate F Variations {Variantes}
 translate F Annotations {Annotations}
@@ -788,10 +863,8 @@ translate F BrilliancyFlag {Spectaculaire}
 translate F BlunderFlag {Gaffe}
 translate F UserFlag {Utilisateur}
 translate F PgnContains {PGN contenant du texte}
-# ====== TODO To be translated ======
-translate F Annotator {Annotator}
-# ====== TODO To be translated ======
-translate F Cmnts {Annotated games only}
+translate F PreComment {Commentaires initiaux}
+translate F PostComment {Commentaires finaux}
 
 # Game list window:
 translate F GlistNumber {Numéro}
@@ -804,7 +877,7 @@ translate F GlistSite {Lieux}
 translate F GlistRound {Ronde}
 translate F GlistDate {Date}
 translate F GlistYear {Année}
-translate F GlistEDate {Événement-Date}
+translate F GlistEventDate {Événement-Date}
 translate F GlistResult {Résultat}
 translate F GlistLength {Longueur}
 translate F GlistCountry {Pays}
@@ -813,99 +886,33 @@ translate F GlistOpening {Ouverture}
 translate F GlistEndMaterial {Matériel final}
 translate F GlistDeleted {Effacé}
 translate F GlistFlags {Drapeaux}
-translate F GlistVars {Variantes}
+translate F GlistVariations {Variantes}
 translate F GlistComments {Commentaires}
 translate F GlistAnnos {Annotations}
 translate F GlistStart {Départ}
 translate F GlistGameNumber {Partie numéro}
-# ====== TODO To be translated ======
-translate F GlistAverageElo {Average Elo}
-# ====== TODO To be translated ======
-translate F GlistRating {Rating}
 translate F GlistFindText {Rechercher texte}
 translate F GlistMoveField {Coup}
 translate F GlistEditField {Configurer}
 translate F GlistAddField {Ajouter}
-translate F GlistDeleteField {Enlever}
-translate F GlistWidth {Largeur}
-translate F GlistAlign {Aligner}
-# ====== TODO To be translated ======
-translate F GlistAlignL {Align: left}
-# ====== TODO To be translated ======
-translate F GlistAlignR {Align: right}
-# ====== TODO To be translated ======
-translate F GlistAlignC {Align: center}
+translate F GlistDeleteField {Supprimer}
 translate F GlistColor {Couleur}
-translate F GlistSep {Séparateur}
-# ====== TODO To be translated ======
-translate F GlistCurrentSep {-- Current --}
-# ====== TODO To be translated ======
-translate F GlistNewSort {New}
-# ====== TODO To be translated ======
-translate F GlistAddToSort {Add}
-# ====== TODO To be translated ======
-translate F GsortSort {Sort...}
-# ====== TODO To be translated ======
-translate F GsortDate {Date}
-# ====== TODO To be translated ======
-translate F GsortYear {Year}
-# ====== TODO To be translated ======
-translate F GsortEvent {Event}
-# ====== TODO To be translated ======
-translate F GsortSite {Site}
-# ====== TODO To be translated ======
-translate F GsortRound {Round}
-# ====== TODO To be translated ======
-translate F GsortWhiteName {White Name}
-# ====== TODO To be translated ======
-translate F GsortBlackName {Black Name}
-# ====== TODO To be translated ======
-translate F GsortECO {ECO}
-# ====== TODO To be translated ======
-translate F GsortResult {Result}
-# ====== TODO To be translated ======
-translate F GsortMoveCount {Move Count}
-# ====== TODO To be translated ======
-translate F GsortAverageElo {Average Elo}
-# ====== TODO To be translated ======
-translate F GsortCountry {Country}
-# ====== TODO To be translated ======
-translate F GsortDeleted {Deleted}
-# ====== TODO To be translated ======
-translate F GsortEventDate {Event Date}
-# ====== TODO To be translated ======
-translate F GsortWhiteElo {White Elo}
-# ====== TODO To be translated ======
-translate F GsortBlackElo {Black Elo}
-# ====== TODO To be translated ======
-translate F GsortComments {Comments}
-# ====== TODO To be translated ======
-translate F GsortVariations {Variations}
-# ====== TODO To be translated ======
-translate F GsortNAGs {NAGs}
-# ====== TODO To be translated ======
-translate F GsortAscending {Ascending}
-# ====== TODO To be translated ======
-translate F GsortDescending {Descending}
-# ====== TODO To be translated ======
-translate F GsortAdd {Add}
-# ====== TODO To be translated ======
-translate F GsortStore {Store}
-# ====== TODO To be translated ======
-translate F GsortLoad {Load}
+translate F GlistSort {Trier la base}
 
 # menu shown with right mouse button down on game list.
-translate F GlistRemoveThisGameFromFilter  {Enlever cette partie du filtre}
-translate F GlistRemoveGameAndAboveFromFilter  {Enlever cette partie (et celles au-dessus) du filtre}
-translate F GlistRemoveGameAndBelowFromFilter  {Enlever cette partie (et celles en-dessous) du filtre}
+translate F GlistRemoveThisGameFromFilter  {Enlever}
+translate F GlistRemoveGameAndAboveFromFilter  {Enlever cette partie (et celles au-dessus)}
+translate F GlistRemoveGameAndBelowFromFilter  {Enlever cette partie (et celles en-dessous)}
 translate F GlistDeleteGame {(Dés-)effacer cette partie} 
 translate F GlistDeleteAllGames {Effacer toutes les parties du filtre} 
 translate F GlistUndeleteAllGames {Dés-effacer toutes les parties du filtre} 
-translate F GlistMergeGameInBase {Fusionner la partie dans une autre base} 
+translate F GlistAlignL {Aligner à gauche}
+translate F GlistAlignR {Aligner à droite}
+translate F GlistAlignC {Centrer}
 
 # Maintenance window:
 translate F DatabaseName {Nom de base:}
-translate F TypeIcon {Type icône:}
+translate F TypeIcon {Type icône}
 translate F NumOfGames {Parties:}
 translate F NumDeletedGames {Parties supprimées:}
 translate F NumFilterGames {Parties dans le filtre:}
@@ -913,8 +920,7 @@ translate F YearRange {Années:}
 translate F RatingRange {Classements:}
 translate F Description {Description}
 translate F Flag {Drapeau}
-# ====== TODO To be translated ======
-translate F CustomFlags {Custom flags}
+translate F CustomFlags {Drapeaux personnalisés}
 translate F DeleteCurrent {Effacer la partie courante}
 translate F DeleteFilter {Effacer le filtre de parties}
 translate F DeleteAll {Effacer toutes les parties}
@@ -929,6 +935,9 @@ translate F UnmarkCurrent {Désélectionner la partie en cours}
 translate F UnmarkFilter {Désélectionner les parties filtrées}
 translate F UnmarkAll {Désélectionner toutes les parties}
 translate F Spellchecking {Vérification orthographique}
+translate F MakeCorrections {Faire des corrections}
+translate F Ambiguous {Ambigu}
+translate F Surnames {Patronymes}
 translate F Players {Joueurs}
 translate F Events {Événements}
 translate F Sites {Lieux}
@@ -941,6 +950,7 @@ translate F AddEloRatings {Ajouter les classements Elo}
 translate F AutoloadGame {Chargement automatique du numéro de partie}
 translate F StripTags {Enlever les marqueurs PGN}
 translate F StripTag {Enlever les marqueurs}
+translate F CheckGames {Vérifier les parties}
 translate F Cleaner {Nettoyer}
 translate F CleanerHelp {
 Le Nettoyeur Scid va réaliser pour la base en cours toutes les actions de maintenance que vous avez sélectionné à partir de la liste ci-dessous.
@@ -1016,6 +1026,9 @@ translate F SearchBoardFiles {Colonnes (même matériel, tous les pions sur mêmes 
 translate F SearchBoardAny {Tous (même matériel, pions et pièces n'importe où)}
 translate F SearchInRefDatabase { Dans la base de référence }
 translate F LookInVars {Chercher dans les variantes}
+translate F CQLLabel {Script CQL}
+translate F CQLComments {Commentaires acceptés}
+translate F CQLStrip {Supprimer les commentaires}
 
 # Material search:
 translate F MaterialSearch {Rechercher Motifs}
@@ -1051,20 +1064,20 @@ translate F EndingQueenPawnVsQueen {Dame et 1 pion contre Dame}
 translate F BishopPairVsKnightPair {Milieu de jeu 2 Fous contre 2 Cavaliers}
 
 # Common patterns in material search:
-translate F PatternWhiteIQP {White IQP} ;# ***
-translate F PatternWhiteIQPBreakE6 {White IQP: d4-d5 break vs. e6} ;# ***
-translate F PatternWhiteIQPBreakC6 {White IQP: d4-d5 break vs. c6} ;# ***
-translate F PatternBlackIQP {Black IQP} ;# ***
-translate F PatternWhiteBlackIQP {White IQP vs. Black IQP} ;# ***
-translate F PatternCoupleC3D4 {White c3+d4 Isolated Pawn Couple} ;# ***
-translate F PatternHangingC5D5 {Black Hanging Pawns on c5 and d5} ;# ***
-translate F PatternMaroczy {Maroczy Center (with Pawns on c4 and e4)} ;# ***
-translate F PatternRookSacC3 {Rook Sacrifice on c3} ;# ***
-translate F PatternKc1Kg8 {O-O-O vs. O-O (Kc1 vs. Kg8)} ;# ***
-translate F PatternKg1Kc8 {O-O vs. O-O-O (Kg1 vs. Kc8)} ;# ***
-translate F PatternLightFian {Light-Square Fianchettos (Bishop-g2 vs. Bishop-b7)} ;# ***
-translate F PatternDarkFian {Dark-Square Fianchettos (Bishop-b2 vs. Bishop-g7)} ;# ***
-translate F PatternFourFian {Four Fianchettos (Bishops on b2,g2,b7,g7)} ;# ***
+translate F PatternWhiteIQP {PDI blanc}
+translate F PatternWhiteIQPBreakE6 {PDI blanc: la pousée d4-d5 vs e6}
+translate F PatternWhiteIQPBreakC6 {PDI blanc: la pousée d4-d5 vs c6}
+translate F PatternBlackIQP {PDI noir}
+translate F PatternWhiteBlackIQP {PDI blanc vs PDI noir}
+translate F PatternCoupleC3D4 {Deux pions isolés blancs c3 et d4}
+translate F PatternHangingC5D5 {Pions noirs en prise en c5 et d5}
+translate F PatternMaroczy {L'Étau de Maróczy (Pions en c4 et e4)}
+translate F PatternRookSacC3 {Le sacrifice de tour en c3}
+translate F PatternKc1Kg8 {O-O-O vs O-O (Kc1 vs Kg8)}
+translate F PatternKg1Kc8 {O-O vs O-O-O (Kg1 vs Kc8)}
+translate F PatternLightFian {Fianchettos des fous de cases blanches (Fou-g2 vs. Fou-b7)}
+translate F PatternDarkFian {Fianchettos des fous de cases noires (Fou-b2 vs. Fou-g7)}
+translate F PatternFourFian {Quatre Fianchettos (Fous en b2, g2, b7, g7)}
 
 # Game saving:
 translate F Today {Aujourd'hui}
@@ -1080,7 +1093,7 @@ translate F EnPassantFile {Prise en passant}
 translate F ClearFen {Effacer FEN}
 translate F PasteFen {Coller FEN}
 translate F SaveAndContinue {Enregistrer et continuer}
-translate F DiscardChangesAndContinue {Ignorer changements\net continuer}
+translate F DiscardChangesAndContinue {Ignorer Changements}
 translate F GoBack {Revenir}
 
 # Replace move dialog:
@@ -1102,14 +1115,9 @@ Vous pouvez facilement rendre la base à nouveau accessible en écriture, en la fe
 
 Voulez vous vraiment passer cette base en lecture seule?}
 
-# Clear game dialog:
-translate F ClearGameDialog {Cette partie a été modifiée.
-
-Voulez vous vraiment continuer et ignorer les changements effectués?
-}
-
 # Exit dialog:
-translate F ExitDialog {Voulez vous réellement quitter Scid?}
+translate F ExitDialog {Voulez-vous réellement quitter Scid?}
+translate F ClearGameDialog {Ce jeu a été modifié.\nVoulez-vous le sauvegarder?}
 translate F ExitUnsaved {Les bases de données suivantes ont des parties modifiées non sauvegardées. Si vous quittez maintenant, ces modifications seront perdues.}
 
 # Import window:
@@ -1200,6 +1208,7 @@ translate F OprepViewLaTeX {Voir en LaTeX}
 translate F PReportTitle {Rapport du joueur}
 translate F PReportColorWhite {avec les Blancs pièces}
 translate F PReportColorBlack {avec les Noirs pièces}
+translate F PReportBeginning {Commençant avec}
 translate F PReportMoves {après %s}
 translate F PReportOpenings {Ouvertures}
 translate F PReportClipbase {Vider le presse-papier et copier dedans toutes les parties qui correspondent}
@@ -1256,14 +1265,9 @@ translate F NameEditSelect {Parties à éditer}
 translate F NameEditReplace {Remplacer}
 translate F NameEditWith {avec}
 translate F NameEditMatches {Correspondances: Presser Alt+1 à Alt+9 pour sélectionner}
-# ====== TODO To be translated ======
-translate F CheckGames {Check games}
-# ====== TODO To be translated ======
-translate F CheckGamesWhich {Check games}
-# ====== TODO To be translated ======
-translate F CheckAll {All games}
-# ====== TODO To be translated ======
-translate F CheckSelectFilterGames {Only games in filter}
+translate F CheckGamesWhich {Vérifier les parties}
+translate F CheckAll {Toutes les parties}
+translate F CheckSelectFilterGames {Jeux filtrés uniquement}
 
 # Classify window:
 translate F Classify {Classer}
@@ -1288,7 +1292,8 @@ translate F CompactNames {Compacter le fichier de noms}
 translate F CompactGames {Compacter le fichier de parties}
 translate F NoUnusedNames "Il n'y a pas de noms inutilisés, le fichier de noms est donc déjà compacté."
 translate F NoUnusedGames "Le fichier des parties est déjà compacté."
-translate F GameFileCompacted {Le fichier de parties de la base a été compacté.}
+translate F NameFileCompacted {Le fichier de noms de la base "[file tail [sc_base filename]]" a été compacté.}
+translate F GameFileCompacted {Le fichier de parties de la base "[file tail [sc_base filename]]" a été compacté.}
 
 # Sorting:
 translate F SortCriteria {Critère}
@@ -1305,6 +1310,7 @@ translate F IndentVariations {Indenter les variantes?}
 translate F ExportColumnStyle {Style en colonne (un coup par ligne)?}
 translate F ExportSymbolStyle {Style d'annotation symbolique:}
 translate F ExportStripMarks {Enlever les codes de marquages de flèches et de coloration de cases des commentaires?}
+translate F ExportFlags {Exporter les drapeaux}
 
 # Goto game/move dialogs:
 translate F LoadGameNumber {Entrer le numéro de la partie à charger:}
@@ -1329,11 +1335,16 @@ translate F CopyErrNotOpen {n'est pas ouverte}
 translate F LightSquares {Cases blanches}
 translate F DarkSquares {Cases noires}
 translate F SelectedSquares {Cases sélectionnées}
-translate F SuggestedSquares {Cases des coups suggérés}
+translate F Grid {Grille}
+translate F Previous {Précédents}
 translate F WhitePieces {Pièces blanches}
 translate F BlackPieces {Pièces noires}
 translate F WhiteBorder {Bordure des pièces blanches}
 translate F BlackBorder {Bordure des pièces noires}
+translate F ArrowMain   {Main Arrow}
+translate F ArrowVar    {Var Arrows}
+# ====== TODO To be translated ======
+translate F ShowArrows  {Show Arrows}
 
 # Novelty window:
 translate F FindNovelty {Trouver la nouveauté}
@@ -1355,14 +1366,14 @@ translate F SoundsAnnounceBack {Annoncer quand retour arrière d'un coup}
 # Upgrading databases:
 translate F Upgrading {Mise à jour}
 translate F ConfirmOpenNew {
-Ceci est une base de données à l'ancien format (Scid 3) qui ne peut être ouverte dans Scid 4, mais une version au nouveau format (Scid 4) a déjà été crée.
+Ceci est une base de données à l'ancien format (Scid 2) qui ne peut être ouverte dans Scid 3, mais une version au nouveau format (Scid 3) a déjà été crée.
 
 Voulez vous ouvrir le nouveau format de la base de données?
 }
 translate F ConfirmUpgrade {
-Ceci est une base de données à l'ancien format (Scid 3). Une version de la base de données au nouveau format doit être créée avant de pouvoir être utilisée dans Scid 4.
+Ceci est une base de données à l'ancien format (Scid 2). Une version de la base de données au nouveau format doit être créée avant de pouvoir être utilisée dans Scid 3.
 
-Mettre à jour va créer une nouvelle version de la base de données; les fichiers originaux seront effacés.
+Mettre à jour va créer une nouvelle version de la base de données; les fichiers originaux ne seront pas édités ou effacés.
 
 Cela peut prendre un peu de temps, mais il n'est nécessaire de le faire qu'une fois. Vous pouvez abandonner si cela dure trop longtemps.
 
@@ -1399,12 +1410,12 @@ translate F Play {Jouer}
 translate F Noblunder {Pas d'erreur}
 translate F blunder {erreur}
 translate F Noinfo {-- Pas d'info --}
-translate F PhalanxOrTogaMissing {Phalanx ou Toga non trouvé}
 translate F moveblunderthreshold {le coup est une erreur si les pertes sont supérieures à }
 translate F limitanalysis {limiter le temps d'analyse}
 translate F seconds {secondes}
 translate F Abort {Arrêter}
 translate F Resume {Reprendre}
+translate F Restart {Recommencer}
 translate F OutOfOpening {Hors de l'ouverture}
 translate F NotFollowedLine {Vous n'avez pas suivi la ligne}
 translate F DoYouWantContinue {Voulez-vous continuer ?}
@@ -1424,32 +1435,21 @@ translate F DisplayOpeningStats {Montrer statistiques}
 translate F ShowReport {Montrer rapport}
 translate F NumberOfGoodMovesPlayed {bons coups joués}
 translate F NumberOfDubiousMovesPlayed {coups douteux joués}
-translate F NumberOfMovesPlayedNotInRepertoire {coups joués absents du répertoire}
 translate F NumberOfTimesPositionEncountered {nombre de fois position rencontrée}
 translate F PlayerBestMove  {N'autoriser que les meilleurs coups}
 translate F OpponentBestMove {Ne jouer que les meilleurs coups}
 translate F OnlyFlaggedLines {Seulement les lignes marquées}
 translate F resetStats {Remettre à zéro les scores}
-translate F Repertoiretrainingconfiguration {Configuration entrainement répertoire}
-translate F Loadingrepertoire {Chargement du répertoire}
 translate F Movesloaded {Coups lus}
-translate F Repertoirenotfound {Répertoire introuvable}
-translate F Openfirstrepertoirewithtype {Ouvrez d'abord une base avec le bon type/icône sur le côté droit}
-translate F Movenotinrepertoire {Coup absent du répertoire}
-translate F PositionsInRepertoire {Positions dans le répertoire}
 translate F PositionsNotPlayed {Positions non jouées}
 translate F PositionsPlayed {Positions jouées}
 translate F Success {Succès}
 translate F DubiousMoves {Coups douteux}
-translate F OutOfRepertoire {Hors du répertoire}
 translate F ConfigureTactics {Configurer exercices tactiques}
 translate F ResetScores {Remise à zéro des scores}
 translate F LoadingBase {Chargement de la base}
 translate F Tactics {Tactique}
 translate F ShowSolution {Montrer la solution}
-translate F NextExercise {Exercice suivant}
-translate F PrevExercise {Exercice précédent}
-translate F StopTraining {Arrêter l'entrainement}
 translate F Next {Suivant}
 translate F ResettingScore {Remise à zéro des scores}
 translate F LoadingGame {Chargement partie}
@@ -1475,7 +1475,16 @@ translate F FixedDepth {Profondeur fixe}
 translate F Nodes {Noeuds} 
 translate F Depth {Profondeur}
 translate F Time {Temps} 
+translate F Auto {Auto}
+translate F Score {Score}
+translate F {Score Combo} {Score Combiné}
+translate F {Time Combo} {Time Combiné}
 translate F SecondsPerMove {Secondes par coup}
+translate F DepthPerMove {Profondeur par coup}
+translate F MoveControl {Type d'analyse}
+translate F TimeLabel {Time per move}
+translate F AddVars {Ajouter les variantes}
+translate F AddScores {Additionner scores}
 translate F Engine {Moteur}
 translate F TimeMode {Mode de réflexion}
 translate F TimeBonus {Temps + bonus}
@@ -1498,6 +1507,8 @@ translate F addAnnotatorTag {Ajouter Annotateur}
 translate F AddScoreToShortAnnotations {Ajouter score aux annotations courtes}
 translate F Export {Exporter}
 translate F BookPartiallyLoaded {Bibliothèque chargée en partie}
+translate F AddLine {Ajouter ligne}
+translate F RemLine {Enlever ligne}
 translate F Calvar {Calcul de variantes}
 translate F ConfigureCalvar {Configuration}
 # Opening names used in tacgame.tcl
@@ -1557,19 +1568,19 @@ translate F NimzoIndianRubinstein {Nimzo-Indienne Rubinstein}
 translate F KingsIndian {Est-indienne}
 translate F KingsIndianSamisch {Est-indienne Sämisch}
 translate F KingsIndianMainLine {Est-indienne ligne principale}
+
 translate F ConfigureFics {Configurer FICS}
+translate F FICSLogin {Login}
 translate F FICSGuest {Login comme invité}
 translate F FICSServerPort {Port du serveur}
 translate F FICSServerAddress {Adresse IP}
 translate F FICSRefresh {Rafraîchir}
+translate F FICSTimeseal {Timeseal}
 translate F FICSTimesealPort {Port Timeseal}
 translate F FICSSilence {Silence}
 translate F FICSOffers {Offres}
-translate F FICSConsole {Console}
+translate F FICSMakeOffer {Faire une Offre}
 translate F FICSGames {Parties}
-translate F FICSUnobserve {Arrêter de suivre la partie}
-translate F FICSProfile {Afficher mon historique et mes données}
-translate F FICSRelayedGames {Parties retransmises}
 translate F FICSFindOpponent {Trouver adversaire}
 translate F FICSTakeback {Reprendre un coup}
 translate F FICSTakeback2 {Rependre deux coups}
@@ -1580,35 +1591,20 @@ translate F FICSAutoColour {automatique}
 translate F FICSManualConfirm {accepter manuellement}
 translate F FICSFilterFormula {Filtrer avec formule}
 translate F FICSIssueSeek {Envoyer seek}
-translate F FICSChallenge {Challenge}
 translate F FICSAccept {accepter}
 translate F FICSDecline {refuser}
 translate F FICSColour {Couleur}
 translate F FICSSend {envoyer}
 translate F FICSConnect {Connecter}
-translate F FICSdefaultuservars {Variables par défaut}
-translate F FICSObserveconfirm {Voulez-vous suivre la partie}
-# ====== TODO To be translated ======
-translate F FICSpremove {Enable premove}
-translate F GameReview {Revue de partie}
-translate F GameReviewTimeExtended {Temps étendu}
-translate F GameReviewMargin {Marge d'erreur}
-translate F GameReviewAutoContinue {Continuer quand le coup est correct}
-translate F GameReviewReCalculate {Utiliser temps étendu}
-translate F GameReviewAnalyzingMovePlayedDuringTheGame {Analyse du coup joué pendant la partie}
-translate F GameReviewAnalyzingThePosition {Analyse de la position}
-translate F GameReviewEnterYourMove {Jouez votre coup}
-translate F GameReviewCheckingYourMove {Vérification de votre coup}
-translate F GameReviewYourMoveWasAnalyzed {Votre coup a été analysé}
-translate F GameReviewYouPlayedSameMove {Vous avez joué le même coup que dans la partie}
-translate F GameReviewScoreOfYourMove {Score de votre coup}
-translate F GameReviewGameMoveScore {Score du coup de la partie}
-translate F GameReviewEngineScore {Score du moteur}
-translate F GameReviewYouPlayedLikeTheEngine {Vous avez joué un coup aussi bon que le moteur}
-translate F GameReviewNotEngineMoveButGoodMove {Pas le coup du moteur, mais un coup jouable}
-translate F GameReviewMoveNotGood {Ce coup n'est pas bon, le score est}
-translate F GameReviewMovesPlayedLike {Coups joués comme}
-translate F GameReviewMovesPlayedEngine {coups joués comme le moteur}
+translate F FICSShouts {Cris}
+translate F FICSTells {Dire}
+translate F FICSOpponent {Informations de l'adversaire}
+translate F FICSInfo {Informations}
+translate F FICSDraw {Proposer la nulle}
+translate F FICSRematch {Revanche}
+translate F FICSQuit {Quitter}
+translate F FICSCensor {Censurer}
+
 translate F CCDlgConfigureWindowTitle {Configurer échecs par correspondance}
 translate F CCDlgCGeneraloptions {Options générales}
 translate F CCDlgDefaultDB {Base par défaut:}
@@ -1660,8 +1656,6 @@ translate F CCHelpBtn {Aide sur les icônes et indicateurs.\nPour plus d'aide app
 translate F CCDlgServerName {Nom serveur:}
 translate F CCDlgLoginName  {Login:}
 translate F CCDlgPassword   {Mot de passe:}
-# ====== TODO To be translated ======
-translate F CCDlgShowPassword {Show password}
 translate F CCDlgURL        {Xfcc-URL:}
 translate F CCDlgRatingType {Type classement:}
 translate F CCDlgDuplicateGame {Identifiant de partie non-unique}
@@ -1673,25 +1667,23 @@ translate F CCOrderMyTimeTxt {Ma pendule}
 translate F CCOrderTimePerMoveTxt {Temps par coup jusqu'au prochain contrôlede temps}
 translate F CCOrderStartDate {Date de départ}
 translate F CCOrderOppTimeTxt {Pendule adversaire}
-# ====== TODO To be translated ======
-translate F CCDlgConfigRelay {Configure ICCF observations}
-# ====== TODO To be translated ======
-translate F CCDlgConfigRelayHelp {Go to the games page on http://www.iccf-webchess.com and display the game to be observed.  If you see the chessboard copy the URL from your browser to the list below. One URL per line only!\nExample: http://www.iccf-webchess.com/MakeAMove.aspx?id=266452}
-translate F ExtHWConfigConnection {Configure external hardware}
+translate F CCDlgConfigRelay {Configurer observations ICCF}
+translate F CCDlgConfigRelayHelp {Aller à la page des parties sur http://www.iccf-webchess.com et afficher la partie que vous aimez observer. Si vouz voyez l'échiquier, copiez l'URL de votre navigateur à la liste ci-dessous. Seule une URL par ligne !\nPar exemple: http://www.iccf-webchess.com/MakeAMove.aspx?id=266452}
+
+translate F ExtHWConfigConnection {Configurer hardware extérieur}
 translate F ExtHWPort {Port}
-translate F ExtHWEngineCmd {Commande moteur}
-translate F ExtHWEngineParam {Paramètre moteur}
+translate F ExtHWEngineCmd {Commande du moteur}
+translate F ExtHWEngineParam {Paramètre du moteur}
 translate F ExtHWShowButton {Montrer bouton}
-translate F ExtHWHardware {Matériel}
+translate F ExtHWHardware {Hardware}
 translate F ExtHWNovag {Novag Citrine}
-translate F ExtHWInputEngine {Moteur en entrée}
-translate F ExtHWNoBoard {Pas d'échiquier}
-translate F NovagReferee {Arbitre}
-translate F IEConsole {Console du moteur en entrée}
-translate F IESending {Coups envoyés pour}
-translate F IESynchronise {Synchronizer}
-translate F IERotate  {Tourner}
-translate F IEUnableToStart {Impossible de démarrer le moteur en entrée:}
+translate F ExtHWInputEngine {Autre périphérique}
+translate F ExtHWNoBoard {Pas de plateau}
+translate F IEConsole {Console périphérique}
+translate F IESending {Les coups ont été envoyés par}
+translate F IESynchronise {Synchroniser}
+translate F IERotate  {Retourner}
+translate F IEUnableToStart {Echec du démarrage périphérique:}
 translate F DoneWithPosition {Position terminée}
 translate F Board {Echiquier}
 translate F showGameInfo {Montrer le panneau d'info}
@@ -1701,13 +1693,22 @@ translate F DockBottom {Déplacer en bas}
 translate F DockLeft {Déplacer à gauche}
 translate F DockRight {Déplacer à droite}
 translate F Undock {Détacher}
-translate F ChangeIcon {Changer icone...}
+translate F ChangeIcon {Changer icone}
+translate F More {Plus...}
+
+# Drag & Drop
+translate F CannotOpenUri {Ouverture impossible de l'URI:}
+translate F InvalidUri {Les données déposées sont sans URI valide}
+translate F UriRejected	{Les fichiers suivant sont rejetés:}
+translate F UriRejectedDetail {Seuls les types de fichiers listés seront gérés:}
+translate F EmptyUriList {Le contenu déposé est vide.}
+translate F SelectionOwnerDidntRespond {Timeout durant l'envoi: absence de réponse.}
 
 ##########
 #
 # ECO Opening name translations:
 
-# translateECO F {
+# translateECO F 
   # Accelerated {, Accéléré}
   # {: Accelerated} Accéléré
   # Accepted {, accepté}
@@ -1903,7 +1904,6 @@ translate F ChangeIcon {Changer icone...}
   # {Two Pawns Attack} {Attaque des Deux Pions}
   # {Wing Gambit} {Gambit de l'aile}
   # {Yugoslav Attack} {Attaque Yougoslave}
-# }
 
 
 }

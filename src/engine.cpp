@@ -15,8 +15,6 @@
 #include "attacks.h"
 #include "engine.h"
 #include "recog.h"
-#include "sqmove.h"
-#include "sqlist.h"
 
 // The Engine class implements the Scid built-in chess engine.
 // See engine.h for details.
@@ -927,11 +925,7 @@ Engine::PlayMove (simpleMoveT * sm) {
     PushRepeat(&RootPos);
     RootPos.DoSimpleMove(sm);
     Pos.DoSimpleMove(sm);
-#ifdef WINCE
-    simpleMoveT * newMove = (simpleMoveT *) my_Tcl_Alloc(sizeof(simpleMoveT));
-#else
     simpleMoveT * newMove = new simpleMoveT;
-#endif
     *newMove = *sm;
     GameMoves[NumGameMoves] = newMove;
     NumGameMoves++;
@@ -950,11 +944,7 @@ Engine::RetractMove (void)
     NumGameMoves--;
     RootPos.UndoSimpleMove(GameMoves[NumGameMoves]);
     Pos.UndoSimpleMove(GameMoves[NumGameMoves]);
-#ifdef WINCE
-    my_Tcl_Free((char *)GameMoves);
-#else
     delete GameMoves[NumGameMoves];
-#endif
     TranTableSequence--;
 }
 
@@ -1084,13 +1074,8 @@ Engine::SetHashTableKilobytes (uint size)
 	{
       TranTableSize = bytes / sizeof(transTableEntryT);
       if ((TranTableSize % 2) == 1) { TranTableSize--; }
-#ifdef WINCE
-      if (TranTable != NULL) { my_Tcl_Free((char *) TranTable); }
-      TranTable = (transTableEntryT*)my_Tcl_Alloc(sizeof ( transTableEntryT [TranTableSize]));
-#else
       if (TranTable != NULL) { delete[] TranTable; }
       TranTable = new transTableEntryT [TranTableSize];
-#endif
     }
     ClearHashTable();
 }
@@ -1106,13 +1091,8 @@ Engine::SetPawnTableKilobytes (uint size)
 	if(PawnTableSize != bytes / sizeof(pawnTableEntryT))
 	{
       PawnTableSize = bytes / sizeof(pawnTableEntryT);
-#ifdef WINCE
-      if (PawnTable != NULL) { my_Tcl_Free((char *) PawnTable); }
-      PawnTable = (pawnTableEntryT*)my_Tcl_Alloc(sizeof (pawnTableEntryT [PawnTableSize]) );
-#else
       if (PawnTable != NULL) { delete[] PawnTable; }
       PawnTable = new pawnTableEntryT [PawnTableSize];
-#endif
     }
     ClearPawnTable();
 }
@@ -1333,11 +1313,7 @@ Engine::SetPosition (Position * newpos)
 {
     // Delete old game moves:
     for (uint i=0; i < NumGameMoves; i++) {
-#ifdef WINCE
-        my_Tcl_Free((char *) GameMoves[i]);
-#else
         delete GameMoves[i];
-#endif
     }
     NumGameMoves = 0;
 
@@ -1354,9 +1330,10 @@ Engine::SetPosition (Position * newpos)
     RepStackSize = 0;
 
     // Clear the PV:
-    PV[0].length = 0;
+    for (uint i=0; i < ENGINE_MAX_PLY; i++)
+        PV[i].length = 0;
 
-    // Change the transposition table sequence number so existing
+    // Change the tranposition table sequence number so existing
     // entries can be detected as old ones:
     TranTableSequence++;
 }
@@ -1388,9 +1365,7 @@ Engine::Think (MoveList * mlist)
     ClearHistoryValues();
 
     // If no legal move list was specified, generate and search all moves:
-    MoveList tmpMoveList;
     if (mlist == NULL) {
-        mlist = &tmpMoveList;
         Pos.GenerateMoves(mlist);
     }
 
@@ -1479,7 +1454,7 @@ Engine::Think (MoveList * mlist)
         PrintPV (depth, bestScore, ">>>");
 
         // Stop if Only a few moves OR checkmate has been found - but not too soon:
-        if (mlist->Size() <= depth || depth >= 5  &&  IsMatingScore (bestScore)) { break; }
+        if (mlist->Size() <= depth || (depth >= 5  &&  IsMatingScore (bestScore))) { break; }
 
         // Make sure the first move in the list remains there by
         // giving it a huge node count for its move ordering score:
@@ -1498,9 +1473,7 @@ Engine::SearchRoot (int depth, int alpha, int beta, MoveList * mlist)
     ASSERT (depth >= 1);
 
     // If no legal move list was specified, generate and search all moves:
-    MoveList tmpMoveList;
     if (mlist == NULL) {
-        mlist = &tmpMoveList;
         Pos.GenerateMoves(mlist);
     }
 
@@ -1571,7 +1544,7 @@ Engine::Search (int depth, int alpha, int beta, bool tryNullMove)
 {
     SetPVLength();
 
-    // If there is no remaining depth, return a quiescent evaluation:
+    // If there is no remaining depth, return a qiuescent evaluation:
     if (depth <= 0) { return Quiesce (alpha, beta); }
 
     // Check that the absolute depth limit is not exceeded:
@@ -1819,7 +1792,7 @@ Engine::Search (int depth, int alpha, int beta, bool tryNullMove)
                 mlist.SwapWithFirst (hashIndex);
             } else {
                 // The hash table move was legal, but not found in the
-                // move list -- Bizarre!
+                // move list -- Bizzare!
                 Output ("# Yikes! Hash table move not in move list! Bug?\n");
             }
         }
@@ -2357,7 +2330,6 @@ Engine::PerfTest (uint depth)
     }
     return nmoves;
 }
-
 //////////////////////////////////////////////////////////////////////
 //  EOF: engine.cpp
 //////////////////////////////////////////////////////////////////////

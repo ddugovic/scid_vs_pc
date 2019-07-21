@@ -17,6 +17,11 @@
 #include "san.h"
 #include "util.h"
 #include "list.h"
+#ifndef _WIN32
+#include <unistd.h>
+#else
+#include <io.h>
+#endif
 
 // types
 
@@ -29,11 +34,7 @@ struct entry_t {
 };
 
 // variables
-#ifdef WINCE
-static Tcl_Channel BookFile[MaxBook];
-#else
 static FILE * BookFile[MaxBook];
-#endif
 
 static int BookSize[MaxBook];
 
@@ -44,21 +45,11 @@ static int    find_pos      (uint64 key, const int BookNumber);
 static void   read_entry    (entry_t * entry, int n, const int BookNumber);
 static void   write_entry   (const entry_t * entry, int n, const int BookNumber);
 
-#ifdef WINCE
-static void   read_entry_file    (Tcl_Channel file, entry_t * entry);
-static void   write_entry_file   (Tcl_Channel file, const entry_t * entry);
-#else
 static void   read_entry_file    (FILE *f, entry_t * entry);
 static void   write_entry_file   (FILE *f, const entry_t * entry);
-#endif
 
-#ifdef WINCE
-static uint64 read_integer  (Tcl_Channel file, int size);
-static void   write_integer (Tcl_Channel file, int size, uint64 n);
-#else
 static uint64 read_integer  (FILE * file, int size);
 static void   write_integer (FILE * file, int size, uint64 n);
-#endif
 
 // functions
 
@@ -129,11 +120,7 @@ int scid_book_movesupdate(char * moves, char * probs, const int BookNumber, char
     int probs_written;
     int write_count;
     int i;
-#ifdef WINCE
-  Tcl_Channel f;
-#else
     FILE *f;
-#endif
     char *probs_copy, *moves_copy;
     //	printf("Updating book: moves=%s; probs=%s; tempfile=%s; key=%016llx.\n",moves,probs,tempfile,scid_board[BookNumber]->key);
         /* parse probs and fill prob array */
@@ -185,21 +172,14 @@ int scid_book_movesupdate(char * moves, char * probs, const int BookNumber, char
 	// return 0; // nothing to do
     }
 
-#ifdef WINCE
-  if ((f = my_Tcl_OpenFileChannel(NULL, tempfile, "w+", 0666) ) == NULL) {
-#else
+    // 'b' mean binary and is ignored on all Posix systems. Windows ??
     if(!(f=fopen(tempfile,"wb+"))){
-#endif
         return -1;  //fail
     }
     probs_written=0;
     write_count=0;
 
-#ifdef WINCE
-    my_Tcl_Seek(BookFile[BookNumber],0,SEEK_SET);
-#else
     fseek(BookFile[BookNumber],0,SEEK_SET);
-#endif
 
     for(pos=0; pos<BookSize[BookNumber];pos++){
         read_entry_file(BookFile[BookNumber],entry);
@@ -246,83 +226,79 @@ int scid_book_movesupdate(char * moves, char * probs, const int BookNumber, char
       probs_written=1;
     }
     ASSERT(probs_written);
-#ifdef WINCE
-    my_Tcl_Seek(BookFile[BookNumber],0,SEEK_SET);
-    my_Tcl_Seek(f,0,SEEK_SET);
-#else
     fseek(BookFile[BookNumber],0,SEEK_SET);
     fseek(f,0,SEEK_SET);
-#endif
     for(pos=0; pos<write_count ;pos++){
         read_entry_file(f,entry);
         write_entry_file(BookFile[BookNumber],entry);
     }
-#ifdef WINCE   
-    my_Tcl_Close(NULL, f);
-#else
     fclose(f);
-#endif
+
+    bool isTruncated = (BookSize[BookNumber] > write_count);
     BookSize[BookNumber]=write_count;
     book_flush(BookNumber); // commit changes to disk
+
+    if (isTruncated) {
+      /* We are truncating an open file
+       * http://stackoverflow.com/questions/13755516/is-there-a-guaranteed-and-safe-way-to-truncate-a-file-from-ansi-c-file-pointer
+       * says -
+       *
+       * So, to use ftruncate() safely with STDIO it may be necessary to first
+       * flush any STDIO buffers (with fflush()) if your program may have
+       * already written to the stream in question. This will avoid STDIO
+       * trying to flush the otherwise unwritten buffer to the file after the
+       * truncation has been done.
+       *
+       * You can then use fileno() on the STDIO stream's FILE handle to find the
+       * underlying file descriptor for the open STDIO stream, and you would then use
+       * that file descriptor with ftruncate(). You might consider putting the call
+       * to fileno() right in the parameter list for the ftruncate() call so that you
+       * don't keep the file descriptor around and accidentally use it yet other ways
+       * which might further confuse the internal state of STDIO. Perhaps like this
+       * (say to truncate a file to the current STDIO stream offset):
+       */
+
+#ifdef _WIN32
+	_chsize(fileno(BookFile[BookNumber]),  ftell(BookFile[BookNumber]));
+#else
+	if (ftruncate (fileno(BookFile[BookNumber]), (off_t) ftell(BookFile[BookNumber])) == -1) {
+	  return -1; // Fail
+        }
+#endif
+    }
     return 0; // success
 }
 
 // =================================================================
 int scid_book_close(const int BookNumber) {
-	if (BookFile[BookNumber] != NULL) {
-#ifdef WINCE
-    if (my_Tcl_Close(NULL, BookFile[BookNumber]) != TCL_OK) {
-#else
+  if (BookFile[BookNumber] != NULL) {
     if (fclose(BookFile[BookNumber]) == EOF) {
-#endif
       return -1;
-   	}
-
-
-	}
-	return 0;
+    }
+  }
+  return 0;
 }
 // =================================================================
 int scid_book_open(const char file_name[], const int BookNumber) {
 
    int ReadOnlyFile = 0;
 
-#ifdef WINCE
-   BookFile[BookNumber] = my_Tcl_OpenFileChannel(NULL, file_name, "r+", 0666);
-#else
    BookFile[BookNumber] = fopen(file_name,"rb+");
-#endif
 
    //--------------------------------------------------
    if (BookFile[BookNumber] == NULL) {
       // the book can not be opened in read/write mode, try read only
-#ifdef WINCE
-      BookFile[BookNumber] = my_Tcl_OpenFileChannel(NULL, file_name, "r", 0666);
-#else
       BookFile[BookNumber] = fopen(file_name,"rb");
-#endif
       ReadOnlyFile = 1;
       if (BookFile[BookNumber] == NULL) return -1;
    }
    //--------------------------------------------------
 
-
-#ifdef WINCE
-   my_Tcl_SetChannelOption(NULL, BookFile[BookNumber], "-encoding", "binary");
-   my_Tcl_SetChannelOption(NULL, BookFile[BookNumber], "-translation", "binary");
-    if (my_Tcl_Seek(BookFile[BookNumber], 0, SEEK_END) == -1) 
-      return -1;
-#else
    if (fseek(BookFile[BookNumber],0,SEEK_END) == -1) {
       return -1;
    }
-#endif
 
-#ifdef WINCE
-    BookSize[BookNumber] = my_Tcl_Tell(BookFile[BookNumber]) / 16;
-#else
     BookSize[BookNumber] = ftell(BookFile[BookNumber]) / 16;
-#endif
    if (BookSize[BookNumber] == 0) return -1;
    return(0+ReadOnlyFile); //success
 }
@@ -441,30 +417,16 @@ void book_open(const char file_name[], const int BookNumber) {
 
    ASSERT(file_name!=NULL);
 
-#ifdef WINCE
-   BookFile[BookNumber] = my_Tcl_OpenFileChannel(NULL, file_name, "r+", 0666);
-   my_Tcl_SetChannelOption(NULL, BookFile[BookNumber], "-encoding", "binary");
-   my_Tcl_SetChannelOption(NULL, BookFile[BookNumber], "-translation", "binary");
-#else
    BookFile[BookNumber] = fopen(file_name,"rb+");
-#endif
 
    if (BookFile[BookNumber] == NULL) my_fatal("book_open(): can't open file \"%s\": %s\n",file_name,strerror(errno));
 
 
-#ifdef WINCE
-    if (my_Tcl_Seek(BookFile[BookNumber], 0, SEEK_END) == -1) {
-#else
    if (fseek(BookFile[BookNumber],0,SEEK_END) == -1) {
-#endif
       my_fatal("book_open(): fseek(): %s\n",strerror(errno));
    }
 
-#ifdef WINCE
-    BookSize[BookNumber] = my_Tcl_Tell(BookFile[BookNumber]) / 16;
-#else
     BookSize[BookNumber] = ftell(BookFile[BookNumber]) / 16;
-#endif
 
    if (BookSize[BookNumber] == 0) my_fatal("book_open(): empty file\n");
 }
@@ -472,11 +434,7 @@ void book_open(const char file_name[], const int BookNumber) {
 // book_close()
 
 void book_close(const int BookNumber) {
-#ifdef WINCE
-    if (my_Tcl_Close(NULL, BookFile[BookNumber]) != TCL_OK) {
-#else
     if (fclose(BookFile[BookNumber]) == EOF) {
-#endif
       my_fatal("book_close(): fclose(): %s\n",strerror(errno));
    }
 }
@@ -627,11 +585,7 @@ void book_learn_move(const board_t * board, int move, int result, const int Book
 // book_flush()
 
 void book_flush(const int BookNumber) {
-#ifdef WINCE
-   if (my_Tcl_Flush(BookFile[BookNumber]) != TCL_OK) {
-#else
    if (fflush(BookFile[BookNumber]) == EOF) {
-#endif
       my_fatal("book_flush(): fflush(): %s\n",strerror(errno));
    }
 }
@@ -671,11 +625,7 @@ static int find_pos(uint64 key, const int BookNumber) {
 }
 
 // read_entry()
-#ifdef WINCE
-static void read_entry_file(Tcl_Channel f, entry_t * entry) {
-#else
 static void read_entry_file(FILE *f, entry_t * entry) {
-#endif
    ASSERT(entry!=NULL);
 
    entry->key   = read_integer(f,8);
@@ -692,11 +642,7 @@ static void read_entry_file(FILE *f, entry_t * entry) {
 static void read_entry(entry_t * entry, int n, const int BookNumber) {
    ASSERT(entry!=NULL);
    ASSERT(n>=0&&n<BookSize[BookNumber]);
-#ifdef WINCE
-    if (my_Tcl_Seek(BookFile[BookNumber], n*16,SEEK_SET) == -1) {
-#else
    if (fseek(BookFile[BookNumber],n*16,SEEK_SET) == -1) {
-#endif
       my_fatal("read_entry(): fseek(): %s\n",strerror(errno));
    }
 
@@ -708,11 +654,7 @@ static void read_entry(entry_t * entry, int n, const int BookNumber) {
 }
 
 // write_entry_file
-#ifdef WINCE
-static void write_entry_file(Tcl_Channel f, const entry_t * entry) {
-#else
 static void write_entry_file(FILE * f, const entry_t * entry) {
-#endif
    ASSERT(entry!=NULL);
    write_integer(f,8,entry->key);
    write_integer(f,2,entry->move);
@@ -727,11 +669,7 @@ static void write_entry(const entry_t * entry, int n, const int BookNumber) {
 
    ASSERT(entry!=NULL);
    ASSERT(n>=0&&n<BookSize[BookNumber]);
-#ifdef WINCE
-   if (my_Tcl_Seek(BookFile[BookNumber],n*16,SEEK_SET) == -1) {
-#else
    if (fseek(BookFile[BookNumber],n*16,SEEK_SET) == -1) {
-#endif
       my_fatal("write_entry(): fseek(): %s\n",strerror(errno));
    }
 
@@ -743,11 +681,7 @@ static void write_entry(const entry_t * entry, int n, const int BookNumber) {
 }
 
 // read_integer()
-#ifdef WINCE
-static uint64 read_integer(Tcl_Channel file, int size) {
-#else
 static uint64 read_integer(FILE * file, int size) {
-#endif
    uint64 n;
    int i;
    int b;
@@ -758,11 +692,6 @@ static uint64 read_integer(FILE * file, int size) {
 
    for (i = 0; i < size; i++) {
 
-#ifdef WINCE
-      unsigned char c;
-      my_Tcl_Read(file, (char *)&c , 1);
-      b = c;
-#else
       b = fgetc(file);
       if (b == EOF) {
          if (feof(file)) {
@@ -771,7 +700,6 @@ static uint64 read_integer(FILE * file, int size) {
             my_fatal("read_integer(): fgetc(): %s\n",strerror(errno));
          }
       }
-#endif
 
       ASSERT(b>=0&&b<256);
       n = (n << 8) | b;
@@ -781,11 +709,7 @@ static uint64 read_integer(FILE * file, int size) {
 }
 
 // write_integer()
-#ifdef WINCE
-static void write_integer(Tcl_Channel file, int size, uint64 n) {
-#else
 static void write_integer(FILE * file, int size, uint64 n) {
-#endif
    int i;
    int b;
    ASSERT(file!=NULL);
@@ -796,13 +720,7 @@ static void write_integer(FILE * file, int size, uint64 n) {
 
       b = (n >> (i*8)) & 0xFF;
       ASSERT(b>=0&&b<256);
-#ifdef WINCE
-      unsigned char c;
-      c = b;
-      if (my_Tcl_Write(file, (char*) &c, 1) != 1) {
-#else
       if (fputc(b,file) == EOF) {
-#endif
          my_fatal("write_integer(): fputc(): %s\n",strerror(errno));
       }
    }

@@ -1,5 +1,6 @@
 # utils/graph.tcl: Graph plotting package for Scid.
 #
+# Utilized by tcl/tools/graphs.tcl
 
 namespace eval ::utils::graph {}
 
@@ -19,7 +20,7 @@ namespace eval ::utils::graph {}
 #  -ytick:     distance between y-axis ticks, in graph units.
 #  -xlabels, -ylabels: lists of {value,label} pairs to print on each axis.
 #              If a list has no pairs, values are printed at each tick.
-#  -xmin, -xmax, -ymin, -ymax:  minimum/maximum graph units to plot.
+#  -xmin, -xmax, -ymin, -ymax:  miminum/maximum graph units to plot.
 #  -canvas:    canvas to plot the graph in.
 #  -vline, -hline: list of vertical/horizontal lines to plot. Each
 #              element is a list of four items: {color width type value}
@@ -27,17 +28,18 @@ namespace eval ::utils::graph {}
 #              pixels, type is "each" or "at", and value is the value.
 #  -brect: list of background rectangles. Each element is a list of 5 items:
 #              the graph coordinates of a rectangle, and its color.
+#  -highx: color of highlighted X axis labels
 #
 set ::utils::graph::_options(graph) {
   width height xtop ytop background font ticksize textgap xtick ytick
   xmin xmax ymin ymax canvas vline hline textcolor tickcolor
-  xlabels ylabels brect
+  xlabels ylabels brect highx
 }
 set ::utils::graph::_defaults(graph) \
   { -width 400 -height 300 -xtop 50 -ytop 30 -ticksize 5 -textgap 2 \
-    -xtick 5 -ytick 5 -tickcolor black -font fixed -background white \
+    -xtick 5 -ytick 5 -tickcolor black -font fixed -background $::defaultGraphBackgroud \
       -canvas {} -hline {} -vline {} -textcolor black \
-      -xlabels {} -ylabels {} -brect {} }
+      -xlabels {} -ylabels {} -brect {} -highx {}}
 
 # Data options, specific to each data set within a graph:
 #
@@ -73,6 +75,7 @@ proc ::utils::graph::create args {
   lappend ::utils::graph::_graphs $graph
   
   # Remove any existing data for this graph name:
+  catch {unset ::utils::graph::prevMove}
   foreach key [array names ::utils::graph::_data] {
     if {[string match "$graph,*" $key]} { unset ::utils::graph::_data($key) }
   }
@@ -113,14 +116,16 @@ proc ::utils::graph::isgraph {graph} {
 }
 
 
-# data:
 #    Adds a new data set to the graph, or modifies an existing one.
-#
+
 proc ::utils::graph::data args {
   variable _data
   variable _defaults
   set graph [lindex $args 0]
   set dataset [lindex $args 1]
+
+  # This concat doesnt make any attempt to remove previously defined data.
+  # ie - it send multiple "-coords" (for eg) to _configure
 
   set args [concat data $graph,$dataset $_defaults(data) \
               [lrange $args 2 end]]
@@ -172,12 +177,13 @@ proc ::utils::graph::configure args {
 }
 
 
-# _configure:
 #    Handle configuration of both the graph, and individual data sets.
 #    The first arg (type) should be "graph" or "data". The second should
 #    be a graph name for graph configuration, or a "graph,set" pair
 #    for dataset configuration.
-#
+
+#    eg: data score,bounds -points 0 -lines 1 -bars 0 -color red -outline black -radius 2  -linewidth 1 -barwidth 1.0 -key {} -coords {} -points 0 -lines 0 -bars 0 -coords {1 -0.9 1 0.9}
+
 proc ::utils::graph::_configure args {
   variable _data
   set type [lindex $args 0]
@@ -199,20 +205,24 @@ proc ::utils::graph::_configure args {
   }
 }
 
-# redraw:
 #    Redraw the entire graph, axes and data.
-#
+
 proc ::utils::graph::redraw {graph} {
+  variable _data
   if {! [::utils::graph::isgraph $graph]} { error "$graph: no such graph" }
-  if {! [info exists ::utils::graph::_data($graph,canvas)]} { return }
-  $::utils::graph::_data($graph,canvas) delete -withtag g$graph
+  if {! [info exists _data($graph,canvas)]} { return }
+  $_data($graph,canvas) delete -withtag g$graph
   ::utils::graph::plot_axes $graph
   ::utils::graph::plot_data $graph
+  if {$graph == "score"} {
+    ::utils::graph::updateMove
+    # Print a little title on the top left of graph
+    $_data(score,canvas) create text [expr {$_data(score,xtop) + 10}] 50 -text $::tools::graphs::score::title -font font_Small -anchor w -tag title
+  }
 }
 
-# plot_axes:
 #    Replot the graph axes.
-#
+
 proc ::utils::graph::plot_axes {graph} {
   variable _data
   # Set ranges and scaling factors:
@@ -242,9 +252,13 @@ proc ::utils::graph::plot_axes {graph} {
     set $attr $_data($graph,$attr)
   }
 
-  $canvas create rectangle $xminc $yminc $xmaxc $ymaxc -outline $tickcolor \
-    -fill $_data($graph,background) -tag $tag
+  # Two border rectangles
+  # One for outline (which gets raised after graph is drawn), one for fill
+  $canvas create rectangle $xminc $yminc $xmaxc $ymaxc -outline $tickcolor -tag "$tag outline"
+  $canvas create rectangle $xminc $yminc $xmaxc $ymaxc -fill $_data($graph,background) -tag "$tag fill"
 
+  # brect - Blue Rectangle of original tree graph
+  # Now unused - S.A.
   set brect $_data($graph,brect)
   for {set i 0} {$i < [llength $brect]} {incr i} {
     set item [lindex $brect $i]
@@ -284,8 +298,12 @@ proc ::utils::graph::plot_axes {graph} {
       set x [expr {int($xmin/$inc) * $inc + $inc}]
       while {$x < $xmax} {
         set xvalue [xmap $graph $x]
+
+        # offset by one if gray to stop overwriting black axis
+	set ymaxc2 $ymaxc ; if {[string match {gray*} $color]} { incr ymaxc2 }
+
         if {$xvalue != $xminvalue  &&  $xvalue != $xmaxvalue} {
-          $canvas create line $xvalue $yminc $xvalue $ymaxc -width $width \
+          $canvas create line $xvalue $yminc $xvalue $ymaxc2 -width $width \
             -fill $color -tag $tag
         }
         set x [expr {$x + $inc}]
@@ -311,8 +329,12 @@ proc ::utils::graph::plot_axes {graph} {
       set y [expr {int($ymin/$inc) * $inc + $inc}]
       while {$y < $ymax} {
         set yvalue [ymap $graph $y]
+
+        # offset by one if gray to stop overwriting black axis
+	set xminc2 $xminc ; if {[string match {gray*} $color]} { incr xminc2 }
+
         if {$yvalue != $yminvalue  &&  $yvalue != $ymaxvalue} {
-          $canvas create line $xminc $yvalue $xmaxc $yvalue -width $width \
+          $canvas create line $xminc2 $yvalue $xmaxc $yvalue -width $width \
             -fill $color -tag $tag
         }
         set y [expr {$y + $inc}]
@@ -345,8 +367,13 @@ proc ::utils::graph::plot_axes {graph} {
     set x [lindex $label 0]
     set text [lindex $label 1]
     set xc [xmap $graph $x]
-    $canvas create text $xc [expr {$yminc + $textgap}] -font $font \
-      -text $text -anchor n -tag $tag -fill $textcolor -justify center
+    set citem [$canvas create text $xc [expr {$yminc + $textgap}] -font $font \
+      -text $text -anchor n -tag $tag -fill $textcolor -justify center]
+
+    if {$_data($graph,highx) != {}} {
+      $canvas bind $citem <Enter> "$canvas itemconfigure $citem -fill $_data($graph,highx) -font font_Bold"
+      $canvas bind $citem <Leave> "$canvas itemconfigure $citem -fill $textcolor -font $font"
+    }
   }
 
   if {$ytick > 0} {
@@ -375,18 +402,42 @@ proc ::utils::graph::plot_axes {graph} {
   }
 }
 
-# plot_data:
 #    Plot the lines/points/bars for each data set in the graph.
-#
+
 proc ::utils::graph::plot_data {graph} {
   variable _data
   set canvas $_data($graph,canvas)
 
   foreach dataset $_data($graph,sets) {
     set color $_data($graph,$dataset,color)
+    # Time bargraphs (ytick > 1) have dual coloured bars
+    if {$graph == "score" && $dataset == "data" && $_data($graph,ytick) > 1} {
+      set color2 [::utils::graph::gradient $color .3 .]
+    } else {
+      set color2 {}
+    }
     set outline $_data($graph,$dataset,outline)
     set tag g$graph
     set coords [scale_data $graph $_data($graph,$dataset,coords)]
+
+    if {$graph == "score" && $dataset == "data" } {
+      ### Init move offset list, used for highlighting the current move
+      # $_data($graph,$dataset,coords)
+      # 2.0 0.16 2.5 0.19 3.5 0.17 4.0 0.10 4.5 0
+
+      set plyList  {}
+      set coordList {}
+      foreach {i j} $_data($graph,$dataset,coords) {k l} $coords {
+	# Reverse this # 3->2.0 4->2.5 5->3.0
+	set ply [expr {int($i*2 - 1)}]
+	lappend plyList $ply
+	lappend coordList $k
+      }
+      set _data($graph,plyList) $plyList
+      set _data($graph,coordList) $coordList
+    }
+
+
     set ncoords [expr {[llength $coords] - 1}]
 
     # Draw key:
@@ -416,7 +467,7 @@ proc ::utils::graph::plot_data {graph} {
     }
 
     # Plot points:
-    if {$_data($graph,$dataset,points)} {
+    if {$_data($graph,$dataset,points) || ($_data($graph,$dataset,lines) && $ncoords == 1)} {
       for {set i 0} {$i < $ncoords} {incr i 2} {
         set x [lindex $coords $i]
         set y [lindex $coords [expr {$i + 1}]]
@@ -429,20 +480,56 @@ proc ::utils::graph::plot_data {graph} {
 
     # Plot bars:
     if {$_data($graph,$dataset,bars)} {
-      set base [ymap $graph $_data($graph,aymin)]
+      # only used by ECO and score graphs i think
+      if {$_data($graph,aymin) < 0} {
+        # set to zero allows minus values for the score graph
+	set base [ymap $graph 0]
+      } else {
+	set base [ymap $graph $_data($graph,aymin)]
+      }
       set hwidth [xmap $graph $_data($graph,$dataset,barwidth)]
       set hwidth [expr {$hwidth - [xmap $graph 0]}]
       set hwidth [expr {$hwidth / 2}]
       if {$hwidth < 1} { set hwidth 1 }
-
       for {set i 0} {$i < $ncoords} {incr i 2} {
         set x [lindex $coords $i]
         set y [lindex $coords [expr {$i + 1}]]
+        # todo - fixme. The light/dark color breaks if there is 1 missing %emt
+        if {$color2 != {} && [expr {$i % 4}] == 0} {
+          set c $color2
+        } else {
+          set c $color
+        }
         $canvas create rectangle \
           [expr {$x-$hwidth}] $y [expr {$x+$hwidth}] $base \
-          -fill $color -outline $outline -tag $tag
+          -fill $c -outline $outline -tags [list $tag moves move$x]
       }
     }
+  }
+  $_data($graph,canvas) raise outline
+}
+
+proc ::utils::graph::updateMove {} {
+  variable _data
+
+  set canvas .sgraph.c
+
+  if {!$::tools::graphs::showbar || ![winfo exists $canvas] || ![info exists _data(score,plyList)]} {
+    return
+  }
+
+  # Hmmm... a little slow doing this maybe ?
+  if {[info exists ::utils::graph::prevMove]} {
+    $canvas itemconfigure move$::utils::graph::prevMove -fill $::utils::graph::prevCol
+  }
+  if {[sc_var level]} {
+    return
+  }
+  set result [lsearch $_data(score,plyList) [sc_pos location]]
+  set ::utils::graph::prevMove [lindex $_data(score,coordList) $result]
+  set ::utils::graph::prevCol  [$canvas itemcget move$::utils::graph::prevMove -fill]
+  if {$result > -1} {
+    $canvas itemconfigure move$::utils::graph::prevMove -fill $::scorebarcolor
   }
 }
 
@@ -536,9 +623,9 @@ proc ::utils::graph::yunmap {graph cy} {
             double($_data($graph,yfac))}]
 }
 
-# scale_data:
 #    Transforms an even-sized list of graph coordinates to canvas units.
-#
+#    eg: 2.0 0.16 2.5 0.19 3.5 0.17 4.0 0.10 4.5 0
+
 proc ::utils::graph::scale_data {graph coords} {
   set result {}
   for {set i 0} {$i < [llength $coords] - 1} {incr i 2} {
@@ -579,7 +666,13 @@ proc ::utils::graph::set_range {graph} {
   set _data($graph,axmin) [expr {floor($xmin/$xtick) * $xtick}]
   set _data($graph,axmax) [expr {floor($xmax/$xtick) * $xtick + $xtick}]
   set _data($graph,aymin) [expr {floor($ymin/$ytick) * $ytick}]
-  set _data($graph,aymax) [expr {floor($ymax/$ytick) * $ytick + $ytick}]
+  set _data($graph,aymax) [expr {floor($ymax/$ytick) * $ytick +$ytick}]
+
+  # Using ceil() above to score graph breaks ratings graph, so add a
+  # hack to make handle score graph
+  if {$graph == "score" && $_data($graph,aymax) >= "11.0"} {
+    set _data($graph,aymax) [expr {$_data($graph,aymax) - 1.0}]
+  }
 
   # Explicitly set boundaries override the detected ranges:
   foreach coord {xmin xmax ymin ymax} {
@@ -589,3 +682,57 @@ proc ::utils::graph::set_range {graph} {
   }
 }
 
+# gradient 
+# Bryan Oakley
+# https://wiki.tcl-lang.org/page/Making+color+gradients
+#
+#    color   - standard tk color; either a name or rgb value
+#              (eg: "red", "#ff0000", etc)
+#    factor  - a number between -1.0 and 1.0. Negative numbers
+#              cause the color to be adjusted towards black;
+#              positive numbers adjust the color towards white.
+#    window  - a window name; used internally as an argument to
+#              [winfo rgb]; defaults to "."
+
+proc ::utils::graph::gradient {rgb factor {window .}} {
+
+    foreach {r g b} [winfo rgb $window $rgb] {break}
+
+    ### Figure out color depth and number of bytes to use in
+    ### the final result.
+    if {($r > 255) || ($g > 255) || ($b > 255)} {
+	set max 65535
+	set len 4
+    } else {
+	set max 255
+	set len 2
+    }
+
+    ### Compute new red value by incrementing the existing
+    ### value by a value that gets it closer to either 0 (black)
+    ### or $max (white)
+    set range [expr {$factor >= 0.0 ? $max - $r : $r}]
+    set increment [expr {int($range * $factor)}]
+    incr r $increment
+
+    ### Compute a new green value in a similar fashion
+    set range [expr {$factor >= 0.0 ? $max - $g : $g}]
+    set increment [expr {int($range * $factor)}]
+    incr g $increment
+
+    ### Compute a new blue value in a similar fashion
+    set range [expr {$factor >= 0.0 ? $max - $b : $b}]
+    set increment [expr {int($range * $factor)}]
+    incr b $increment
+
+    ### Format the new rgb string
+    set rgb \
+	[format "#%.${len}X%.${len}X%.${len}X" \
+	     [expr {($r>$max)?$max:(($r<0)?0:$r)}] \
+	     [expr {($g>$max)?$max:(($g<0)?0:$g)}] \
+	     [expr {($b>$max)?$max:(($b<0)?0:$b)}]]
+
+
+    ### Return the new rgb string
+    return $rgb
+}

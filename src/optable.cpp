@@ -104,7 +104,7 @@ OpLine::Init (void)
 }
 
 void
-OpLine::Init (Game * g, const IndexEntry * ie, gamenumT gameNum,
+OpLine::Init (Game * g, IndexEntry * ie, gameNumberT gameNum,
               uint maxExtraMoves, uint maxThemeMoveNumber)
 {
     White = strDuplicate (g->GetWhiteStr());
@@ -185,9 +185,15 @@ OpLine::Init (Game * g, const IndexEntry * ie, gamenumT gameNum,
 void
 OpLine::Destroy (void)
 {
+#ifdef WINCE
+    my_Tcl_Free((char*) White);
+    my_Tcl_Free((char*) Black);
+    my_Tcl_Free((char*)  Site);
+#else
     delete[] White;
     delete[] Black;
     delete[] Site;
+#endif
 }
 
 
@@ -293,24 +299,26 @@ OpLine::PrintMove (DString * dstr, const char * move, uint format)
         transPieces(tempTrans);
         dstr->Append(tempTrans);//(move);
         return;
-    }
+    } 
+
+    dstr->Append(move);
 
     // LaTeX format: K,Q,R,B,N are translated to {\K} etc.
-    char ch = *move;
-    while (ch != 0) {
-        switch (ch) {
-        case 'K': case 'Q': case 'R': case 'B': case 'N':
-            dstr->Append ("{\\");
-            dstr->AddChar (ch);
-            dstr->AddChar ('}');
-            break;
-        default:
-            dstr->AddChar (ch);
-            break;
-        }
-        move++;
-        ch = *move;
-    }
+//    char ch = *move;
+  //  while (ch != 0) {
+   //     switch (ch) {
+   //     case 'K': case 'Q': case 'R': case 'B': case 'N':
+   //         dstr->Append ("{\\");
+   //         dstr->AddChar (ch);
+   //         dstr->AddChar ('}');
+   //         break;
+   //     default:
+   //         dstr->AddChar (ch);
+   //         break;
+   //     }
+   //     move++;
+   //     ch = *move;
+   // }
 }
 
 void
@@ -393,8 +401,14 @@ OpLine::PrintSummary (DString * dstr, uint format, bool fullDate, bool nmoves)
     const char * s = White;
     while (*s != 0  &&  *s != ',') {
         if (format == OPTABLE_LaTeX) {
-            if (*s == '_'  ||  *s == '$'  || *s == '%') {
+            switch (*s) {
+            case '_':
+            case '$':
+            case '%':
+            case '&':
+            case '#':
                 dstr->AddChar ('\\');
+                break;
             }
         }
         dstr->AddChar (*s);
@@ -435,7 +449,27 @@ OpLine::PrintSummary (DString * dstr, uint format, bool fullDate, bool nmoves)
     }
     dstr->Append (postName);
     if (BlackElo > 0) { dstr->Append (preElo, BlackElo, postElo); }
-    dstr->Append (", ", Site, " ");
+    
+    // Add Site to Note with correct escaping for latex
+    dstr->Append(", ");
+    s = Site;
+    while (*s != 0) {
+        if (format == OPTABLE_LaTeX) {
+            switch (*s) {
+            case '_':
+            case '$':
+            case '%':
+            case '&':
+            case '#':
+                dstr->AddChar ('\\');
+                break;
+            }
+        }
+        dstr->AddChar (*s);
+        s++;
+    }
+    dstr->Append (" ");
+    
     if (fullDate) {
         char dateStr [16];
         date_DecodeToString (Date, dateStr);
@@ -457,8 +491,9 @@ OpLine::PrintSummary (DString * dstr, uint format, bool fullDate, bool nmoves)
 
 
 void
-OpTable::Init (const char * type, Game * g, PBook * ebook)
+OpTable::Init (uint base, const char * type, Game * g, PBook * ebook)
 {
+    Base = base;
     Type = strDuplicate (type);
     TargetRows = OPTABLE_DEFAULT_ROWS;
     MaxTableLines = OPTABLE_MAX_TABLE_LINES;
@@ -665,8 +700,8 @@ OpTable::Add (OpLine * line)
     FilterCount++;
 
     // Stop here if this line is excluded from the theory table:
-    if (WTM  && strEqual (line->Move[0], ExcludeMove)) { return false; }
-    if (!WTM  &&  strEqual (line->Move[1], ExcludeMove)) { return false; }
+    if (WTM  && strEqual (line->Move[0], ExcludeMove)) { return OK; }
+    if (!WTM  &&  strEqual (line->Move[1], ExcludeMove)) { return OK; }
 
     TheoryCount++;
     TheoryResults[line->Result]++;
@@ -674,7 +709,7 @@ OpTable::Add (OpLine * line)
         Line[NumLines] = line;
         NumLines++;
         if (NumTableLines < MaxTableLines) { NumTableLines++; }
-        return true;
+        return OK;
     }
 
     // The table is full, so if this line is to be added, it must
@@ -690,6 +725,7 @@ OpTable::Add (OpLine * line)
         }
     }
     if (evictIndex < 0) {
+        delete line;
         return false;
     }
     delete Line[evictIndex];
@@ -1055,11 +1091,11 @@ OpTable::PrintLaTeX (DString * dstr, const char * title, const char * comment)
     // Increasing arraystretch above 1.0 adds more whitespace between
     // rows making the table more readable:
     dstr->Append ("\\renewcommand{\\arraystretch}{1.15}\n");
-    dstr->Append ("\\twocolumn[\n");
+    dstr->Append ("\\twocolumn[\n");       
     dstr->Append (title);
     dstr->Append ("\\begin{center}\n");
-    dstr->Append ("\\begin{tabular}{r*{", OPTABLE_COLUMNS);
-    dstr->Append ("}{p{1.15cm}}r@{: }l}\n\\hline\n");
+    dstr->Append ("\\begin{tabularx}{0.97\\textwidth}{r*{", OPTABLE_COLUMNS);
+    dstr->Append ("}Xr@{: }l}\n\\hline\n");
     dstr->Append ("\\multicolumn{11}{p{13cm}}{\\textbf{");
     PrintStemLine (dstr, OPTABLE_LaTeX, true);
     dstr->Append ("}: \\mbox{");
@@ -1080,7 +1116,7 @@ OpTable::PrintLaTeX (DString * dstr, const char * title, const char * comment)
 
     // Print each row:
     for (uint row=0; row < NumRows; row++) {
-        uint lastNote = 0;
+    //    uint lastNote = 0;        
         dstr->Append ("\\textbf{", row+1, "}");
         uint nSameMoves = 0;
         if (row > 0) { nSameMoves = Row[row]->CommonLength(Row[row-1]); }
@@ -1118,9 +1154,9 @@ OpTable::PrintLaTeX (DString * dstr, const char * title, const char * comment)
                 dstr->Append ("}}");
 #endif
                 dstr->Append ("$");
-                lastNote = NumNotes;
+      //          lastNote = NumNotes;
             } else {
-                lastNote = 0;
+      //          lastNote = 0;
             }
         }
 
@@ -1137,7 +1173,7 @@ OpTable::PrintLaTeX (DString * dstr, const char * title, const char * comment)
     if (! strEqual (comment, "")) {
         dstr->Append ("\\multicolumn{11}{r}{\\em ", comment, "}\n");
     }
-    dstr->Append ("\\end{tabular}\n\\end{center}\n]\n");
+    dstr->Append ("\\end{tabularx}\n\\end{center}\n]\n");
     PrintNotes (dstr, OPTABLE_LaTeX);
 }
 
@@ -1425,7 +1461,7 @@ OpTable::PrintNotes (DString * dstr, uint format)
 
     for (uint note=1; note <= NumNotes; note++) {
         if (format == OPTABLE_LaTeX) {
-            dstr->Append ("\\notenum{", note, "}\n");
+            dstr->Append ("$^{", note, "}$");
         } else if (format == OPTABLE_HTML) {
             //dstr->Append ("<li><b>", note, "</b> ");
             dstr->Append ("<li><a name=\"note", note, "\"></a> ");
@@ -1494,7 +1530,7 @@ OpTable::BestGames (DString * dstr, uint count, const char * rtype)
 
     if (Format == OPTABLE_LaTeX) {
         preNum = "\\textbf{";
-        postNum = ":}  ";
+        postNum = ":}  &";
         endLine = "\\\\\n";
     } else if (Format == OPTABLE_HTML) {
         preNum = "";
@@ -1703,8 +1739,8 @@ OpTable::TopPlayers (DString * dstr, colorT c, uint count)
         startNotes = " <red>["; endNotes = "]</red>";
     }
     if (Format == OPTABLE_LaTeX) {
-        startTable = "\n\\begin{tabular}{rrrrrl}\n";
-        endTable = "\\end{tabular}\n";
+        startTable = "\n\\begin{tabularx}{0.9\\textwidth}{rrrrrX}\n";
+        endTable = "\\end{tabularx}\n";
         startRow = "  ";      endRow = " \\\\ \n";
         nextCell = " & ";     percentStr = "\\%";
         preNum = "\\textbf{"; postNum = ":}";
@@ -1871,8 +1907,8 @@ OpTable::TopEcoCodes (DString * dstr, uint count)
         startTable = "<tt>"; endTable = "</tt>";
     }
     if (Format == OPTABLE_LaTeX) {
-        startTable = "\n\\begin{tabular}{rlrr}\n";
-        endTable = "\\end{tabular}\n";
+        startTable = "\n\\begin{tabularx}{0.9\\textwidth}{rlrr}\n";
+        endTable = "\\end{tabularx}\n";
         startRow = "  ";      endRow = " \\\\ \n";
         nextCell = " & ";     percentStr = "\\%";
         preNum = "\\textbf{"; postNum = ":}";
@@ -1978,13 +2014,17 @@ OpTable::AddMoveOrder (Game * g)
 {
     uint id = 0;
     int index = -1;
-    DString dstr;
-    g->GetPartialMoveList (&dstr, g->GetCurrentPly());
+
+    // Breaks Player opening report from current position
+    // g->MoveToPly(0);
+
+    DString * dstr = new DString;
+    g->GetPartialMoveList (dstr, g->GetCurrentPly());
 
     // Search for this move order in the current list:
 
     for (uint i=0; i < NumMoveOrders; i++) {
-        if (strEqual (dstr.Data(), MoveOrder[i].moves)) {
+        if (strEqual (dstr->Data(), MoveOrder[i].moves)) {
             index = i;
             MoveOrder[i].count++;
             id = MoveOrder[i].id;
@@ -1997,12 +2037,14 @@ OpTable::AddMoveOrder (Game * g)
     if (index < 0) {
         if (NumMoveOrders == OPTABLE_MAX_LINES) { return 0; }
         MoveOrder[NumMoveOrders].count = 1;
-        MoveOrder[NumMoveOrders].moves = strDuplicate (dstr.Data());
+        MoveOrder[NumMoveOrders].moves = strDuplicate (dstr->Data());
         MoveOrder[NumMoveOrders].id = NumMoveOrders + 1;
         id = MoveOrder[NumMoveOrders].id;
         index = NumMoveOrders;
         NumMoveOrders++;
     }
+
+    delete dstr;
 
     // Keep the array in sorted order, to avoid needing to sort it later:
     // The list is sorted by count (highest first), with tied counts
@@ -2044,11 +2086,13 @@ OpTable::PopularMoveOrders (DString * dstr, uint count)
     const char * postList = "";
     const char * preCount = " (";
     const char * postCount = ")";
+    bool forLatex = false;
 
     if (Format == OPTABLE_LaTeX) {
-        preNum = "\\textbf{"; postNum = ":}  ";
+        preNum = "\\textbf{"; postNum = ":} & ";
         endLine = "\\\\\n";
-        preCount = " \\textbf{("; postCount = ")}";
+        preCount = " & \\textbf{("; postCount = ")}";
+        forLatex = true;
     } else if (Format == OPTABLE_HTML) {
         preNum = ""; postNum = ":  ";
         endLine = "<br>\n";
@@ -2072,11 +2116,18 @@ OpTable::PopularMoveOrders (DString * dstr, uint count)
             dstr->Append ("<run sc_report ", Type, " select mo ");
             dstr->Append (MoveOrder[i].id, "; ::windows::stats::Refresh>");
         }
-        OpLine::PrintMove (dstr, MoveOrder[i].moves, Format);
-        dstr->Append (preCount, MoveOrder[i].count, postCount);
+        if (forLatex) {            
+            sprintf(tempStr, "%u", i+1);
+            dstr->Append("\\newchessgame[id=", tempStr, "]\\mainline{");
+            OpLine::PrintMove (dstr, MoveOrder[i].moves, Format);   
+            dstr->Append("}");
+        } else {
+            OpLine::PrintMove (dstr, MoveOrder[i].moves, Format);
+        }               
         if (Format == OPTABLE_CText) {
             dstr->Append ("</run></darkblue></tab>");
         }
+        dstr->Append (preCount, MoveOrder[i].count, postCount);
         dstr->Append (endLine);
     }
     dstr->Append (postList);
@@ -2109,28 +2160,34 @@ OpTable::ThemeReport (DString * dstr, uint argc, const char ** argv)
     }
     if (Format == OPTABLE_LaTeX) {
         percentStr = "\\%";
-        startTable = "\n\\begin{tabular}{lrlr}\n";
-        endTable = "\\end{tabular}\n";
+        startTable = "\n\\begin{tabularx}{0.9\\textwidth}{XrXr} \\hline \n";
+        endTable = "\\end{tabularx}\n";
         startRow = "";  endRow = " \\\\ \n";
         nextCell = " & ";  nextCellRight = nextCell;
     }
 
-    const char * themeName [NUM_POSTHEMES] = {NULL};
-    themeName [POSTHEME_CastSame]  = "Same-side castling:         ";
-    themeName [POSTHEME_CastOpp]   = "Opposite castling:          ";
-    themeName [POSTHEME_QueenSwap] = "Queens exchanged:           ";
-    themeName [POSTHEME_OneBPair]  = "Only 1 side has Bishop pair:";
-    themeName [POSTHEME_Kstorm]    = "Kingside pawn storm:        ";
-    themeName [POSTHEME_WIQP]      = "White Isolated Queen Pawn:  ";
-    themeName [POSTHEME_BIQP]      = "Black Isolated Queen Pawn:  ";
-    themeName [POSTHEME_WAdvPawn]  = "White Pawn on 5/6/7th rank: ";
-    themeName [POSTHEME_BAdvPawn]  = "Black Pawn on 2/3/4th rank: ";
-    themeName [POSTHEME_OpenFyle]  = "Open c/d/e file:            ";
+  //  const char * themeName [NUM_POSTHEMES] = {NULL};
+  //  themeName [POSTHEME_CastSame]  = "Same-side castling:         ";
+  //  themeName [POSTHEME_CastOpp]   = "Opposite castling:          ";
+  //  themeName [POSTHEME_QueenSwap] = "Queens exchanged:           ";
+  //  themeName [POSTHEME_OneBPair]  = "Only 1 side has Bishop pair:";
+  //  themeName [POSTHEME_Kstorm]    = "Kingside pawn storm:        ";
+  //  themeName [POSTHEME_WIQP]      = "White Isolated Queen Pawn:  ";
+  //  themeName [POSTHEME_BIQP]      = "Black Isolated Queen Pawn:  ";
+  //  themeName [POSTHEME_WAdvPawn]  = "White Pawn on 5/6/7th rank: ";
+  //  themeName [POSTHEME_BAdvPawn]  = "Black Pawn on 2/3/4th rank: ";
+  //  themeName [POSTHEME_OpenFyle]  = "Open c/d/e file:            ";
 
     char tempStr [250];
     //sprintf (tempStr, argv[0], (StartLength + (OPTABLE_COLUMNS * 2)) / 2);
     sprintf (tempStr, argv[0], MaxThemeMoveNumber);
-    dstr->Append (tempStr, endLine);
+    if (Format != OPTABLE_LaTeX) {
+        dstr->Append (tempStr, endLine);
+    } else {
+        dstr->Append ("\\begin{center}\n");
+        dstr->Append (tempStr);
+        dstr->Append ("\n\\end{center}\n");
+    }
     argc--;
     argv++;
 
@@ -2211,8 +2268,8 @@ OpTable::EndMaterialReport (DString * dstr, const char * repGames,
         startTable = "<tt>"; endTable = "</tt>";
     }
     if (Format == OPTABLE_LaTeX) {
-        startTable = "\n\\begin{tabular}{l*{8}{p{0.8cm}}}\n\\hline\n";
-        endTable = "\\hline\n\\end{tabular}\n";
+        startTable = "\n\\begin{tabularx}{0.8\\textwidth}{Xl*{7}{p{0.8cm}}}\n\\hline\n";
+        endTable = "\\hline\n\\end{tabularx}\n";
         startRow = "";  endRow = " \\\\ \n";
         nextCell = " & ";  percentStr = "\\%";
         preNum = "\\multicolumn{1}{r}{";  postNum = "}";
@@ -2225,11 +2282,11 @@ OpTable::EndMaterialReport (DString * dstr, const char * repGames,
     length[OPTABLE_All] = strLength (allGames);
 
     if (Format == OPTABLE_LaTeX) {
-        const char * q = " & \\hspace*{\\fill}{\\F Q}\\hspace*{\\fill}";
-        const char * r = " & \\hspace*{\\fill}{\\F R}\\hspace*{\\fill}";
-        const char * qr = " & \\hspace*{\\fill}{\\F QR}\\hspace*{\\fill}";
-        const char * bn = " & \\hspace*{\\fill}{\\F BN}\\hspace*{\\fill}";
-        const char * p = " & \\hspace*{\\fill}{{\\F p}}\\hspace*{\\fill}";
+        const char * q = " & \\hspace*{\\fill}{\\Q}\\hspace*{\\fill}";
+        const char * r = " & \\hspace*{\\fill}{\\R}\\hspace*{\\fill}";
+        const char * qr = " & \\hspace*{\\fill}{\\Q \\R}\\hspace*{\\fill}";
+        const char * bn = " & \\hspace*{\\fill}{\\B \\N}\\hspace*{\\fill}";
+        const char * p = " & \\hspace*{\\fill}{{\\p}}\\hspace*{\\fill}";
         const char * x = " & ";
         dstr->Append (startRow);
         dstr->Append (x, x, x, r); dstr->Append (x, q, x, qr);
@@ -2295,8 +2352,8 @@ OpTable::EndMaterialReport (DString * dstr, const char * repGames,
 //    number, returns an array with two integer elements
 //    for every game in the opening report that matches the
 //    specified theme or note. The type is specified by
-//    the character 'e' for endgame theme, 'o' for opening
-//    theme, or 'n' for note number.
+//    the character 'e' for endgame theme, 't' for opening
+//    theme, 'n' for note number, 'm' for move order, 'a' for all
 //    Each pair of elements contains the game number, and
 //    its start ply. The caller is responsible for deleting
 //    the allocated array, which ends with a (0,0) pair.

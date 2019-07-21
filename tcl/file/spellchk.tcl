@@ -3,39 +3,29 @@
 ### Copyright (C) 2000-2003 Shane Hudson.
 
 set spellcheckType Player
-
-# Maximum nr of corrections to be scanned
-# Set to zero to find them all
-# Set to some positive number to limit
-#
-set spell_maxCorrections 0
-
-set spellcheckSurnames 1
+set spellcheckSurnames 0
 set spellcheckAmbiguous 0
 
-# Remember what we are doing, being
-# - "idle"       - nothing special
-# - "scanning"   - finding corrections
-# - "correcting" - making corrections
-#
-set spellstate idle
-
-# readSpellCheckFile:
 #    Presents a File Open dialog box for a Scid spellcheck file,
 #    then tries to read the file. If the parameter "message" is true
 #    (which is the default), a message box indicating the results
 #    is displayed.
-#
-proc readSpellCheckFile {{message 1}} {
-  global spellCheckFile
-  set ftype { { "Scid Spellcheck files" {".ssp" ".ssp.gz"} } }
-  set fullname [tk_getOpenFile -initialdir [pwd] -filetypes $ftype -title "Open Spellcheck file"]
-  if {![string compare $fullname ""]} { return 0 }
 
-  progressWindow "Scid - [tr Spellcheking]" "Loading $fullname ..."
-  set err [catch {sc_name read $fullname} result]
-  closeProgressWindow
-  if {$err} {
+proc readSpellCheckFile {{message 1}} {
+  global spellCheckFile spellCheckFileExists
+
+  set spellCheckFileExists 0
+  set ftype { { "Scid Spellcheck files" {".ssp" ".ssp.gz"} } }
+  set dirname [file dirname $spellCheckFile]
+  if {! [file isdirectory $dirname] } {
+    set dirname $::env(HOME)
+  }
+  set result {}
+  set fullname [tk_getOpenFile -initialdir $dirname -filetypes $ftype -title "Open Spellcheck file"]
+  if {$fullname == ""} {
+    return 0
+  }
+  if {![file isfile $fullname] || [catch {sc_name read $fullname} result]} {
       if {$message} {
         tk_messageBox -title "ERROR: Unable to read file" -type ok \
           -icon error -message "Scid could not correctly read the spellcheck file you selected:\n\n$result"
@@ -43,256 +33,172 @@ proc readSpellCheckFile {{message 1}} {
     return 0
   }
   set spellCheckFile $fullname
+  set spellCheckFileExists 1
   if {$message} {
     tk_messageBox -title "Spellcheck file loaded." -type ok -icon info \
-      -message "Spellcheck file [file tail $fullname] loaded:\n[lindex $result 0] players, [lindex $result 1] events, [lindex $result 2] sites, [lindex $result 3] rounds.\n\nTo have this file automatically loaded every time you start Scid, select the \"Save Options\" from the Options menu before exiting."
+      -message "Spellcheck file [file tail $fullname] loaded:\n\n[lindex $result 0] players, [lindex $result 1] events, [lindex $result 2] sites, [lindex $result 3] rounds.\n\nTo automatically load this file at start-up, select \"Save Options\" from the Options menu before exiting."
   }
   return 1
 }
 
-# Set the environment when the correction scan starts
-#
-proc startScanning {} {
-    global spellstate
-    global spellcheckType
-    
-    # Remember that we are scanning
-    #
-    set spellstate scanning
-    
-    # Disable all buttons except the cancel button that we
-    # transfer into a stop button
-    #
-    .spellcheckWin.buttons.ambig  configure -state disabled
-    .spellcheckWin.buttons.ok     configure -state disabled
-    .spellcheckWin.buttons.cancel configure -text "Stop"
-    bind .spellcheckWin <Alt-s> ".spellcheckWin.buttons.cancel invoke; break"
-    if {$spellcheckType == "Player"} {
-        .spellcheckWin.buttons.surnames configure -state disabled
-    }
-}
-
-# Set the environment when the correction scan stops
-#
-proc stopScanning {} {
-    global spellstate
-    global spellcheckType
-    
-    # Remember that we are not scanning
-    #
-    set spellstate idle
-    
-    # Enable all buttons and set the cancel button back
-    #
-    .spellcheckWin.buttons.ambig  configure -state enabled
-    .spellcheckWin.buttons.ok     configure -state enabled
-    .spellcheckWin.buttons.cancel configure -text "Cancel"
-    bind .spellcheckWin <Alt-c> ".spellcheckWin.buttons.cancel invoke; break"
-    if {$spellcheckType == "Player"} {
-        .spellcheckWin.buttons.surnames configure -state enabled
-    }
-}
-
-
-# Set the environment when correction starts
-#
-proc startCorrecting {} {
-    global spellstate
-    global spellcheckType
-    
-    # Remember that we are correcting
-    #
-    set spellstate correcting
-    
-    # Disable all buttons
-    #
-    .spellcheckWin.buttons.ambig  configure -state disabled
-    .spellcheckWin.buttons.ok     configure -state disabled
-    .spellcheckWin.buttons.cancel configure -state disabled
-
-    if {$spellcheckType == "Player"} {
-        .spellcheckWin.buttons.surnames configure -state disabled
-    }
-}
-
-
-# Start the correction scan and dump the results into the
-# text window. After this the user may edit the correction
-# 'script' and actually make the corrections.
-#
-# While the scan is running, all buttons except a stop button
-# are disabled.
-#
 proc updateSpellCheckWin {type} {
-    global spellcheckType spell_maxCorrections spellcheckSurnames
-    global spellcheckAmbiguous
 
-    .spellcheckWin.text.text delete 1.0 end
-    .spellcheckWin.text.text insert end "Scid is finding spelling corrections.\nPlease wait..."
+  global spellcheckType spellcheckSurnames
+  global spellcheckAmbiguous
+  busyCursor .
 
-    # Enable the progress bar
-    #
+  set w .spellcheckWin
+  set b $w.buttons
 
-    startScanning
+  foreach i [winfo children $b] {
+    $i configure -state disabled
+  }
+  $w.text.text delete 1.0 end
 
-    update idletasks
-    progressBarSet .spellcheckWin.progress 451 21
-    set err [catch {sc_name spellcheck -max $spell_maxCorrections \
-                                   -surnames $spellcheckSurnames \
-                                   -ambiguous $spellcheckAmbiguous $type} result]
-    stopScanning
-    if {$err} {
-        ERROR::MessageBox "" "Scid: Spellcheck results"
-        return
-    }
+  $b.cancel configure -textvar ::tr(Stop) -state normal -command sc_progressBar
+  update
 
-    .spellcheckWin.text.text delete 1.0 end
-    .spellcheckWin.text.text insert end $result
+  sc_progressBar $w.progress bar 301 21 time
+  grab $b.cancel
+  if {[catch {sc_name spellcheck -surnames $spellcheckSurnames -ambiguous $spellcheckAmbiguous $type} result]} {
+    grab release $b.cancel
+    unbusyCursor .
+    tk_messageBox -parent $w -type ok -icon info -title Scid -message $result
+  } else {
+    grab release $b.cancel
+    unbusyCursor .
+  }
+  $b.cancel configure -textvar ::tr(Cancel) -command "destroy $w"
+
+  $w.text.text delete 1.0 end
+  $w.text.text insert end $result
+
+  foreach i [winfo children $b] {
+    $i configure -state normal
+  }
 }
 
-
-# Create the spell checking window with its event handlers
-# and start the initial correction scan
-#
 proc openSpellCheckWin {type {parent .}} {
-    global spellcheckType spellcheckSurnames
-    global spellcheckAmbiguous
-    global spellstate
+  global spellcheckType spellcheckSurnames
+  global spellcheckAmbiguous spellcheckFind
+  set w .spellcheckWin
+  if {[winfo exists $w]} {
+    raiseWin $w
+    return
+  }
+  if {[lindex [sc_name read] 0] == 0} {
+    # No spellcheck file loaded, so try to open one:
+    if {![readSpellCheckFile]} {
+      return
+    }
+  }
 
-    set w .spellcheckWin
+  set result ""
+  set spellcheckType $type
 
-    if {[winfo exists $w]} {
-        tk_messageBox -type ok -icon info -title "Scid: Spellcheck error" \
-                      -parent $parent \
-                      -message "The spellcheck window is already open; close it first."
-        return
+  toplevel $w
+  wm title $w "Scid: Spellcheck [file tail [sc_base filename [sc_base current]]]"
+  wm withdraw $w
+  wm minsize $w 50 10
+
+  bind $w <F1> { helpWindow Maintenance Spellcheck}
+  bind $w <Configure> "recordWinSize $w"
+  bind $w <Escape> "destroy $w"
+
+  set f [frame $w.buttons]
+  pack $f -side bottom -ipady 1 -fill x -pady 3
+
+  checkbutton $f.ambig -variable spellcheckAmbiguous \
+    -textvar ::tr(Ambiguous) -command "updateSpellCheckWin $type"
+  pack $f.ambig -side left -padx 2 -ipady 2 -ipadx 3
+  if {$type == "Player"} {
+    checkbutton $f.surnames -variable spellcheckSurnames \
+      -textvar ::tr(Surnames) -command "updateSpellCheckWin Player"
+    pack $f.surnames -side left -padx 2 -ipady 2 -ipadx 3
+  }
+
+  button $f.ok -textvar ::tr(MakeCorrections) -underline 0 -command {
+    if {[sc_base current] != 9} {
+      set result [tk_messageBox -title Scid -parent .spellcheckWin -icon question \
+	-type yesno -message "Please confirm making Name corrections.\nThis cannot be undone."]
+      if {$result == "no"} {return 0}
     }
 
-    if {[lindex [sc_name read] 0] == 0} {
-        # No spellcheck file loaded, so try to open one:
-        if {![readSpellCheckFile]} {
-            return
-        }
-    }
-    set spellcheckType $type
+    busyCursor .
+    set spelltext ""
+    catch {set spelltext [.spellcheckWin.text.text get 1.0 end-1c]}
+    .spellcheckWin.text.text delete 1.0 end
+    .spellcheckWin.text.text insert end \
+      "Scid is making the spelling corrections.\nPlease wait..."
+    update idletasks
+    set spell_result ""
+    set result [catch {sc_name correct $spellcheckType $spelltext} spell_result]
+    set messageIcon info
+    if {$result} { set messageIcon error }
+    tk_messageBox -type ok -parent .spellcheckWin -icon $messageIcon \
+      -title "Spellcheck results" -message $spell_result
+    unbusyCursor .
+    focus .main
+    destroy .spellcheckWin
+    sc_game tags reload
+    updateBoard -pgn
+    ::windows::gamelist::Refresh
+  }
 
-    toplevel $w
-    wm title $w "Scid: Spellcheck Results"
-    wm minsize $w 50 10
+  button $f.cancel -textvar ::tr(Cancel) -underline 0 -width 8 -command "destroy $w"
 
-    bind $w <F1> { helpWindow Maintenance }
-    bind $w <Configure> "recordWinSize $w"
+  button $f.help -textvar ::tr(Help) -command {helpWindow Maintenance Spellcheck}
 
-    # Create the button pad at the bottom of the window
-    #
-    set f [ttk::frame $w.buttons]
-    pack $f -side bottom -ipady 1 -fill x
-  
-    # Draw a canvas ("progress") to hold the progress bar
-    # and put it above the buttons at the bottom of the window
-    #
-    canvas $w.progress -width 450 -height 20 -bg white -relief solid -border 1
-    $w.progress create rectangle 0 0 0 0 -fill blue -outline blue -tags bar
-    $w.progress create text 445 10 -anchor e -font font_Regular -tags time \
-                                   -fill black -text "0:00 / 0:00"
-    pack $w.progress -side bottom
+  entry $f.find -width 10 -textvariable spellcheckFind(find) -font font_Small -highlightthickness 0
+  # configured below
 
-    # The ambiguous check mark
-    # Hitting it starts a new correction scan
-    ttk::checkbutton $f.ambig -variable spellcheckAmbiguous \
-                              -text "Ambiguous" -command "updateSpellCheckWin $type"
-    pack $f.ambig -side left -padx 2 -ipady 2 -ipadx 3
+  pack $f.cancel $f.ok $f.help $f.find -side right -padx 2
 
-    # When correcting player names, we add a surnames option
-    #
-    if {$type == "Player"} {
-        # The surnames check mark
-        # Hitting it starts a new correction scan
-        #
-        ttk::checkbutton $f.surnames -variable spellcheckSurnames \
-                                     -text "Surnames" -command "updateSpellCheckWin Player"
-        pack $f.surnames -side left -padx 2 -ipady 2 -ipadx 3
-    }
+  # Progress bar
 
-    # The button to start the correction making...
-    #
-    ttk::button $f.ok -text "Make Corrections" -underline 0 -command {
-        busyCursor .
-        set spelltext ""
-        catch {set spelltext [.spellcheckWin.text.text get 1.0 end-1c]}
-        .spellcheckWin.text.text delete 1.0 end
-        .spellcheckWin.text.text insert end \
-            "Scid is making the spelling corrections.\nPlease wait..."
+  canvas $w.progress -width 300 -height 20  -relief solid -border 1
+  $w.progress create rectangle 0 0 0 0 -fill $::progcolor -outline $::progcolor -tags bar
+  $w.progress create text 295 10 -anchor e -font font_Regular -tags time \
+      -fill black -text "0:00 / 0:00"
 
-        # Enable the progress bar
-        #
-        update idletasks
-        set spell_result ""
-        startCorrecting
-        progressBarSet .spellcheckWin.progress 451 21
-        set err [catch {sc_name correct $spellcheckType $spelltext} spell_result]
-        if ($err) {
-            ERROR::MessageBox
-        } else {
-            set msg "Number of names to be corrected: "
-            append msg "[lindex $spell_result 0] \n"
-            append msg "Number of names errors: "
-            append msg "[lindex $spell_result 1] \n\n"
-            append msg "Number of games corrected: "
-            append msg "[lindex $spell_result 2] \n"
-            append msg "NUmber of games _not_ corrected (date < birth or > death): "
-            append msg "[lindex $spell_result 3] \n"
-            tk_messageBox -type ok -parent .spellcheckWin \
-                -title "Scid: Spellcheck results" -message $msg
-        }
-        unbusyCursor .
-        focus .
-        destroy .spellcheckWin
-        sc_game tags reload
-        updateBoard -pgn
-        ::windows::gamelist::Refresh
-    }
-    bind $w <Alt-m> "$f.ok invoke; break"
+  pack $w.progress -side bottom -padx 2 -pady 2
 
-    # The cancel button operates in an either/or context
-    # While some process is running, it simply stops it
-    # In other cases, spell checking is left
-    #
-    ttk::button $f.cancel -text "Cancel" -underline 0 -command {
-        if {$spellstate == "scanning" || $spellstate == "correcting"} {
-            progressBarCancel
-        } else {
-            focus .
-            destroy .spellcheckWin
-        }
-    }
-    bind $w <Alt-c> "$f.cancel invoke; break"
-    pack $f.cancel $f.ok -side right -padx 5
+  # Text widget
 
-    # Prepare the text pad
-    #
-    set f [ttk::frame $w.text]
-    pack $w.text -expand yes -fill both
-    ttk::scrollbar $f.ybar -command "$f.text yview"
-    ttk::scrollbar $f.xbar -orient horizontal -command "$f.text xview"
-    text $f.text -yscrollcommand "$f.ybar set" -xscrollcommand "$f.xbar set" \
-                 -setgrid 1 -width $::winWidth($w) -height $::winHeight($w) \
-                 -background white -wrap none
-    $f.text configure -tabs \
-        [font measure font_Regular  "xxxxxxxxxxxxxxxxxxxxxxxxx"]
+  set f [frame $w.text]
+  pack $w.text -expand yes -fill both
+  scrollbar $f.ybar -command "$f.text yview"
+  scrollbar $f.xbar -orient horizontal -command "$f.text xview"
+  text $f.text -yscrollcommand "$f.ybar set" -xscrollcommand "$f.xbar set" \
+    -setgrid 1 -width $::winWidth($w) -height $::winHeight($w) \
+     -wrap none -undo 1
 
-    grid $f.text -row 0 -column 0 -sticky news
-    grid $f.ybar -row 0 -column 1 -sticky news
-    grid $f.xbar -row 1 -column 0 -sticky news
+  configFindEntryBox $w.buttons.find spellcheckFind $f.text
 
-    grid rowconfig $w.text 0 -weight 1 -minsize 0
-    grid columnconfig $w.text 0 -weight 1 -minsize 0
-  
-    focus $f.text
+  # Undo and redo bindings
+  bind $f.text <Control-z> {catch {.spellcheckWin.text.text edit undo} ; break}
+  bind $f.text <Control-y> {catch {.spellcheckWin.text.text edit redo} ; break}
+  bind $f.text <Control-r> {catch {.spellcheckWin.text.text edit redo} ; break}
+  bind $f.text <Control-a> {.spellcheckWin.text.text tag add sel 0.0 end-1c ; break}
 
-    # Start the initial search for spelling corrections
-    #
-    updateSpellCheckWin $type
+  $f.text configure -tabs \
+    [font measure font_Regular  "xxxxxxxxxxxxxxxxxxxxxxxxx"]
+
+  grid $f.text -row 0 -column 0 -sticky news
+  grid $f.ybar -row 0 -column 1 -sticky news
+  grid $f.xbar -row 1 -column 0 -sticky news
+
+  grid rowconfig $w.text 0 -weight 1 -minsize 0
+  grid columnconfig $w.text 0 -weight 1 -minsize 0
+
+  $f.text insert end $result
+  focus $f.text
+  placeWinOverParent $w $parent
+  wm state $w normal
+  update
+
+  updateSpellCheckWin $type
 }
 
+### end of spellchk.tcl
 

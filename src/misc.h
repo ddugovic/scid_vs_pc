@@ -1,4 +1,3 @@
-
 //////////////////////////////////////////////////////////////////////
 //
 //  FILE:       misc.h
@@ -8,7 +7,6 @@
 //  Version:    3.5
 //
 //  Notice:     Copyright (c) 2001-2003  Shane Hudson.  All rights reserved.
-//              Copyright (C) 2015  Fulvio Benini
 //
 //  Author:     Shane Hudson (sgh@users.sourceforge.net)
 //
@@ -19,156 +17,9 @@
 #define SCID_MISC_H
 
 #include "common.h"
-#include <string>
-#include <string.h>
-#include <stdio.h>
+#include "error.h"
 #include <ctype.h>   // For isspace(), etc
-#include <cstdlib>
-#include <vector>
 
-/**
- * class StrRange - parse a string interpreting its content as 1 or 2 integers
- *                  separated by whitespace.
- * The integers represent the min and max value of a range.
- * If only one integer is provided it will represent both the min and max value.
- *
- * inRange()  :  Return true if @val is >= min and <= max
- */
-class StrRange {
-protected:
-	long min_;
-	long max_;
-
-protected:
-	StrRange()
-	: min_(0), max_(0) {}
-
-public:
-	explicit StrRange(const char* range) {
-		char* next;
-		min_ = std::strtol(range, &next, 10);
-		char* end;
-		max_ = std::strtol(next, &end, 10);
-		if (next == end) max_ = min_;
-		if (min_ > max_) std::swap(min_, max_);
-	}
-
-	bool inRange(long val) const {
-		if (val < min_ || val > max_) return false;
-		return true;
-	}
-};
-
-
-/**
- * class VectorBig - store data into chunks to avoid (or minimize) reallocations
- * @CHUNKSHIFT:	is the base-2 logarithm of the number of T entries per chunk.
- *              Total size of a chunk: (2^CHUNKSHIFT)*sizeof(T)
- * resize()   : Used to avoid reallocations.
- *              Very efficient because it allocates space only for chunk pointers
- *              i.e with @count==16777214 and @CHUNKSHIFT==16 will use 256 pointers
- */
-template <class T, size_t CHUNKSHIFT>
-class VectorBig {
-	std::vector<T*> index_;
-	size_t size_;
-
-public:
-	VectorBig() : size_(0) {}
-	~VectorBig() { resize(0); }
-
-	const T& operator[] (size_t idx) const {
-		const size_t low_mask = ((1 << CHUNKSHIFT) - 1);
-		return index_[idx >> CHUNKSHIFT][idx & low_mask];
-	}
-	T& operator[] (size_t idx) {
-		const size_t low_mask = ((1 << CHUNKSHIFT) - 1);
-		return index_[idx >> CHUNKSHIFT][idx & low_mask];
-	}
-
-	size_t size() const {
-		return size_;
-	}
-
-	void reserve(size_t count) {
-		index_.reserve(1 + (count >> CHUNKSHIFT));
-	}
-
-	void resize(size_t count) {
-		size_ = count;
-		size_t index_NewSize = (count > 0) ? 1 + (count >> CHUNKSHIFT) : 0;
-
-		while (index_.size() > index_NewSize) {
-			delete [] index_.back();
-			index_.pop_back();
-		}
-		while (index_.size() < index_NewSize) {
-			index_.push_back(new T[1 << CHUNKSHIFT]);
-		}
-	}
-	void resize(size_t count, const T& defaulVal) {
-		size_t i = size_;
-		resize(count);
-		while (i < count) (*this)[i++] = defaulVal;
-	}
-
-	void push_back(const T& e) {
-		resize(size_ + 1, e);
-	}
-};
-
-
-class ProgressImp {
-public:
-	virtual ~ProgressImp() {}
-	virtual bool report(uint done, uint total) = 0;
-};
-
-class Progress {
-	ProgressImp* f_;
-public:
-	Progress(ProgressImp* f = 0) : f_(f) {}
-	Progress(const Progress&);
-	Progress& operator=(const Progress&);
-	~Progress() { if (f_) delete f_;}
-
-	bool report(uint done, uint total) const {
-		if (f_) return f_->report(done, total);
-		return true;
-	}
-};
-
-
-#if CPP11_SUPPORT
-using std::to_string;
-#else
-#include <sstream>
-inline std::string to_string(int val) {
-	std::ostringstream res;
-	res << std::dec << val;
-	return res.str();
-}
-#endif
-
-
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// strGetFilterOp:
-//    Converts a string value to a filter operation value.
-enum filterOpT { FILTEROP_AND, FILTEROP_OR, FILTEROP_RESET };
-
-inline filterOpT strGetFilterOp (const char * str)
-{
-    switch (*str) {
-        // AND:
-        case 'A': case 'a': case '0': return FILTEROP_AND;
-        // OR:
-        case 'O': case 'o': case '1': return FILTEROP_OR;
-        // RESET:
-        case 'R': case 'r': case '2': return FILTEROP_RESET;
-    }
-    // Default is RESET.
-    return FILTEROP_RESET;
-}
 
 // ECO string routines
 //
@@ -182,16 +33,23 @@ inline void eco_ToExtendedString (ecoT ecoCode, char * ecoStr) {
 ecoT eco_FromString (const char * ecoStr);
 ecoT eco_LastSubCode (ecoT ecoCode);
 ecoT eco_BasicCode (ecoT ecoCode);
-ecoT eco_Reduce(ecoT eco);
 
 // String routines. Some are identical to ANSI standard functions, but
 //      I have included them:
-//      (a) to keep nice consistent naming conventions, e.g. strCopy.
+//      (a) to keep nice consistent naming comventions, e.g. strCopy.
 //      (b) so stats can easily be kept by modifying the functions.
 //      (c) so some can be made inline for speed if necessary.
 //
 //      Currently, strLength() and strPrefix() are inline.
 //      strCompare_INLINE() is an inline equivalent of strCompare().
+
+// charIsSpace:
+//   Return true if the char is whitespace, including ASCII-160 (a
+//   non-breaking space, = 240 octal or A0 hex).
+inline bool
+charIsSpace (byte ch) {
+    return (isspace(ch)  ||  ch == 160);
+}
 
 char * strDuplicate (const char * str);
 int    strCompare (const char * s1, const char * s2);
@@ -201,6 +59,11 @@ int    strCompareRound (const char * sleft, const char * sright);
 inline bool
 strEqual (const char * s1, const char * s2) {
     return (strCompare (s1, s2) == 0);
+}
+
+inline bool
+strCaseEqual (const char * s1, const char * s2) {
+    return (strCaseCompare (s1, s2) == 0);
 }
 
 void   strCopy (char * target, const char * original);
@@ -233,6 +96,7 @@ inline uint strTrimRight (char * target) {
 uint   strTrimSuffix (char * target, char suffixChar);
 void   strTrimDate (char * str);
 void   strTrimMarkCodes (char * str);
+void   strConvertBraces (char * str);
 void   strTrimMarkup (char * str);
 void   strTrimSurname (char * str, uint initials);
 inline void strTrimSurname (char * str) { strTrimSurname (str, 0); }
@@ -246,8 +110,13 @@ strPlural (uint x) {
     return (x == 1 ? "" : "s");
 }
 
+uint   strSingleSpace (char * str);
+
 bool   strIsAllWhitespace (const char * str);
 bool   strIsUnknownName (const char * str);
+
+bool   strIsScore(const char *str);
+double strGetScore(const char *str);
 
 // strIsPrefix: returns true if prefix is a prefix of longStr.
 bool   strIsPrefix (const char * prefix, const char * longStr);
@@ -343,29 +212,36 @@ strLength (const char * str)
 }
 
 
+//////////////////////////////////////////////////////////////////////
+//   MATH functions
+
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// strTrimRight():
-//      Trims the provided string in-place, removing the
-//      end characters that match the trimChars.
-//      Returns the number of characters trimmed.
-//      E.g., strTrimRight("abcyzyz", "yz") would leave the string
-//      as "abc" and return 4.
-inline uint strTrimRight (char* target, const char* trimChars)
+// log2(): Returns logarithm (base 2) of the integer x.
+//      log2(0 or 1) = 0, log2(2 or 3) = 1,
+//      log2(4/5/6/7) = 2, etc.
+//
+inline uint
+log2 (uint x)
 {
-	int oldSz = strlen(target);
-	int sz = oldSz;
-	while (--sz >= 0) {
-		if (strchr(trimChars, target[sz]) == 0) break;
-	}
-	if (++sz == oldSz) return 0;
-	target[sz] = 0;
-	return oldSz - sz;
+    uint result = 0;
+    x = x >> 1;
+    while (x) { result++; x = x >> 1; }
+    return result;
 }
 
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// isPowerOf2():
+//      Fast test for a power of two. Returns true (nonzero) only
+//      if x is a power of two (0, 1, 2, 4, 8, 16, etc).
+//
+inline uint
+isPowerOf2 (uint x)
+{
+    return ((x & (x-1)) == 0);
+}
 
 //////////////////////////////////////////////////////////////////////
 //   FILE I/O Routines.
-// TODO: remove this functions
 
 uint    fileSize (const char * name, const char * suffix);
 uint    rawFileSize (const char * name);
@@ -377,9 +253,301 @@ errorT  renameFile (const char * oldName, const char * newName,
 errorT  removeFile (const char * fname, const char * suffix);
 errorT  createFile (const char * fname, const char * suffix);
 
+#ifdef WINCE
+errorT  writeString (/*FILE * */Tcl_Channel fp, const char * str, uint length);
+errorT  readString  (/*FILE * */Tcl_Channel fp, char * str, uint length);
+
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// writeOneByte(), readOneByte()
+
+inline errorT
+writeOneByte (/*FILE * */Tcl_Channel fp, byte value)
+{
+    ASSERT(fp != NULL);
+    return (/*putc(value, fp)*/my_Tcl_Write(fp, (char *)&value, 1) == -1) ? ERROR_FileWrite : OK;
+}
+
+inline byte
+readOneByte (/*FILE * */Tcl_Channel fp)
+{
+    ASSERT(fp != NULL);
+    byte b;
+    my_Tcl_Read(fp, (char *)&b,1);
+    //byte b = getc(fp);
+    return b;//getc(fp);
+}
+
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// writeTwoBytes(), readTwoBytes()
+
+inline errorT
+writeTwoBytes (/*FILE * */Tcl_Channel fp, uint value)
+{
+    ASSERT(fp != NULL);
+    int result;
+    //int v = (value >> 8)  & 255; putc(v, fp);
+    char v = (value >> 8)  & 255; my_Tcl_Write(fp, &v, 1);
+    //v = value & 255; putc(v, fp);
+    v = value & 255; result = my_Tcl_Write(fp, &v, 1);
+    return (result == -1 ? ERROR_FileWrite : OK);
+}
+
+inline uint
+readTwoBytes (/*FILE * */Tcl_Channel fp)
+{
+    ASSERT(fp != NULL);
+    byte b;
+    my_Tcl_Read(fp, (char *)&b,1);
+    uint v = b;//getc(fp);
+    v = v << 8;
+    my_Tcl_Read(fp, (char *)&b,1);
+    v += b;
+    //v += getc(fp);
+    return v;
+}
+
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~!!
+// writeThreeBytes(), readThreeBytes()
+
+inline errorT
+writeThreeBytes (/*FILE * */Tcl_Channel fp, uint value)
+{
+    ASSERT(fp != NULL);
+    int result;
+//     int v = (value >> 16)  & 255;   putc(v, fp);
+//     v = (value >> 8) & 255;         putc(v, fp);
+//     v = value & 255;                putc(v, fp);
+    char v = (value >> 16)  & 255;   my_Tcl_Write(fp, &v, 1);
+    v = (value >> 8) & 255;         my_Tcl_Write(fp, &v, 1);
+    v = value & 255;                result = my_Tcl_Write(fp, &v, 1);
+    return (result == -1 ? ERROR_FileWrite : OK);
+}
+
+inline uint
+readThreeBytes (/*FILE * */Tcl_Channel fp)
+{
+
+    ASSERT(fp != NULL);
+    byte b;
+    //uint v = getc(fp);
+    my_Tcl_Read(fp, (char *)&b,1);
+    uint v = (uint)b;
+    v = v << 8;    my_Tcl_Read(fp, (char *)&b,1); v += (uint)b;//v += (uint) getc(fp);
+    v = v << 8;    my_Tcl_Read(fp, (char *)&b,1); v += (uint)b; //v += (uint) getc(fp);
+    return v;
+}
+
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// writeFourBytes(), readFourBytes()
+
+inline errorT
+writeFourBytes (/*FILE * */Tcl_Channel fp, uint value)
+{
+    ASSERT(fp != NULL);
+    int result;
+//     uint v = (value >> 24) & 255;   my_Tcl_Write(fp, (char*)&v, 1);//putc(v, fp);
+//     v = (value >> 16) & 255;        my_Tcl_Write(fp, (char*)&v, 1);//putc(v, fp);
+//     v = (value >>  8) & 255;        my_Tcl_Write(fp, (char*)&v, 1);//putc(v, fp);
+//     v = value & 255;                result = my_Tcl_Write(fp, (char*)&v, 1);//result = putc(v, fp);
+    char v = (value >> 24) & 255;   my_Tcl_Write(fp, &v, 1);
+    v = (value >> 16) & 255;        my_Tcl_Write(fp, &v, 1);
+    v = (value >>  8) & 255;        my_Tcl_Write(fp, &v, 1);
+    v = value & 255;                result = my_Tcl_Write(fp, &v, 1);
+    return (result == -1 ? ERROR_FileWrite : OK);
+}
+
+inline uint
+readFourBytes (/*FILE * */Tcl_Channel fp)
+{
+    ASSERT(fp != NULL);
+    byte b;
+    my_Tcl_Read(fp, (char *)&b,1); uint v = b; //getc(fp);
+    v = v << 8;    my_Tcl_Read(fp, (char *)&b,1); v += (uint)b;//v += (uint) getc(fp);
+    v = v << 8;    my_Tcl_Read(fp, (char *)&b,1); v += (uint)b;//v += (uint) getc(fp);
+    v = v << 8;    my_Tcl_Read(fp, (char *)&b,1); v += (uint)b;//v += (uint) getc(fp);
+    return v;
+}
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// readCompactUint, writeCompactUint:
+//   Read/write an unsigned int using a variable number
+//   of bytes: 1 for 0-127, 2 for 128-16383, etc.
+
+inline errorT
+writeCompactUint (/*FILE * */Tcl_Channel fp, uint value)
+{
+    ASSERT (fp != NULL);
+    int result;
+    char c;
+    while (true) {
+        if (value < 128) {
+            result = my_Tcl_Write(fp, (char*)&value, 1);//putc (value, fp);
+            break;
+        }
+        c = (value & 127) | 128;
+        my_Tcl_Write(fp, &c, 1);
+        //putc ((value & 127) | 128, fp);
+        value = value >> 7;
+    }
+    return (result == -1 ? ERROR_FileWrite : OK);
+}
+
+inline uint
+readCompactUint (/*FILE * */Tcl_Channel fp)
+{
+    ASSERT (fp != NULL);
+    uint v = 0;
+    uint bitIndex = 0;
+    byte c;
+    while (true) {
+        //uint b = (uint) getc(fp);
+        my_Tcl_Read(fp, (char *)&c,1);
+        uint b = (uint) c;
+        v = v | ((b & 127) << bitIndex);
+        if (! (b & 128)) { break; }
+        bitIndex += 7;
+    }
+    return v;
+}
+
+#else
 errorT  writeString (FILE * fp, const char * str, uint length);
 errorT  readString  (FILE * fp, char * str, uint length);
 
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// writeOneByte(), readOneByte()
+
+inline errorT
+writeOneByte (FILE * fp, byte value)
+{
+    ASSERT(fp != NULL);
+    return (putc(value, fp) == EOF) ? ERROR_FileWrite : OK;
+}
+
+inline byte
+readOneByte (FILE * fp)
+{
+    ASSERT(fp != NULL);
+    return (byte) getc(fp);
+}
+
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// writeTwoBytes(), readTwoBytes()
+
+inline errorT
+writeTwoBytes (FILE * fp, uint value)
+{
+    ASSERT(fp != NULL);
+    int result;
+    int v = (value >> 8)  & 255;    putc(v, fp);
+    v = value & 255;                result = putc(v, fp);
+    return (result == EOF ? ERROR_FileWrite : OK);
+}
+
+inline uint
+readTwoBytes (FILE *fp)
+{
+    ASSERT(fp != NULL);
+    uint v = getc(fp);
+    v = v << 8;    
+    v += getc(fp);
+    return v;
+}
+
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~!!
+// writeThreeBytes(), readThreeBytes()
+
+inline errorT
+writeThreeBytes (FILE * fp, uint value)
+{
+    ASSERT(fp != NULL);
+    int result;
+    int v = (value >> 16)  & 255;   putc(v, fp);
+    v = (value >> 8) & 255;         putc(v, fp);
+    v = value & 255;                result = putc(v, fp);
+    return (result == EOF ? ERROR_FileWrite : OK);
+}
+
+inline uint
+readThreeBytes (FILE * fp)
+{
+    ASSERT(fp != NULL);
+    uint v = getc(fp);
+    v = v << 8;    v += (uint) getc(fp);
+    v = v << 8;    v += (uint) getc(fp);
+    return v;
+}
+
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// writeFourBytes(), readFourBytes()
+
+inline errorT
+writeFourBytes (FILE * fp, uint value)
+{
+    ASSERT(fp != NULL);
+    int result;
+    uint v = (value >> 24) & 255;   putc(v, fp);
+    v = (value >> 16) & 255;        putc(v, fp);
+    v = (value >>  8) & 255;        putc(v, fp);
+    v = value & 255;                result = putc(v, fp);
+    return (result == EOF ? ERROR_FileWrite : OK);
+}
+
+inline uint
+readFourBytes (FILE * fp)
+{
+    ASSERT(fp != NULL);
+    uint v = getc(fp);
+    v = v << 8;    v += (uint) getc(fp);
+    v = v << 8;    v += (uint) getc(fp);
+    v = v << 8;    v += (uint) getc(fp);
+    return v;
+}
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// readCompactUint, writeCompactUint:
+//   Read/write an unsigned int using a variable number
+//   of bytes: 1 for 0-127, 2 for 128-16383, etc.
+
+inline errorT
+writeCompactUint (FILE * fp, uint value)
+{
+    ASSERT (fp != NULL);
+    int result;
+    while (true) {
+        if (value < 128) {
+            result = putc (value, fp);
+            break;
+        }
+        putc ((value & 127) | 128, fp);
+        value = value >> 7;
+    }
+    return (result == EOF ? ERROR_FileWrite : OK);
+}
+
+inline uint
+readCompactUint (FILE * fp)
+{
+    ASSERT (fp != NULL);
+    uint v = 0;
+    uint bitIndex = 0;
+    while (true) {
+        uint b = (uint) getc(fp);
+        v = v | ((b & 127) << bitIndex);
+        if (! (b & 128)) { break; }
+        bitIndex += 7;
+    }
+    return v;
+}
+#endif // WINCE
 
 #endif  // #ifdef SCID_MISC_H
 

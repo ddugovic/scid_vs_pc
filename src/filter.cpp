@@ -14,6 +14,131 @@
 
 #include "filter.h"
 
+// Include header file for memcpy():
+#ifdef WIN32
+#  include <memory.h>
+#else
+#  include <string.h>
+#endif
+
+void
+Filter::Init (uint size) {
+    FilterSize = size;
+    FilterCount = size;
+    Capacity = size;
+    CachedFilteredCount = 0;
+    CachedIndex = 0;
+
+    isValidOldDataTree = false;
+
+    Data = new byte [Capacity];
+    oldDataTree = new byte [Capacity];
+    // Set all values in filter to 1 by default:
+    byte * pb = Data;
+    for (uint i=0; i < size; i++) { *pb++ = 1; }
+}
+
+Filter *
+Filter::Clone () 
+{
+	Filter *f = new Filter( Capacity);
+	memcpy( f->Data, Data, Capacity);
+	f->FilterCount = FilterCount;
+	f->FilterSize = FilterSize;
+	return f;
+}
+
+void
+Filter::Fill (byte value)
+{
+    ASSERT (FilterSize <= Capacity);
+    CachedFilteredCount = 0;
+    CachedIndex = 0;
+    FilterCount = (value != 0) ? FilterSize : 0;
+    for (uint i=0; i < FilterSize; i++) {
+        Data[i] = value;
+    }
+}
+
+void
+Filter::Append (byte value)
+{
+    ASSERT (FilterSize <= Capacity);
+    if (FilterSize == Capacity) {
+        // Data array is full, extend it in chunks of 1000:
+	SetCapacity(Capacity + 1000);
+    }
+    Data[FilterSize] = value;
+    FilterSize++;
+    // This is not really consistent. Size should be set in SetCapacity - S.A.
+    if (value != 0) { FilterCount++; }
+    CachedFilteredCount = 0;
+    CachedIndex = 0;
+}
+
+void
+Filter::SetCapacity(uint size)
+{
+    if (size > Capacity) 
+	{
+        Capacity = size;
+        byte * newData = new byte [Capacity];
+        byte * newOldDataTree = new byte [Capacity];
+        if (Data != NULL) {
+            for (uint i=0; i < FilterSize; i++) {
+                newData[i] = Data[i];
+            }
+            delete[] Data;
+            delete[] oldDataTree;
+        }
+        Data = newData;
+        oldDataTree = newOldDataTree;
+    }
+}
+void
+Filter::SetFilterSize(uint size)
+{
+	FilterSize = size;
+}
+
+
+uint
+Filter::IndexToFilteredCount (uint index)
+{
+    if (index > FilterSize) { return 0; }
+    uint filteredCount = 0;
+    for (uint i=0; i < index; i++) {
+        if (Data[i] > 0) { filteredCount++; }
+    }
+    return filteredCount;
+}
+
+uint
+Filter::FilteredCountToIndex (uint filteredCount)
+{
+    if (filteredCount == CachedFilteredCount) { return CachedIndex; }
+    if (filteredCount > FilterCount) { return 0; }
+    uint index;
+    uint count = filteredCount;
+    for (index=0; index < FilterSize; index++) {
+        if (Data[index] > 0) {
+            count--;
+            if (count == 0) { break; }
+        }
+    }
+    if (index == FilterSize) { return 0; }
+    CachedFilteredCount = filteredCount;
+    CachedIndex = index;
+    return index;
+}
+
+// Read the compressed filter from the specified open file.
+
+void Filter::saveFilterForFastMode(uint ply) {
+  memcpy( (void*) GetOldDataTree(), GetData(), Size() );
+  isValidOldDataTree = true;
+  oldDataTreePly = ply;
+}
 
 //////////////////////////////////////////////////////////////////////
 //
@@ -39,7 +164,7 @@ const uint OVERFLOW_BYTES = 8;
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // CompressedFilter::Verify():
 //      Return OK only if the compressed filter is identical to
-//      the regular filter passed as the parameter.
+//      the regular filter passed as the paramter.
 //
 errorT
 CompressedFilter::Verify (Filter * filter)
@@ -48,7 +173,7 @@ CompressedFilter::Verify (Filter * filter)
 
     // Decompress the compressed block and compare with the original:
     byte * tempBuffer = new byte [CFilterSize];
-    const byte * filterData = filter->Data;
+    const byte * filterData = filter->GetData();
 
     if (unpackBytemap (CompressedData, tempBuffer,
                        CompressedLength, CFilterSize) != OK) {
@@ -56,13 +181,12 @@ CompressedFilter::Verify (Filter * filter)
         return ERROR_Corrupt;
     }
     for (uint i=0; i < CFilterSize; i++) {
-        if (tempBuffer[i] != filterData[i]) {
+        if (tempBuffer[i] != filterData[i]) { 
             delete[] tempBuffer;
             return ERROR_Corrupt;
         }
     }
     delete[] tempBuffer;
-
     return OK;
 }
 
@@ -78,13 +202,8 @@ CompressedFilter::CompressFrom (Filter * filter)
 
     CFilterSize = filter->Size();
     CFilterCount = filter->Count();
-    if(filter->Data == NULL) {
-        CompressedLength = 0;
-        CompressedData = NULL;
-        return;
-    }
     byte * tempBuf = new byte [CFilterSize + OVERFLOW_BYTES];
-    CompressedLength = packBytemap (filter->Data, tempBuf, CFilterSize);
+    CompressedLength = packBytemap (filter->GetData(), tempBuf, CFilterSize);
     CompressedData = new byte [CompressedLength];
     memcpy (CompressedData, tempBuf, CompressedLength);
     delete[] tempBuf;
@@ -103,25 +222,62 @@ CompressedFilter::CompressFrom (Filter * filter)
 //      stored in this compressed filter.
 //
 errorT
-CompressedFilter::UncompressTo (Filter * filter) const
+CompressedFilter::UncompressTo (Filter * filter)
 {
     // The filter and compressed filter MUST be of the same size:
     if (CFilterSize != filter->Size()) { return ERROR_Corrupt; }
-    if (CompressedLength == 0) {
-        filter->Init(CFilterSize);
-        return OK;
-    }
-
     byte * tempBuffer = new byte [CFilterSize];
     if (unpackBytemap (CompressedData, tempBuffer,
                        CompressedLength, CFilterSize) != OK) {
-        delete[] tempBuffer;
+
+	delete[] tempBuffer;
         return ERROR_Corrupt;
     }
     for (uint index=0; index < CFilterSize; index++) {
         filter->Set (index, tempBuffer[index]);
     }
     delete[] tempBuffer;
+    return OK;
+}
+
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// CompressedFilter::WriteToFile():
+//      Writes the compressed filter to the specified open file.
+//
+errorT
+CompressedFilter::WriteToFile (FILE * fp)
+{
+    ASSERT (fp != NULL);
+
+    writeFourBytes (fp, CFilterSize);
+    writeFourBytes (fp, CFilterCount);
+    writeFourBytes (fp, CompressedLength);
+    byte * pb = CompressedData;
+    for (uint i=0; i < CompressedLength; i++, pb++) {
+        writeOneByte (fp, *pb);
+    }
+    return OK;
+}
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// CompressedFilter::ReadFromFile():
+//      Reads the compressed filter from the specified open file.
+//
+errorT
+CompressedFilter::ReadFromFile (FILE * fp)
+{
+    ASSERT (fp != NULL);
+    if (CompressedData) { delete[] CompressedData; }
+
+    CFilterSize = readFourBytes (fp);
+    CFilterCount = readFourBytes (fp);
+    CompressedLength = readFourBytes (fp);
+    CompressedData = new byte [CompressedLength];
+    byte * pb = CompressedData;
+    for (uint i=0; i < CompressedLength; i++, pb++) {
+        *pb = readOneByte(fp);
+    }
     return OK;
 }
 

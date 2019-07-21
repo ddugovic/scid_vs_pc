@@ -2,9 +2,9 @@
 ### Correspondence.tcl: part of Scid.
 ### Copyright (C) 2008 Alexander Wagner
 ###
-### $Id: correspondence.tcl,v 4.3 2011/02/13 18:12:02 arwagner Exp $
+### $Id: correspondence.tcl,v 1.101 2010/12/23 14:08:18 arwagner Exp $
 ###
-### Last change: <Mon, 2014/10/27 19:29:26 arwagner agamemnon>
+### Last change: <Thu, 2010/12/23 14:55:12 arwagner agamemnon>
 ###
 ### Add correspondence chess via eMail or external protocol to scid
 ###
@@ -12,15 +12,12 @@
 
 # http and tdom are required for the Xfcc protocol
 
-#======================================================================
-#
-# Xfcc interface for scid
-#
-#======================================================================
+### Xfcc interface for scid
+
 namespace eval Xfcc {
 
 	#----------------------------------------------------------------------
-	# Header and footer of the SOAP-messages. Linebreaking is important
+	# Header and footer of the SOAP-messages. Linebreaking is imporant
 	#
 	set SOAPstart {<?xml version="1.0" encoding="utf-8"?>
 	<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
@@ -54,18 +51,19 @@ namespace eval Xfcc {
 	set xfccrcfile ""
 
 	# Set up a proper user agent
-	# Something like
+	# Something like 
 	#    Scid/3.7 (x11; Linux i686; rv:Devel 2009) Tcl/Tk 8.5.2
 	set useragent "Scid/$::scidVersion ([tk windowingsystem]; $::tcl_platform(os) $::tcl_platform(machine); rv:$scidVersionDate) Tcl/Tk [info patchlevel]"
-
+	
 	#----------------------------------------------------------------------
 	# Replace XML entities by their normal characters
 	#----------------------------------------------------------------------
 	proc xmldecrypt {chdata} {
+
 		foreach from {{\&amp;} {\&lt;} {\&gt;} {\&quot;} {\&apos;}}   \
 			to {{\&} < > {"} {'}} {                                     ;# '"
 				regsub -all $from $chdata $to chdata
-		 }
+		 }   
 		 return $chdata
 	}
 
@@ -73,12 +71,14 @@ namespace eval Xfcc {
 	# Replace normal characters by their XML entities
 	#----------------------------------------------------------------------
 	proc xmlencrypt {chdata} {
+
 		foreach from {{\&} < > {"} {'}} \
 				to {{\&amp;} {\&lt;} {\&gt;} {\&quot;} {\&apos;}} {    ;# '"
 				regsub -all $from $chdata $to chdata
-		 }
+		 }   
 		 return $chdata
 	}
+
 
 	#----------------------------------------------------------------------
 	# Configure Xfcc by means of rewriting the .xfccrc in xml
@@ -87,7 +87,7 @@ namespace eval Xfcc {
 		global ::Xfcc::xfccrc ::Xfcc::xfccrcfile
 		# file delete $xfccrcfile
 		if {[catch {open $xfccrcfile w} optionF]} {
-			puts stderr "$xfccrcfile can not be created"
+			::splash::add "$xfccrcfile can not be created" error
 		} else {
 			# devide by 4 as the size function returns all subarray entries
 			set size [expr [ array size ::Xfcc::xfccsrv ] / 4]
@@ -128,13 +128,13 @@ namespace eval Xfcc {
 			::Xfcc::ReadConfig $xfccrcfile
 		}
 	}
-
+	
 	#----------------------------------------------------------------------
 	# Delete the currently selected server entry
 	#----------------------------------------------------------------------
 	proc DeleteServer {} {
-		# mark a deleted server by '#' allows the user to manually
-		# undelete again by removing the '#' before hitting ok.
+		# mark a deleted server by # allows the user to manually
+		# undelete by removing the # again before hitting ok.
 		set ::Xfcc::Server   "# $::Xfcc::xfccsrv($::Xfcc::Oldnum,0)"
 		set ::Xfcc::Username "# $::Xfcc::xfccsrv($::Xfcc::Oldnum,2)"
 		set ::Xfcc::Password "# $::Xfcc::xfccsrv($::Xfcc::Oldnum,3)"
@@ -147,6 +147,7 @@ namespace eval Xfcc {
 	# Add a new, empty server entry to xfccsrv array
 	#----------------------------------------------------------------------
 	proc AddServer {} {
+
 		set ::Xfcc::xfccsrv($::Xfcc::Oldnum,0) $::Xfcc::Server
 		set ::Xfcc::xfccsrv($::Xfcc::Oldnum,2) $::Xfcc::Username
 		set ::Xfcc::xfccsrv($::Xfcc::Oldnum,3) $::Xfcc::Password
@@ -163,15 +164,15 @@ namespace eval Xfcc {
  		set ::Xfcc::xfccsrv($size,3) "SeCrEt!"
  		set ::Xfcc::xfccsrv($size,4) "Rating"
  		set ::Xfcc::xfccsrv($size,1) "http://"
-
+ 
  		set ::Xfcc::Server    $::Xfcc::xfccsrv($size,0)
  		set ::Xfcc::Username  $::Xfcc::xfccsrv($size,2)
  		set ::Xfcc::Password  $::Xfcc::xfccsrv($size,3)
  		set ::Xfcc::Rating    $::Xfcc::xfccsrv($size,4)
  		set ::Xfcc::URI       $::Xfcc::xfccsrv($size,1)
-
+ 
  		lappend ::Xfcc::lsrvname [list $::Xfcc::xfccsrv($size,0)]
-
+ 
  		set ::Xfcc::Oldnum    $size
 	}
 
@@ -179,6 +180,7 @@ namespace eval Xfcc {
 	# Store the current values to the xfccsrv-array
 	#----------------------------------------------------------------------
 	proc xfccsrvstore {} {
+
 		set number [ .configXfccSrv.xfccSrvList curselection ]
 		if {!($number > 0)} {
 			set number 0
@@ -223,12 +225,13 @@ namespace eval Xfcc {
 		set ::Xfcc::Password  $::Xfcc::xfccsrv($::Xfcc::Oldnum,3)
 		set ::Xfcc::Rating    $::Xfcc::xfccsrv($::Xfcc::Oldnum,4)
 		set ::Xfcc::URI       $::Xfcc::xfccsrv($::Xfcc::Oldnum,1)
-		set ::Xfcc::showPass  0
 
 		# create the window and buttons
 		toplevel $w
+		wm state $w withdrawn
 		wm title $w "\[$xfccrcfile\]"
 		ttk::button $w.bOk     -text OK -command "::Xfcc::xfccsrvstore; ::Xfcc::SaveXfcc; destroy .configXfccSrv"
+		ttk::button $w.bHelp   -text [::tr Help] -command {helpWindow CCXfccSetupDialog}
 		ttk::button $w.bAdd    -text  [::tr "GlistAddField"] -command {
 			::Xfcc::AddServer
 		}
@@ -242,22 +245,15 @@ namespace eval Xfcc {
 		# select the first entry
 		$w.xfccSrvList selection set $::Xfcc::Oldnum
 
-		ttk::label  $w.lxfccSrv   -text [::tr CCDlgServerName]
-		ttk::label  $w.lxfccUid   -text [::tr CCDlgLoginName]
-		ttk::label  $w.lxfccPas   -text [::tr CCDlgPassword]
-		ttk::checkbutton $w.showPass -text [::tr CCDlgShowPassword] -variable ::Xfcc::showPass -command {
-			if {$::Xfcc::showPass} {
-				.configXfccSrv.xfccPas configure -show {}
-			} else {
-				.configXfccSrv.xfccPas configure -show *
-			}
-		}
-		ttk::label  $w.lxfccURI   -text [::tr CCDlgURL]
-		ttk::label  $w.lxfccrtype -text [::tr CCDlgRatingType]
+		label  $w.lxfccSrv   -text [::tr CCDlgServerName]
+		label  $w.lxfccUid   -text [::tr CCDlgLoginName]
+		label  $w.lxfccPas   -text [::tr CCDlgPassword]
+		label  $w.lxfccURI   -text [::tr CCDlgURL]
+		label  $w.lxfccrtype -text [::tr CCDlgRatingType]
 
 		ttk::entry  .configXfccSrv.xfccSrv  -width 60 -textvariable ::Xfcc::Server
 		ttk::entry  .configXfccSrv.xfccUid  -width 60 -textvariable ::Xfcc::Username
-		ttk::entry  .configXfccSrv.xfccPas  -width 60 -textvariable ::Xfcc::Password -show *
+		ttk::entry  .configXfccSrv.xfccPas  -width 60 -textvariable ::Xfcc::Password
 		ttk::entry  .configXfccSrv.xfccURI  -width 60 -textvariable ::Xfcc::URI
 
 		if {$::tcl_version >= 8.5} {
@@ -273,29 +269,34 @@ namespace eval Xfcc {
 			::Xfcc::xfccsrvstore
 		}
 
-		grid $w.xfccSrvList  -sticky e -columnspan 6 -column  0 -row 0 -rowspan $number
+		grid columnconfigure $w 1 -pad 20
+		grid $w.xfccSrvList  -sticky e -columnspan 6 -column  0 -row 0 -rowspan $number -padx 5 -pady 3
 
 		grid $w.lxfccSrv     -sticky e -columnspan 2 -column  0 -row [expr {$number + 1}]
 		grid $w.lxfccUid     -sticky e -columnspan 2 -column  0 -row [expr {$number + 2}]
 		grid $w.lxfccPas     -sticky e -columnspan 2 -column  0 -row [expr {$number + 3}]
-		grid $w.showPass     -sticky e -columnspan 2 -column  0 -row [expr {$number + 4}]
-		grid $w.lxfccURI     -sticky e -columnspan 2 -column  0 -row [expr {$number + 5}]
-		grid $w.lxfccrtype   -sticky e -columnspan 2 -column  0 -row [expr {$number + 6}]
+		grid $w.lxfccURI     -sticky e -columnspan 2 -column  0 -row [expr {$number + 4}]
+		grid $w.lxfccrtype   -sticky e -columnspan 2 -column  0 -row [expr {$number + 5}]
 
-		grid $w.xfccSrv      -sticky w -columnspan 4 -column  2 -row [expr {$number + 1}]
-		grid $w.xfccUid      -sticky w -columnspan 4 -column  2 -row [expr {$number + 2}]
-		grid $w.xfccPas      -sticky w -columnspan 4 -column  2 -row [expr {$number + 3}]
-		grid $w.xfccURI      -sticky w -columnspan 4 -column  2 -row [expr {$number + 5}]
-		grid $w.xfccrtype    -sticky w -columnspan 4 -column  2 -row [expr {$number + 6}]
+		grid $w.xfccSrv      -sticky w -columnspan 4 -column  2 -row [expr {$number + 1}] -padx 5 -pady 3
+		grid $w.xfccUid      -sticky w -columnspan 4 -column  2 -row [expr {$number + 2}] -padx 5 -pady 3
+		grid $w.xfccPas      -sticky w -columnspan 4 -column  2 -row [expr {$number + 3}] -padx 5 -pady 3
+		grid $w.xfccURI      -sticky w -columnspan 4 -column  2 -row [expr {$number + 4}] -padx 5 -pady 3
+		grid $w.xfccrtype    -sticky w -columnspan 4 -column  2 -row [expr {$number + 5}] -padx 5 -pady 3
 
 		# Add the buttons to the window
-		grid $w.bOk     -column 2 -row [expr {$number + 6}]
-		grid $w.bAdd    -column 3 -row [expr {$number + 6}]
-		grid $w.bDelete -column 4 -row [expr {$number + 6}]
-		grid $w.bCancel -column 5 -row [expr {$number + 6}]
+		grid $w.bOk     -column 1 -row [expr {$number + 6}] -pady 5
+		grid $w.bAdd    -column 2 -row [expr {$number + 6}] -pady 5
+		grid $w.bDelete -column 3 -row [expr {$number + 6}] -pady 5
+		grid $w.bHelp   -column 4 -row [expr {$number + 6}] -pady 5
+		grid $w.bCancel -column 5 -row [expr {$number + 6}] -pady 5
 
 		bind $w <Escape> "$w.bCancel invoke"
 		bind $w <F1> { helpWindow CCXfccSetupDialog}
+
+		update
+		placeWinOverParent $w .correspondenceChessConfig
+		wm state $w normal
 	}
 
 	#----------------------------------------------------------------------
@@ -305,10 +306,10 @@ namespace eval Xfcc {
 	proc ReadConfig {xfccrcfile} {
 		global xfccrc
 
-		::CorrespondenceChess::updateConsole "info This is Scid's internal Xfcc-interface"
+		::CorrespondenceChess::updateConsole "info This is Scids internal Xfcc-interface"
 		::CorrespondenceChess::updateConsole "info Using $xfccrcfile..."
 		if {[catch {open $xfccrcfile r} optionF]} {
-			::CorrespondenceChess::updateConsole "info ERROR: Unable to open config file $xfccrcfile";
+			::CorrespondenceChess::updateConsole "info ERROR: Unable ot open config file $xfccrcfile";
 		} else {
 			set xfccrc [read $optionF]
 
@@ -371,7 +372,7 @@ namespace eval Xfcc {
 				::CorrespondenceChess::updateConsole "info Server Error!"
 				set Title "Scid Error"
 				set Error "$server reported an unknown error."
-				tk_messageBox -icon warning -type ok -parent . \
+				tk_messageBox -icon warning -type ok \
 					-title $Title -message $Error
 			} \
 			"FeatureUnavailable" {
@@ -381,7 +382,7 @@ namespace eval Xfcc {
 				::CorrespondenceChess::updateConsole "info Authentication failed!"
 				set Title "Scid Authentication Failure!"
 				set Error "Could not authenticate to the Xfcc-Server.\nPlease check Username and Password for $server."
-				tk_messageBox -icon warning -type ok -parent . \
+				tk_messageBox -icon warning -type ok \
 					-title $Title -message $Error
 			} \
 			"InvalidGameID" {
@@ -449,7 +450,7 @@ namespace eval Xfcc {
 	}
 
 	#----------------------------------------------------------------------
-	# Receive games via XFCC from the web service at uri using username
+	# Recieve games via XFCC from the web service at uri using username
 	# and password provided
 	#----------------------------------------------------------------------
 	proc Receive {uri username password} {
@@ -462,6 +463,9 @@ namespace eval Xfcc {
 			append xmlmessage "</GetMyGames>"
 		append xmlmessage $::Xfcc::SOAPend
 
+		if {![::CorrespondenceChess::CheckHTTPS $uri]} {
+			return $::CorrespondenceChess::NoHTTPS
+		}
 		# send it to the web service note the space before the charset
 		set token [::http::geturl $uri \
 						-type "text/xml; charset=\"utf-8\"" \
@@ -473,7 +477,7 @@ namespace eval Xfcc {
 
 		###---###
 		# if {[catch {open "/tmp/xfcc.xml" w} dbg]} {
-		# 	::CorrespondenceChess::updateConsole "info ERROR: Unable to open debug file";
+		# 	::CorrespondenceChess::updateConsole "info ERROR: Unable ot open debug file";
 		# } else {
 		# 	puts $dbg $xmlresult
 		# }
@@ -514,13 +518,9 @@ namespace eval Xfcc {
 			append xmlmessage "</MakeAMove>"
 		append xmlmessage $::Xfcc::SOAPend
 
-		# if {[catch {open "/tmp/send.xml" w} debug]} {
-		# 	::CorrespondenceChess::updateConsole "info unable to open debug file..."
-		# } else {
-		# 	puts $debug $xmlmessage
-		# }
-		# close $debug
-
+		if {![::CorrespondenceChess::CheckHTTPS $uri]} {
+			return $::CorrespondenceChess::NoHTTPS
+		}
 		# send it to the web service note the space before the charset
 		set token [::http::geturl $uri \
 						-type "text/xml; charset=\"utf-8\"" \
@@ -546,10 +546,10 @@ namespace eval Xfcc {
 
 		foreach srv $aNodes {
 			set server   [$srv selectNodes {string(name)}]
-			set uri      [$srv selectNodes {string(uri)}]
+			set uri      [$srv selectNodes {string(uri)}] 
 			set username [$srv selectNodes {string(user)}]
 			set password [$srv selectNodes {string(pass)}]
-
+			
 			if {$name == $server} {
 				::CorrespondenceChess::updateConsole "info Processing $gameid for $username\@$name..."
 				::CorrespondenceChess::updateConsole "info Sending $movecount\. $move \{$comment\}"
@@ -571,13 +571,6 @@ namespace eval Xfcc {
 							$gameid $movecount $move $comment \
 							$resign $acceptdraw $offerdraw $claimdraw]
 				::Xfcc::SOAPError $name $xml
-
-				# if {[catch {open "/tmp/answer.xml" w} debug]} {
-				# 	::CorrespondenceChess::updateConsole "info unable to open debug file..."
-				# } else {
-				# 	puts $debug $xml
-				# }
-				# close $debug
 			}
 		}
 	}
@@ -592,6 +585,7 @@ namespace eval Xfcc {
 	# Scid
 	#----------------------------------------------------------------------
 	proc WritePGN {path name rating xml} {
+
 		# The following removes the SOAP-Envelope. tDOM does not seem to
 		# like it for whatever reason, but it's not needed anyway.
 		regsub -all {.*<GetMyGamesResult>} $xml {<GetMyGamesResult>} xml
@@ -688,8 +682,8 @@ namespace eval Xfcc {
 					::CorrespondenceChess::updateConsole "info $name-$id was cancelled...";
 			} elseif {($variant == "chess") || ($variant == "") || ($variant == "randompieces") || ($variant == "upsidedown") || ($variant == "loosers") ||  ($variant == "nocastle")} {
 				### --- Istvan --- ###
-				### Racing Kings is not possible due to unambiguous moves
-				### that are ambiguous if check is allowed
+				### Racing Kings is not possible due to unambigious moves
+				### that are ambigious if check is allowed
 				### ($variant == "racingkings") ||
 				### --- Istvan --- ###
 
@@ -768,7 +762,7 @@ namespace eval Xfcc {
 					}
 
 					# Add the game-id as comment before starting the game.
-					# This might be helpful on certain mobile devices, that
+					# This might be helpfull on certain mobile devices, that
 					# can not deal with extensive header information, e.g.
 					# OpenChess on PalmOS.
 					puts $pgnF "{$name-$id}"
@@ -784,7 +778,7 @@ namespace eval Xfcc {
 							puts $pgnF "\}"
 						}
 					}
-					# If a game has finished and a message is sent always
+					# If a game has finished and a message is sent allways
 					# add it here.
 					if {($Result != "Ongoing") && ($mess != "")} {
 						puts -nonewline $pgnF "\{"
@@ -810,13 +804,13 @@ namespace eval Xfcc {
 						puts $pgnF "1/2-1/2\n";
 					} \
 					"WhiteDefaulted" {
-						puts $pgnF "\{White Defaulted\} 0-1\n";
+						puts $pgnF "\{White Defaultet\} 0-1\n";
 					}\
 					"BlackDefaulted" {
-						puts $pgnF "\{Black Defaulted\} 1-0\n";
+						puts $pgnF "\{Black Defaultet\} 1-0\n";
 					}\
 					"BothDefaulted" {
-						puts $pgnF "\{Both Defaulted\} 1/2-1/2\n";
+						puts $pgnF "\{Both Defaultet\} 1/2-1/2\n";
 					}
 					close $pgnF
 				}
@@ -920,9 +914,8 @@ namespace eval Xfcc {
 		if {[catch {open $filename w} stateF]} {
 			::CorrespondenceChess::updateConsole "info ERROR: Unable to open state file $filename";
 		} else {
-			puts $stateF "# Scid options file"
+			puts $stateF "# $::scidName options file"
 			puts $stateF "# State file for correspondence chess"
-			puts $stateF "# Version: $::scidVersion, $::scidVersionDate"
 			puts $stateF "# This file is generated automatically. Do NOT edit."
 
 			set ::Xfcc::update 1
@@ -937,10 +930,12 @@ namespace eval Xfcc {
 			}
 		}
 		close $stateF
+
 	}
 
 	#- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 	# source the options file to overwrite the above setup
+	set scidConfigFiles(xfccstate) "xfccstate.dat"
 	if {[catch {source [scidConfigFile xfccstate]} ]} {
 	} else {
 	  ::splash::add "Xfcc state found and restored."
@@ -948,19 +943,332 @@ namespace eval Xfcc {
 
 }
 
+### end namespace Xfcc
+
 #======================================================================
 #
 # Correspondence chess menus, dialogs and functions
 #
 #======================================================================
+image create photo tb_CC_Prev -data {
+	R0lGODlhGAAYAMZIAAAAAAEBAQMDAwYGBh0dHWB8U2eEWGiFWWmHW2qHW3GOYnKQY3OSZHOTZHWS
+	Z3qVbYWfdommfIykgIqmf4qseourfoqteo6qgYute4uue42tf5GqhZSpiZKrh4+ugZCugZCug5Ku
+	hZGxgpewjZW0h5m0jJ21kbm+tbu/t73BuL7Cur7Cu7/Du9bZ1dnZ19zd2uLg4OLh4ePi4uTj4+Xk
+	4+fn5+no6Orp6erp6uvq6uzq6+zr6+7s7u/s7u/s7/Ds8PHt8PDu8PLv8vPv8vPv8/Tw9PXx9fby
+	9v//////////////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////
+	/////////////////////////////////////////////////////////////////////////yH+
+	FUNyZWF0ZWQgd2l0aCBUaGUgR0lNUAAh+QQBCgB/ACwAAAAAGAAYAAAHjIB/goOEhYaHiImKi4yN
+	jo+LAACQhpKUhAQtHAOXggAvHZOXADAyIwmikAI2OCYSqY4AMjw/JRsGsIwBOUFEJCEOuYoAMz1D
+	RyIfEAfCiAA6QEVHGRgXD82VMT5CRkUWFBoTCNiEAC40Ozc1HiAVEQrknicoKSwqKwwMDQsHBfGS
+	AAMK7ESwoMGDBAMBADs=
+}
 
-#----------------------------------------------------------------------
-# Correspnodence Chess functions
+
+image create photo tb_CC_Next -data {
+	R0lGODlhGAAYAMZHAAAAAAEBAQMDAwQEBAUFBQYGBggICAoKCl97UmN/VWeEWWeFWGqIXG6LYHOP
+	ZXKRY3ORZHaVaH2ZcH+dcYakeIeje4aodoaod4mme4mseYqteouue5Crg42ufY6ufo+tgY+vgI+v
+	gZGvgpOzhaOsnpq1kKO6l6a9m7DEprvAuNLU0NTV0dTV0tvb2tvc2eDg3+Hh4OPj4eTk4uno6Onq
+	6Ovp6uzr6+7s7u7t7e7u7fDu7/Hv8fDw8PLv8vHw8fPv8/Lw8vPw8/Tw9PXx9fPz8vPz8/by9v//
+	////////////////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////
+	/////////////////////////////////////////////////////////////////////////yH+
+	FUNyZWF0ZWQgd2l0aCBUaGUgR0lNUAAh+QQBCgB/ACwAAAAAGAAYAAAHjIB/goOEhYaHiImKi4yN
+	jo+FAAWTBgcElwQGAJuKAC40OUVEPCgnJiUVDgCLATI6PkA+IyEgFxCriwMtNT9DQxoaGRQMuIsA
+	Lz1CRhsaFhHFxis4QL8dGMSPADE7QR4fD9CMACw2NyITCuGMAjAzHA3q4iouEgnx4ikL9+IkCPvi
+	/wBCGkiwoMGDBgMBADs=
+}
+
+image create photo tb_CC_Send -data {
+	R0lGODlhGAAYAKU4AAAAAE8/Cj4+PkNDQ01NTU9PT1NTU3NdEHVfEHxkEWNjY2pqapB0E3Nzc3x8
+	fIGBga+NGJWVlaCgoMukHNGoHKysrK6urrm5ueS/Pby8vMbGxsjIyO3TfO3VgO3Vgu3WhNTU1O7W
+	he7Yie7Yi+/ZjO/akvDbk/Dcl+Pj4/Tls+Tk5PTmtezs7O3t7e7u7u/v7/Dw8PPz8/T09PX19fb2
+	9vj4+Pv7+/39/f///////////////////////////////yH5BAEKAD8ALAAAAAAYABgAAAbjwJ9w
+	SCwaj8cAclkErABMJiD1QUCjxmknBLFiiVPSyAPpXrFTUUlELnuXgLjc9OlADnJ51oDr4wAnHx93
+	ADQzMigGZ0IALgU4hwAiHIN4Li0oBRaLPwA4KgM3MQAYExQMCQCYBRUbnJ4zKgU2eXIoAxIgrk04
+	NrEDNTAvlyyZESAqu2CQM7ECM8QoBA8aKsmvvc0qCwMxxQULGhqxykOwsQo4FwUwBREaDePXvDYq
+	6bEgrNUqDtbljJ8aMNOmolmsfv864XDwyZrDh9YcJATQIIPFixgzKuDUqZZHj19CihxJMggAOw==
+}
+
+image create photo tb_CC_Retrieve -data {
+	R0lGODlhGAAYAMY/AAAAAC0tLT4+PkNDQ01NTU9PT1NTU01nRE1oRGNjY1RxSlh1TWpqalt5UHNz
+	c3x8fIGBgYGaeZWVlaCgoKysrK6urqnEp7m5uarHqK3Gq7y8vK7HrK3Iq7DHrrDJsLHJsLLJsLPK
+	sbTLsrXOtbnOt8bGxrvQucjIyMnax8nbx9TU1M3ey8/fzOPj4+Tk5Ozs7O3t7e7u7u/v7/Dw8PHx
+	8fLy8vPz8/T09PX19fb29vf39/j4+Pv7+/39/f7+/v//////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////
+	/////////////////////////////////////////////////////////////////////////yH5
+	BAEKAEAALAAAAAAYABgAAAf+gECCg4IAhocAhIqLhSkoKBELiYyUQAAgFhwNB5OViwAmGxubnZ6W
+	hyQbGKSHppYrHyMeGQ21CKWeACsiIbQNt6aIhisYHb/CuJYGP8w/ProcCgA6OTg3LQa4ADEFP9Y2
+	NQAsADMyMTAtBRXaPy4DPeA1NAHm5+kUJ+w4LgU8NDPlzqEbMEFFPkUAfvDYN2BHQBgv0klQ4eIg
+	oYQ4MroQgONcRAIQSrioyG7hPgYDbEQswKBEiX0WB2Hcl+DHhQIzCkgo4eAlSYQKXdTcp6IABZEu
+	HoyMWaidA28Z97mImvTnxR8P2o3cynXkA6aWHGgYS7as2QTJkKkV5qqt27cEcBUFAgA7
+}
+
+image create photo tb_CC_yourmove -data {
+	R0lGODlhEgASALMLAPv7+wAAAP+9AJlmM8yZM2ZmZv///5mZM2YzM8zMZv//M////wAAAAAAAAAA
+	AAAAACH/C05FVFNDQVBFMi4wAwEJAAAh+QQJFgALACwAAAAAEgASAAAEgnBJiaqdeNakeq8ZdXBe
+	iWTIWCYpeWrJUQ3C0B2fNiKKECsqz6s1AAQGB0DKJEo4n86SYqgSCKQKgiJRKMhGB0KCcKABrwWD
+	odDSlggDbSFhOFCiV2x63UwIxFJ7c309XlcHe3wUCE6CTmpqBSgVc5AxdJIhC1wGMQeQmZqXC11d
+	BxEAIfkECRYACwAsAAAAABIAEgAABH9wSYmqnXjWpHqvGXVwXolkyFgmKXlqyVENwtAdnzYiihAr
+	Ks+rNQAEBgdAyiRKOJ/OkmKoEgikCoIiUSjIRgdCgnCgAa8Fg6HQ0pYIA20hYThQoldset1MCMRS
+	e3N9Cl4EZF5qfBQIXGpOiooFKAhzijEjiyEHXQeekiGhXZ0RACH5BAkWAAsALAAAAAASABIAAAR9
+	cEmJqp141qR6rxl1cF6JZMhYJil5aslRDcLQHZ82IooQKyrPqzUABAYHQMokSjifzpJiqBIIpAqC
+	IlEoyEYHQoJwoAGvBYOh0NKWCANtIWE4UKJXbHrdTAjEUntzfV1dBwdeanwUCHuKj2oFKF4jajGV
+	kiESl4mRmiGFXhEAIfkECRYACwAsAAAAABIAEgAABH9wSYmqnXjWpHqvGXVwXolkyFgmKXlqyVEN
+	wtAdnzYiihArKs+rNQAEBgdAyiRKOJ/OkmKoEgikCoIiUSjIRgdCgnCgAa8Fg6HQ0pYIA20hYThQ
+	oldset1MCMRSe3N9Cl4EZF5qfBQIXGpOiooFKAhzijEjiyEHXQeekiGhXZ0RADs=
+}
+
+image create photo tb_CC_oppmove -data {
+	R0lGODlhGAAYAOevAAAAAAUAAAYAAAYBAAcBAAcCAAcCAQUFBScCACgDASkDASoEATEMBTMNBjMO
+	BjQOBhoaGh0dHUsSD3MCAnIDAk4VDXkCACYmJncEAk8WEHYHA4ADAHwFAoEEAYUDAYEFAnkKBIYE
+	AW4PDFUbEH0JBCwsLFYcE4QIBIkGAi0tLYUJBHASD34OBoMMBVofEpAIA40KBJAKBJMJBJYIA4oO
+	BpcJA5ENBV4kFo4QB4oSCJkLBYYUCpUOBnscFJ8NBYoXCnwdEZ0PBqINBZgTCKMOBqIPBp0SCJcV
+	CZYXCo4bDKMUCaYTCYMjFZsZC5IfDoUlFJscDaMZC5gfDpIiD58cDKoXC6wYDa4ZD64aDq4aD6Mg
+	DpgnEpsmEaoeE0dHR6IjEJ8mEZspFJEvGZIwGrAiFaArE54tFLMlGawpHrYmGaQwFrcmGqUxFrgn
+	GrcoGrcpG1NTU7IwIL1BNb9CNcFCNsBEN2hoaMNEN8REN8NFN75RRsNXSMlbULtiVcxdUM5dUM5e
+	UM5fUMxgUc5gUMBnVsNxYMVzYclxZs9zZs11Z9V0Z9Z0Z9d1aNR3aMp7b9d2aNZ3aNd3aM1+cMyG
+	eM+HetaHfNqJfdiLfd2Kfd2Lfd6Lfd+LfaysrNmbkNudkd+ckOCdkeKdkeOdkeKekeSekduiltyj
+	l9+qoeGroeOroeOtouWsouWtouW3rcfHx///////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////
+	/////////////////////////////////////////////////////yH5BAEKAP8ALAAAAAAYABgA
+	AAj+AP8JHEiwoMGDCBMqXMhwIICHEBs6NHBjDBs1YlwUiNAQwAMzhky1alWqUJgGKRYCcFCGEipV
+	rFalOjWJCwM4CglsIeQJ1ChSokJ96tRnCgFOCAGMACPpUiZNmzRhslTJkRQTdpI++ZKoEaRIjxgt
+	UoToEBQmF14dBOBEyx5BgwYFAvTHDx89TX4cUGsQQBIqcerkwYPnDp05ctAc2bF3LRAkUci8cdNm
+	TZozXYzg6JF2bYUcQ5RUwZLlipUlQWy0yGCHr8EBLGjwCFKEiBAfOmKcACHAleuCEBaQUAFDRo0Z
+	L1B8wJCgtcISCjRw6BDCwwYLFBB4efX7IBwBEkQgTJiwQkKA1t0RcrJz4cCBC3Z8p1fIvf58ifjz
+	69+vPyAAOw==
+}
+
+image create photo tb_CC_draw -data {
+	R0lGODlhFAAUAPdyAP//////AP8A//8AAAD//wD/AAAA/wAAAP/GGP/OMf/OOf/WWv/GIfe9If/G
+	Kf/OQvfGQv/OSv/WY//ee//ehN6lGPe9Kf/GMfe9Mee1Of/OUv/Wa//Wc//ejP/nrcaMEK17EMaU
+	Kee1Qv/OWvfOc//We//elLWEIdacKeetOee1Uv/WhKWMWvfWlP/enO/Wpf/ntbV7EL2EGLWEKdal
+	Sue9c//epa1zELV7GK1zGJxrGLWMSr2UUsacWtata+e9e/fetYxaEKVrGJRjGK17MbWEOcalc+fG
+	lPfWpf/erYxaGJxrKYxjKaVzMa17OZRrMbWEQr2MSqV7Qq2ESsacY6WMa5RjKZxzQq2EUtala5x7
+	Utate8ale+/OpYxaIaVzOaV7SntKGIRaMYxjOa2EWrWMY72Ua9athK2Ma961jHNCGIxaMaVzSpRr
+	Sq2EY6V7Wr2chKVzUv///wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+	AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+	AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+	AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+	AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+	AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+	AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+	AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACH/C05FVFNDQVBFMi4wAwEA
+	AAAh+QQJFAByACwAAAAAFAAUAAAI8ADlCBxIsKDBgwgTKlwo543DN2QYymnDBYZFi20yGqQCRYqU
+	M2nOlCljpotFLm7QvIEjkIKEDRx47MjiwsaWOGQ8JNmZBIjACRoWwCyxooMJF0mOjGnhoukLgRse
+	aBjxkkMJCkdtIBnzo0OHFgIjKHgQIehLokZrsulRooRABg4ujC1blcSTGiZsGIkiRqAMBHATKChL
+	dQOJLz2OXhkIRscHwHLJamiiggPiDj4GYoEwQ0iMBg4ShIAgIgyNDU7WrCEoRgmGEzlwNLAwJEUG
+	NUSKsDg4ZQkDIUIqNFCCwkqVhV6YgAhyQ4cWidCjS08YEAAh+QQFFAByACwAAAAAFAAUAAAI7wDl
+	CBxIsKDBgwgTKlzIMOGbh2/INGzDBYZFi20yGqQCRYqUM2nOlCljpotFLm7QvIEjkIKEDRx47Mji
+	wsaWOGQ8JNmZBIjACRoWwCyxooMJF0mOjGnhoukLgRseaBjxkkMJCkdtIBnzo0OHFgIjKHgQIehL
+	okZrsulRooRABg4ujC1blcSTGiZsGIkiRqAMBHATKChLdQOJLz2OXhkIRscHwHLJamiiggPiDj4G
+	YoEwQ0iMBg4ShIAgIgyNDU7WrCEoRgmGEzlwNLAwJEUGNUSKsDg4ZQkDIUIqNFCCwkqVhV6YgAhy
+	Q4eWhtCjFwwIADs=
+}
+
+image create photo tb_CC_envelope -data {
+	R0lGODlhGAAYAKUyAAAAACAgIExIPG5mWHJsWn50ZH94ZIB4ZoF5ZoZ9aIh+aoh/a4uBbJCFb5WJ
+	c56dlbmtk8Kyk8Szk8S0lcW1lsm5lsm6mMK/uM+/nNPCntTEoMnIxN7Ko+DOqOzYrfDbs/Xesvbf
+	s/nisvrjs/zmtf/ot//ouP/puv/qvf/rwv/tx/3uzfXu7vXx8frz7Pj07fX19fz16v//////////
+	/////////////////////////////////////////////yH5BAEKAD8ALAAAAAAYABgAAAarwJ9w
+	SCwaj8ikcslsIgEBgHRKXQIusKx2+wAoAbADSwVTqVwq0iDjTYJViNbq9VKNCCNL+1lWFWJmJQQq
+	H3pfZSgNAlBUjXtDYCkLKldbljBdRWAMKiBgYmRmaGpsmhsREhJvcXN1d3mPQo19f4GDhbGaiA0E
+	WQQKJB4VuUSRkyoGBiUmCR3Dh5wgJyIiJiEcDhjEkKepEhERExMUGhDbkI6NTuvs7e7v8EVBADs=
+}
+
+image create photo tb_CC_postal -data {
+	R0lGODlhGAAYAIQaAAAAAD4+PkNDQ01NTU9PT1NTU2NjY2pqanNzc3x8fIGBgZWVlaCgoKysrK6u
+	rrm5uby8vMbGxsjIyNTU1OTk5O7u7vX19ff39/r6+vv7+////////////////////////yH+EUNy
+	ZWF0ZWQgd2l0aCBHSU1QACH5BAEKAB8ALAAAAAAYABgAAAWf4CeOZGmeaKqubOu+IyDPdC2bQKHt
+	fO8XgBKgQrBkjJej8oKxEBxBEkBDEViu2KyzIYnGNBZKUYsVMCZdoeZYJTsXE0paCr5SAtqBIkKR
+	e0VTR1cHVlcEBwwUYXNfWAYPD0UECxEIEYt/H4EWBpcUEwQNfBYJfYyAYAgTWX1ZpaeaGglxfbW2
+	fQmwAAgQvb6/wAaZmjbFNDDIycrLzCwhADs=
+}
+
+image create photo tb_CC_book     -data {
+	R0lGODlhGAAYAOewAAAAAAEBAAICAAQDAAcGAQsIARURAxYSAxoVAyggBSoiBiwjBi0lBzAmBjEo
+	BzkuCDswCD0xCDMzM0E0CEM2CUk7Ck0+CkhISF1LDF5MDUtLS2BODWZSDmlVEWxXD1ZWVm5ZD1hY
+	WHJcD3NdEF5eXndgEF9fX3pjEWNjY35lFWdnZ4JpFINqEoVrEoduFYluEm1tbYpwE25uboxxE45y
+	E5B0E5F1FHR0dJN3FJR3FpV4FJd5FHh4eJh7FZp8FXp6epx+FZx/GJ5/FX5+fqGCFqODFoGBgaWF
+	FqWGGaaGF6OGIYWFhaiIF6qJF6iJHq2MGK+NGK+NG7GPGLCQILOQGLKQHbSSGZCQkLaTGbaUHriU
+	GbqWGbuXGpWVlb2ZGpaWlpeXl7+aGsGcGsOdGsSeG8agG8ihG8qjG8ukHM2lHM+nHNGoHKamptSr
+	HaioqNatHdiuHduxHq+vr9+0HrGxsda2ROG3JuG4KrW1teK6MeK7M+O8NOO8NuO9OOO9Orq6uuS+
+	O+S/P+TAQeTAQ+XCSOXDSsLCwsPDw+fGUufHWMXFxejIW+jJXejKX+nLYurMZ+nNa+rNacvLy+rO
+	a+rObevPbs7OzuzSd9LS0u3Ufu3VgO7Whe7Yi9ra2tvb29zc3PDent7e3t/f3+Dg4OHh4eLi4uTk
+	5OXl5ebm5urq6uvr6+/v7/Ly8vPz8/n5+f39/f//////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////
+	/////////////////////////////////////////////////////yH5BAEKAP8ALAAAAAAYABgA
+	AAj+AP8JHEiwoMGDAwEoXMiQIcJ/CSIN0mMnjpoxWjJmFANEwUEAexj1OcPliZAaL17UqNGjhggH
+	Bw9QIrSGjJUkPWKkTLmjhIWPWyjxQcMFChEbO1/M2AGCAwCDACgValMGCxMfM1Lq1FHigZEMBQFs
+	acQnTRgpRXQkjeEDBAUNV8JCIvTGzJYmQGgkxXECwgcVEggCQCNSjRgqR3YkfdFjRIULgZ4mnIRo
+	DkmTKHfSYBFBhYwTkv8BKONID1WrWJO2tRACkIHQAOokumMWrdqkLSZouBEEthpQnDJdqvQoUZ89
+	yPfYsZKBhKDXAwls8rChuvXr1TGg4MEk9D8EgUZ8mLjxhY4cRZb+GDokCVOnLnkWeD8Ap8cQU6ZI
+	iRLF6lWr/27gAQMTARQ0gRlwcHGEJ6mssgoqoZCiXyk/+MGAdwIBUEAKSkyxhRhgfHKKKq64sgQb
+	iwjwEEMr5FBFFl5oMkoqizSAIUIMdeACElE4McBDKzoE5JBEFvlQQAA7
+}
+
+image create photo tb_CC_database -data {
+	R0lGODlhGAAYAMZnAAAAAAEBAQICAgMDAwUFBQYGBgcHBwgICAwMDA4ODhERERMTExUVFRYWFhkZ
+	GRwcHCEhISIiIiUlJScnJy0tLS8vLzIyMjU1NTY2Njw8PEBAQEFBQUREREVFRUZGRkdHR0hISE5O
+	Tk9PT1JSUlNTU1RUVFVVVVlZWVtbW1xcXF9fX2JiYmZmZmdnZ2hoaGlpaWpqamtra2xsbG5ubm9v
+	b3BwcHFxcXJycnNzc3V1dXd3d3h4eHl5eXp6ent7e3x8fH19fX5+fn9/f4CAgIGBgYODg4WFhYeH
+	h4iIiImJiYqKiouLi4yMjI2NjY+Pj5CQkJKSkpSUlJWVlZeXl5iYmJmZmZubm52dnZ6enp+fn6Cg
+	oKKioqOjo6SkpKampqenp6urq66urrGxsbq6uru7u7+/v8LCwv//////////////////////////
+	/////////////////////////////////////////////////////////////////////////yH5
+	BAEKAH8ALAAAAAAYABgAAAf+gH+Cg4SFhoeEFhsHAQEGGBKIhg0fOUxSUE5KQisZCpJ/EwA7WldV
+	UU9NSUZEQCkAAIgAUV1ZVlOZS0dFQz87LbGGFjZfW6aoqqxBPTo4IRSGA1y1t7m7vTs5NTAChgJe
+	xqepq0TLzTMyAYYB1LhOury+2jI5wYQEWVviyeXMODM0gBly8AMLF2vxstXQIcODvUEFbgyJIoYK
+	EmU+fhA5wgIEhIeCCECpMWMIGDNlyIwZE8aFiQsRTID8gwBIFB4oULy4kQOHjBWwRqjoMBMAjiFP
+	sPwooQEWABEudqzwWPQJSZMoVbJ0CbPETAUPbubc2fNnUBUKZv5JwCHp0qYpsKBKFSULAIMgJ1Ou
+	bFmiAixQsBacsNEzBgmnagshXpwYlOPHkCM7DgQAOw==
+}
+
+image create photo tb_CC_tablebase -data {
+	R0lGODlhGAAXAMZAAAAAACc/V0dHRzFObEBTaFhYWFNrg1ZuhXNzc2Z7kXKGmI2NjYGTpK6urra2
+	tre3t7i4uLm5ubu7u7y8vL6+vr+/v8HBwcLCwsPDw8TExMXFxcbGxsfHx8nJydDQ0NLS0tPT09XV
+	1dbW1tfX19jY2NnZ2dra2tvb29zc3N3d3d7e3t/f3+Dg4OHh4eLi4uPj4+Tk5OXl5ebm5ufn5+jo
+	6Onp6erq6uvr6+zs7O3t7e7u7u/v7/Dw8PHx8fPz8/X19f//////////////////////////////
+	////////////////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////
+	/////////////////////////////////////////////////////////////////////////yH5
+	BAEKAEAALAAAAAAYABcAAAfjgECCg4SFhoeIiYUAjI2Oj46LCgUMB5aXlpSXBACLBgUJA6KjoqCj
+	AZ2EAJ+hpKOmoqiLCAW1tre4AqmDAA0FHh8gISMlJigqBS0vMTITu4K9BcHDJMYqKwUvMDI0FM9A
+	0cIj1SgpKy0F2zQ13rO477e6i74i1SfmLS4wBTM1NzkWvkWzh0+fjAL+cOi4INCXiXsrWBicUeCG
+	Qh4ZBNKCB0+eKl8pVEiEEaOfjQI6ePTwsaFhAZEulpnEUWDHyh8cBC4Q4OABhAgSJlCoYEEABg0b
+	OHQQCKnpI0VQo0qdSrUqokAAOw==
+}
+
+image create photo tb_CC_engine -data {
+	R0lGODlhGAAYAOfwAAwMDBAQEBIQEBISEhQSEhQUFBYWFhgYGBoaGhgbGxwaHBwcHB4cHhweHB4e
+	HiAgICIiIiQiIiQiJCQkJCgmJigoKCooKCwqLCwsLC4sLiwuLjAsMC4uLjAuMDAwMDAwMjgwODQ0
+	NDY0Njg0ODY2Njc2Nzg2ODo4Ojs4Ozw4PDo6Oj04PTs7Ozo9Oj07PTw8PD09Pz88Pz8+P0A/QEFB
+	QUFBQ0NAQ0JBQkRARERCQkNDQ0NDRUZDQ0VFRUVFR0dHR0lHR0lJSUpJSktJSUtJS0tLS01LS0xM
+	TE9LS01NTU9NTU9NT01PTU5PTlFOTk9PT1FPT1FRUVNRU1NTU1RTVFVTVVdTV1VVVVZVVldVV1dX
+	V1lXWVpZWltZWVtbW1xbXF1bW11dXV9dXV9dX2BeYF9fX2BfYGFhYWNhYWVjY2VlZWZlZmdlZWdl
+	Z2dnZ2hnaGlnZ2lnaWtpa21pbWxqbG1rbW9rb29sb29tb3FvcXRvcnRydHNzc3V0dnZ0dnV1dXh2
+	eHd3d3h3eHl5e3x5eX55enx7fH98f4B+gIKAgoOAg4SChIiChoiEhomGiYqGiIyGiIuIi4yIio6I
+	io2KjY6KjI6KkI6Kko+Mj5CMkpCMlpKOlJSQlpaSlpaUlpiUmJiWmJiWmpmWmZqWmpmYm5qYmpqY
+	nJyYnJyanp6anp6coKCcoKKeoqCgpKSgpKago6SipqWip6aipqWkp6akpqakqKikpqikqKqmqKyo
+	qqyorK6qrK6qrq6ssLCssLCusrGusbCwtLKwtLSwtLSytra0uLi0uLq2urq4vLy4vL66vr66wMC8
+	wMK8wMK+wsDBxcLBxcXBxcfBxcfDx8nDx8nFycvFycrGysvHy8rIzM3Hy8/Jzc/Lz9HNz9PP0dXR
+	09XR1djU29nV2drY3N3Z3d/b3+Hd4ePf4+Xh4+fj5+nl5+nl6e3p7e/r7+/t8ffz9///////////
+	/////////////////////////////////////////////////////yH5BAEKAP8ALAAAAAAYABgA
+	AAj+AP8JHDhwT5Z/R0bgIMiwoUASARhcCECRABWHDNMtoYiIC8UABQqcwCiw3Dt3ngIsaIdOnB4D
+	FDuQ/Bdr3TlrRPqc00bt0ccAHnQsOMRwTAJl5MR522YtGrMxH0NSzEAw3CxB575149lMmbFaN4SA
+	KvCTxUB259QtrQZN2bFhvXTJQtbqRlQeJc1944ZNGrNkxX7twuVK1ahOkSYEMCCDIKBp1J55FUYK
+	UapVqD5psgSJDswGDP0sS0bMFyYMCDxQ4nRJUqM1Bz5yICjKWLBeuMbADJCo0iNFhLT8DBBCoLls
+	vXLZYoUlwqIAM3ghCsSnzU8HQf4dG7frVmFTdS7RDCLr7E+eOm6iqEBAAcgU47ZWnfq0ydEbAwAC
+	3LIDJ00ZL1eIkAQMZAiUziqhcJLJJIy8YkYAawDDxhlgaCHFEyqgUKBAvEhRwhe/GRIILNfQooYY
+	W1QBhQ82SKCAQ04UQh0ecqjxXxZSKAEEBgcMEMALDYHDRx5zuIFGGFtMAUURPZBAVgBROFRKHP2V
+	0YUVUSDxgw4xiACBAFFi1IQRIdDAxBND7NCCCSR8UEEcMyEkUA4+1LBCAQNYoMEdcRKUwwsnpFDA
+	Ai702RAIGzwQZ0AAOw==
+}
+
+image create photo tb_CC_delete -data {
+	R0lGODlhGAAYAOfyAAAAAAgICA8PDxMTExYWExsbGxwcHB4eGiEhISMjISQkJCYmICkoIyoqIisr
+	IzAwJzExLjQ0KzU0MTU1LDc3LTg3NDw8Mj4+Mz8/NEBANUFBNUBAPkFBNkJCN0JCOkNDN0JCQkRD
+	OkREOEVEQkVFP0dGPkhHPUlJPElJSUxMSU5NRU5OQE5OQU5ORVFRQ1FRRlJRRlNSRlRURVRUS1VV
+	RlRUUVZWR1dWSldXSFdXSldXS1hYSVlZUVpaSltbTVtbUV1cT1xcVV1dVF9fT2BgUmFhU2JhVWJi
+	UWVkVmZmVGhoVmlpV2pqWGppXmtrX2xrXW1sXG1sXW5tXW1tYW9vZ3FwYHFxXXFxXnR0Z3V1a3d2
+	ZXZ2aXZ2a3h3ZnZ2dnp5aHh4dXp6ZXt7ZXx6aXp6cXt7c3x8bX18a3x8cn19bX59d4B+b4B/bX9/
+	dIKCeISEcIWFboWFdoWFe4eGc4uJdoqJfoqKgIyLd46MeI+NeZCPepCPipGRgpGRhZOSfZCQkJKR
+	iZOTipSTipWUhJmYgpqYg5iYjpmYk52di5+ei6GfiJ+flqOhiqGhlKOik6OjmqSkk6WllKemjqim
+	j6qpk6qpmKyqkqqqnqqqo62sk6ysnK+tl6yspq6to6+unbCvlrGvlrOxm7GxorOypLWzmrOzpbOz
+	qLa1m7i2nLi2obe2prm3nbm4nbi3pra2srq4prq4qL27obu6rbu7s728rb69p8C+o8C/scHAtcLB
+	r8HBtsTCqcLCt8XErMTDtsPDvsPDw8bFucbFvcjIw8rJvMzLtczLvs3Mv87NwNDOutDPw9HQwdHQ
+	wtPRvtLRx9PSytXTwdPTydPT09bVw9bVxNjX0NnYzNnZztrZztvaz9va0dvb1Nzb0t/e0d7e3OLh
+	2uLi3+Xk2ebm5urp4+np6Orp5uvq5fHx8PLy7vLy7/T08Pb18vn59/r6+Pv7+vz7+v39/P39/f//
+	/////////////////////////////////////////////////////yH+FUNyZWF0ZWQgd2l0aCBU
+	aGUgR0lNUAAh+QQBCgD/ACwAAAAAGAAYAAAI/gD/CRw4EIDBgwQTKvwHwIAXcdKA/UFhcCHBgyZe
+	gTtXDp05XDdgIFQIYFIsW4ygoElBIgSVYKeihJKkB0BCAJSKJYPWSdCIBBIYHIiRCVAuUJb82BwY
+	YFkxat2QcdqjJkgJJFrW1CJ1ipSipQIBWFunDVs4ZdGIqUr1SRGrVah2baIDlmElV+zaqft2LRu0
+	Zrts9Zp2TNaYKnUHEPL0yxs5d/DivWOXbpy2W4O6SPFRFwAQP45aVdv2bJgwWrAS4bmD58sTFSRB
+	lFnkjJsxZr5A6S7E5kyTDXXDUhBQAcyhOqMuMZqTx0gNCAAcBGdoRYeHBQgKAFBwEACBBg8wpkwH
+	EOZHHC6GsrxowyTDERkXaERwMR6OED5uMJFpYcdMByI9WMDCBDLU94MmcszyyAyB9PGfEhww8QET
+	BkIihy6iOCEKIjK8ccWEExoYiRy8ZLhhhx9KSCFJcPyAyIUmcughiCveJMYPFmKooYwpfjDEeEng
+	6IaOJ87IxAk4TMdQDmlsYUojU5Qi4xIa2CCCkmEZxMMOK2BRBAsnnDCSRVl2191CAQEAOw==
+}
+
+image create photo tb_CC_outoftime -data {
+	R0lGODlhEAAQAMZJAAAAABcQAR0UASofCzAkDD0uDzIyMj09PUVFRUZGRkhISElJSUpJSmZNGldX
+	V2VlZW1tbXR0dKd+KoODg4iIiJiYmMuZNJ6enqysrMircK6urrO0tLW0tOuxPbW2tri3t925b8LC
+	wu7AY8nJyczMzM7OzfDMgdHR0tPT0/bLwvTdrOfn5+fo5+vq6+vr6+zr7O3t7O3t7e7t7e3u7e7u
+	7e/u7u7v7+/v7+/v8PDw7/Dw8PHx8PHx8fLy8vLy8/Lz8vPz8/T09PX19Pb29vf29/f39/n5+fr5
+	+fv7+///////////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////
+	/////////////////////////////////////////////////////////////////////////yH+
+	FUNyZWF0ZWQgd2l0aCBUaGUgR0lNUAAh+QQBCgB/ACwAAAAAEAAQAAAHkYB/goOEhYYAiIiGgwAL
+	JC8WHRIGAIcUPUM/BSImIBGVhAxCQ0VDAx0dKhkHhAAlQ0ZIRwSoHYmgADlESElIArUASSm4PQ9H
+	SEYBDajBw4IAMkGkQxgGFzPNuCM7PkA+OiEINNmDCig2NzUxLTArACnOzxMnLjwQOCwct60JGh4f
+	Gyo4IFfoVqV38RYxSqSwYSAAOw==
+}
+
+image create photo tb_CC_message -data {
+	R0lGODlhDAAQAKUxAAAAACAgIG5mWHJsWn50ZH94ZIB4ZoF5ZoZ9aIh+aoh/a4uBbJCFb5WJc56d
+	lbmtk8Kyk8Szk8S0lcW1lsm5lsm6mMK/uM+/nNPCntTEoMnIxN7Ko+DOqOzYrfDbs/Xesvbfs/ni
+	svrjs/zmtf/ot//ouP/puv/qvf/rwv/tx/3uzfXu7vXx8frz7Pj07fX19fz16v//////////////
+	/////////////////////////////////////////////yH+FUNyZWF0ZWQgd2l0aCBUaGUgR0lN
+	UAAh+QQBCgA/ACwAAAAADAAQAAAGbsCfcEgkAo7I4xDgwFQqFMrlARACXgKRp8NpZKq/62iQGiE2
+	E/A1JRokSiCJ+tVKkQakktz6SrlSLwUhEHN+gIKEfC8qMGQmEYUsBAwpH5B8KwcpJwoplz8BLwYp
+	pCgLiWEWL6usGmBhSUhFs0NBADs=
+}
+
+image create photo tb_CC_online -data {
+	R0lGODlhIAAQAKU3AAAAAA8PDV1ZT2JeVGRgVmVgVmplW2xoXnBsYnJtY3h1a314bn56cIB9dIF9
+	c4qFe4uHfYuHfoyJgY2JgZOOhJeTipiTiZyXjZ+ck6CdlKeimKaim6eknqqnoLGtpLKwq7Oxqrez
+	qry5sr67tcTCvcbCusXDvcjFv87Kw9HQzOHf2+Lh3ePh3ejn5Oro4+vq5uzr6O7s6vDu6/Dv7PLw
+	7fPy8Pn5+P///////////////////////////////////yH+FUNyZWF0ZWQgd2l0aCBUaGUgR0lN
+	UAAh+QQBCgA/ACwAAAAAIAAQAAAGj8CfcEgsGo/IpHLJbDqLAMAv+kxGAZYGoKSlVocAR4jk0pYv
+	oonUem0DGqtZpwyQNT42U9e9Brj+gIA0Lw8wWjENGDUtLIGAfQ2Rkg0KCiMgCyoKACkNFCcak5N9
+	fFEKEhsJKJscDQwZDgela0kBBREIHrIVDQMGArRfAAEBFgQAEHtfR8Q/AcHL0dLT1EVBADs=
+}
+
+image create photo tb_CC_offline -data {
+	R0lGODlhIAAQAKU4AAAAAA8PDV1ZT2JeVGRgVmVgVmplW2xoXnBsYt9CHnJtY3h1a314bn56cIB9
+	dIF9c4qFe4uHfYuHfoyJgY2JgZOOhJeTipiTiZyXjZ+ck6CdlKeimKaim6eknqqnoLGtpLKwq7Ox
+	qrezqry5sr67tcTCvcbCusXDvcjFv87Kw9HQzOHf2+Lh3ePh3ejn5Oro4+vq5uzr6O7s6vDu6/Dv
+	7PLw7fPy8Pn5+P///////////////////////////////yH+FUNyZWF0ZWQgd2l0aCBUaGUgR0lN
+	UAAh+QQBCgA/ACwAAAAAIAAQAAAGosCfcEgsGo/IpHLJbDoBAGEiIaX+oM4r9OKITqtXUxerBDxE
+	pVe3+r2qMSNKtAiFOlg0j3o+bQNmDiA3J2NkAC+ILzUwEDFrYEIAMg4ZNi4tiXMADg4LCyQhDCsL
+	cz9tVyoOFSgbnJyadQsTHAoppGxWAB0ODRoPB3WlQwEFEggfwLiRFg4DBgLCRwABARcEXlZfABGF
+	WdSQbQHRWeTl5udZQQA7
+}
+
+image create photo tb_CC_pluginactive -data {
+	R0lGODlhEAAQAKUmAAAAAAEAABgGAz8RCG4eD6MtFrExGLgzGbozGcY3G845G9Y7HclEKcBLMuFC
+	IuFFJuJIKeRXO+hvV+l3YOp+aeuEcOyHc+6Vg++fkPGrnsXSyPfNxPfOxvnZ0vbb1PXc1vnc1vnf
+	2vrl4fvm4unu6vDz8f//////////////////////////////////////////////////////////
+	/////////////////////////////////////////////yH+FUNyZWF0ZWQgd2l0aCBUaGUgR0lN
+	UAAh+QQBCgA/ACwAAAAAEAAQAAAGYMCfcEgsGo/IIgCQHC4jC2aSYMF0okspEcARTa4AjYbEzAIW
+	3S92Kfx4OvARyBGKFhuMRSJxqSg2CVpCWQEJEBIIGYFZRgKHiYFiJYJCAw8HFAZmSAICEQWUnAJN
+	pKVEQQA7
+}
+
+image create photo tb_CC_relay -data {
+	R0lGODlhFAAUALMAAAAAADMzM2ZmZpmZmczMzP//////////////////////////////////////
+	/wAA/yH5BAkAAAUALAAAAAAUABQAAAhgAAsIHEiwoMGDCAsKWMiwocOGAgEUkEhxosWKEicC2Mix
+	o0eOBQgAIEByZEmSIlGODGky5cmXKVmqnAlzpcubLXMS0PixZ8eIF4NitFjgodGHCZMqXcq0qdOn
+	UKNKNRgQADs=
+}
+
+image create photo tb_CC_spacer -data {
+	R0lGODlhAQAYAIAAAP///////yH5BAEKAAEALAAAAAABABgAAAIEjI+pVwA7
+}
+
+
+### Corresondence Chess functions
+
 namespace eval CorrespondenceChess {
 
-	# whether the console is already open or not
+	# wether the console is already open or not
 	set isOpen   0
-
+	
 	# default Database
 	set CorrBase        [file nativename [file join $scidDataDir "Correspondence.si4"]]
 
@@ -996,7 +1304,7 @@ namespace eval CorrespondenceChess {
 	# Show only games where the player has the move?
 	set ListOnlyOwnMove      0
 	# set sortoptlist        [list "Site, Event, Round, Result, White, Black" "My Time" "Time per Move" "Opponent Time"]
-
+	
 	# Sort criteria to use
 	set CCOrderClassic       0
 	set CCOrderMyTime        1
@@ -1007,7 +1315,7 @@ namespace eval CorrespondenceChess {
 	# Which to use
 	set ListOrder          $CCOrderClassic
 
-	# email-programm capable of SMTP auth and attachments
+	# email-programm capable of SMTP auth and attachements
 	set mailer           "/usr/bin/nail"
 	# mail a bcc of the outgoing mails to this address
 	set bccaddr          ""
@@ -1029,10 +1337,14 @@ namespace eval CorrespondenceChess {
 	set glccstart        1
 	set glgames          0
 
+
 	#----------------------------------------------------------------------
 	# Fetch a file via http
 	#----------------------------------------------------------------------
 	proc getPage { url } {
+		if {![::CorrespondenceChess::CheckHTTPS $url]} {
+			return $::CorrespondenceChess::NoHTTPS
+		}
 		set token [::http::geturl $url]
 		set data [::http::data $token]
 		::http::cleanup $token
@@ -1045,9 +1357,9 @@ namespace eval CorrespondenceChess {
 	# $filespecs: the specs of the file (currently ignored)
 	#----------------------------------------------------------------------
 	proc chooseFile {i filespecs} {
-		set idir [pwd]
-		set fullname [tk_getOpenFile -initialdir $idir -title "Scid Correspondence Chess: Select $i"]
+		set fullname [tk_getOpenFile -initialdir $::env(HOME) -title "Scid Correspondence Chess: Select $i"]
 		if {$fullname == ""} { return }
+	  
 		return $fullname
 	}
 
@@ -1138,28 +1450,32 @@ namespace eval CorrespondenceChess {
 			}
 		}
 	}
-
+	
 	#----------------------------------------------------------------------
 	# Check for the default DB, create it if it does not exist.
 	#----------------------------------------------------------------------
 	proc checkCorrBase {} {
 		global ::CorrespondenceChess::CorrBase
 
+		### This gets called at start-up.... bad.
+
 		if {![file exists $CorrBase]} {
 			set currbase [sc_base current]
 			set fName [file rootname $CorrBase]
-			if {[catch {sc_base create $fName} newbase]} {
-				ERROR::MessageBox "$fName\n"
+			if {[catch {sc_base create $fName} result]} {
+					tk_messageBox -icon warning -type ok \
+						-title "Scid: Unable to create base" -message $result
 			}
 			# Type 6 == Correspondence chess
-			sc_base extra $newbase type 6
-			sc_base close $newbase
+			sc_base type [sc_base current] 6
+
+			sc_base close
 			sc_base switch $currbase
 		}
 	}
 
 	#----------------------------------------------------------------------
-	# Check for In-/Outbox directories and create them if not available
+	# Check for In-/Outbox directories and create them if not avaiable
 	#----------------------------------------------------------------------
 	proc checkInOutbox {} {
 		global scidDataDir ::CorrespondenceChess::Inbox ::CorrespondenceChess::Outbox
@@ -1285,8 +1601,8 @@ namespace eval CorrespondenceChess {
 
 	#----------------------------------------------------------------------
 	# yset / yview: enable synchronous scrolling of the CC game list, ie.
-	# all text widgets involved scroll simultaneously by the same amount
-	# in the vertical direction.
+	# all text widgets involved scroll simultaneously by the same ammount
+	# in the vertial direction.
 	#----------------------------------------------------------------------
 	proc yset {args} {
 		set w .ccWindow
@@ -1321,15 +1637,14 @@ namespace eval CorrespondenceChess {
 
 		set m .ccWindow.menu
 
-		foreach idx {0 1} tag {CorrespondenceChess Edit} {
+		foreach idx {0 1 2} tag {CorrespondenceChess Edit HelpContents} {
 			configMenuText $m $idx $tag $lang
 		}
-		foreach idx {0 1 3 4 6 7 8 9 10 11 13 14} tag {CCConfigure CCConfigRelay CCRetrieve  CCInbox  CCSend  CCResign  CCClaimDraw CCOfferDraw CCAcceptDraw CCGamePage  CCNewMailGame CCMailMove } {
+		foreach idx {0 1 3 4 6 7 8 9 10 11 13 14 16} tag {CCConfigure CCConfigRelay CCRetrieve  CCInbox  CCSend  CCResign  CCClaimDraw CCOfferDraw CCAcceptDraw CCGamePage  CCNewMailGame CCMailMove FileClose} {
 			configMenuText $m.correspondence $idx $tag $lang
 		}
-		foreach idx {0 } tag { CCEditCopy } {
-			configMenuText $m.edit $idx $tag $lang
-		}
+		configMenuText $m.edit 0 CCEditCopy $lang
+		configMenuText $m.help 0 HelpContents $lang
 	}
 
 	#----------------------------------------------------------------------
@@ -1362,7 +1677,7 @@ namespace eval CorrespondenceChess {
 				set Title "Error"
 				append Error "$::CorrespondenceChess::Connector\n"
 				append Error [::tr CCErrDirNotUsable]
-				tk_messageBox -icon warning -type ok -parent . \
+				tk_messageBox -icon warning -type ok \
 					-title $Title -message $Error
 				return
 		} else {
@@ -1382,7 +1697,7 @@ namespace eval CorrespondenceChess {
 					if {[string match "*$stripforid*" $game]} {
 						lappend ::CorrespondenceChess::RelayGames $game
 					}
-				}
+				} 
 			}
 			close $connectF
 		}
@@ -1397,7 +1712,7 @@ namespace eval CorrespondenceChess {
 	proc ConfigureRelay { } {
 		global ::CorrespondenceChess::RelayGames
 
-		puts stderr $::CorrespondenceChess::Connector
+		::splash::add $::CorrespondenceChess::Connector error
 		if {![file exists $::CorrespondenceChess::Connector]} {
 				if {[catch {open $::CorrespondenceChess::Connector w} connectF]} {
 
@@ -1419,7 +1734,7 @@ namespace eval CorrespondenceChess {
 				set Title "Error"
 				append Error "$::CorrespondenceChess::Connector\n"
 				append Error [::tr CCErrDirNotUsable]
-				tk_messageBox -icon warning -type ok -parent . \
+				tk_messageBox -icon warning -type ok \
 					-title $Title -message $Error
 				return
 		} else {
@@ -1429,7 +1744,7 @@ namespace eval CorrespondenceChess {
 
 			if {[winfo exists $w]} { return }
 			toplevel $w
-			::setTitle $w [::tr "CCDlgConfigRelay"]
+			wm title $w [::tr "CCDlgConfigRelay"]
 
 			autoscrollframe $w.desc text $w.desc.text \
 					-background gray90 -foreground black \
@@ -1456,7 +1771,7 @@ namespace eval CorrespondenceChess {
 
 	#----------------------------------------------------------------------
 	# Fetch PGN file of games to be relayed and put them with the
-	# proper header tags into Scid's inbox for display
+	# proper header tags into Scids inbox for display
 	# As parameter use the MakeAMove-URL from ICCF.
 	# Currently only relaying from ICCF is supported.
 	#----------------------------------------------------------------------
@@ -1464,7 +1779,7 @@ namespace eval CorrespondenceChess {
 		global ::CorrespondenceChess::Inbox
 
 		if {[catch {open $::CorrespondenceChess::Connector r} connectF]} {
-			::CorrespondenceChess::updateConsole "info ERROR: Unable to open connector $::CorrespondenceChess::Connector";
+			::CorrespondenceChess::updateConsole "info ERROR: Unable ot open connector $::CorrespondenceChess::Connector";
 		} else {
 
 			set connectxml [read $connectF]
@@ -1557,47 +1872,21 @@ namespace eval CorrespondenceChess {
 	# for the ongoing game.
 	#----------------------------------------------------------------------
 	proc EnableEngineAnalysis {on} {
-
+	
 		if {$on == 0} {
 			set m .menu.tools
 			$m entryconfigure 0 -state disabled
 			$m entryconfigure 1 -state disabled
 			$m entryconfigure 2 -state disabled
-			$m entryconfigure 3 -state disabled
-
-			# disable hotkeys, needs to be done for each window
-			foreach w { .maintWin .sortWin .playerInfoWin .repWin \
-							.fics .metadataWindow .crosstabWin .ecograph \
-							.glistWin .plist .statsWin .baseWin .tourney \
-							.pgnWin .main .nedit .ccWindow } {
-
-				if {[winfo exists $w]} {
-					bind $w <Control-A> {}
-					bind $w <Control-Shift-2> {}
-					bind $w <F2> {}
-					bind $w <F3> {}
-				}
-			}
+			bind . <F2> {}
+			bind . <F3> {}
+			bind . <F4> {}
 		} else {
 			set m .menu.tools
 			$m entryconfigure 0 -state normal
 			$m entryconfigure 1 -state normal
 			$m entryconfigure 2 -state normal
-			$m entryconfigure 3 -state normal
 
-			# disable hotkeys, needs to be done for each window
-			foreach w { .maintWin .sortWin .playerInfoWin .repWin \
-							.fics .metadataWindow .crosstabWin .ecograph \
-							.glistWin .plist .statsWin .baseWin .tourney \
-							.pgnWin .main .nedit .ccWindow } {
-
-				if {[winfo exists $w]} {
-					bind $w <Control-A> makeAnalysisWin
-					bind $w <Control-Shift-2> "makeAnalysisWin 2"
-					bind $w <F2> "::makeAnalysisWin 1 0"
-					bind $w <F3> "::makeAnalysisWin 2 0"
-				}
-			}
 		}
 	}
 
@@ -1606,55 +1895,56 @@ namespace eval CorrespondenceChess {
 	#----------------------------------------------------------------------
 	proc List2Clipboard {} {
 		clipboard clear
-		clipboard append $::CorrespondenceChess::clipboardText
+		setClipboard $::CorrespondenceChess::clipboardText
 	}
 
 	#----------------------------------------------------------------------
 	# Generate the Correspondence Chess Window. This Window offers a
 	# console displaying whats going on and which game is displayed
-	# plus a gmae list containing current games synced in and their
+	# plus a game list containing current games synced in and their
 	# status. Xfcc offers quite some information here whereas eMail
 	# relies mostly on the user.
 	# Additionally this window contains the buttons for easy navigation
-	# and in case of Xfcc the special moves available (resign etc.)
+	# and in case of Xfcc the special moves availabe (resign etc.)
 	#----------------------------------------------------------------------
 	proc CCWindow {} {
 		global scidDataDir helpMessage
 
 		set w .ccWindow
-		if {[winfo exists .ccWindow]} {
-			focus .
-			destroy .ccWindow
-			set ::CorrespondenceChess::isOpen 0
+
+		if {[winfo exists $w]} {
+			raiseWin $w
 			return
 		}
-		set ::CorrespondenceChess::isOpen 1
 
-		::createToplevel $w
-		::setTitle $w [::tr "CorrespondenceChess"]
+		toplevel $w
+		wm title $w [::tr "CorrespondenceChess"]
 
-		# hook up with scid's geometry manager
+		# hook up with scids geometry manager
 		setWinLocation $w
 		setWinSize $w
 
 		# enable the standard shortcuts
-		keyboardShortcuts $w
+		standardShortcuts $w
+		bind $w <Control-q> "destroy $w"
 
 		::CorrespondenceChess::EnableEngineAnalysis 0
 
-		# create the menu and add default CC menu items here as well
 		menu $w.menu
-		::setMenu $w $w.menu
 		set m $w.menu
-		$w.menu add cascade -label CorrespondenceChess -menu $w.menu.correspondence
-		$w.menu add cascade -label Edit                -menu $w.menu.edit
-		foreach i {correspondence edit} {
-			menu $w.menu.$i -tearoff 0
-		}
+		$w configure -menu $m
 
-		$m.correspondence add command -label CCConfigure   -command {::CorrespondenceChess::config}
+		$m add cascade -label CorrespondenceChess -menu $m.correspondence
+		$m add cascade -label Edit                -menu $m.edit
+		$m add cascade -label HelpContents        -menu $m.help
+
+		menu $m.correspondence -tearoff 0
+		menu $m.edit -tearoff 0
+		menu $m.help -tearoff 0
+
+		$m.correspondence add command -label CCConfigure   -command "::CorrespondenceChess::config $w"
 		set helpMessage($m.correspondence,0) CCConfigure
-		$m.correspondence add command -label CCConfigRelay -command {::CorrespondenceChess::ConfigureRelay}
+		$m.correspondence add command -label CCConfigRelay -command ::CorrespondenceChess::ConfigureRelay
 		set helpMessage($m.correspondence,1) CCConfigRelay
 
 		$m.correspondence add separator
@@ -1682,8 +1972,11 @@ namespace eval CorrespondenceChess {
 		set helpMessage($m.correspondence,13) CCNewMailGame
 		$m.correspondence add command -label CCMailMove    -command {::CorrespondenceChess::eMailMove}
 		set helpMessage($m.correspondence,14) CCMailMove
+		$m.correspondence add separator
+		$m.correspondence add command -label FileClose     -command "destroy $w"
 
 		$m.edit add command -label CCEditCopy -accelerator "Ctrl+C" -command { ::CorrespondenceChess::List2Clipboard }
+		$m.help add command -label HelpContents -command "helpWindow Correspondence"
 
 		# Translate the menu
 		::CorrespondenceChess::doConfigMenus
@@ -1723,11 +2016,11 @@ namespace eval CorrespondenceChess {
  		grid $w.top.retrieveCC  -stick ewns  -column  0 -row 0
  		grid $w.top.openDB      -stick ew    -column  0 -row 1 -columnspan 2
  		grid $w.top.inbox       -stick ew    -column  0 -row 2 -columnspan 2
-
+ 
  		grid $w.top.sendCC      -stick ewns  -column  1 -row 0
 
 		grid $w.top.console                  -column  4 -row 0 -columnspan 8
-		grid $w.top.ysc         -stick ns    -column 13 -row 0
+		grid $w.top.ysc         -stick ns    -column 13 -row 0 
 		grid $w.top.help        -stick nsew  -column 14 -row 0 -columnspan 2
 
 		grid $w.top.delinbox    -stick ewns  -column  5 -row 1 -rowspan 2
@@ -1741,7 +2034,7 @@ namespace eval CorrespondenceChess {
 		grid $w.top.acceptDraw  -stick ew    -column  9 -row 2
 
 		# build the table in the bottom frame. This table of text widgets has to
-		# scroll synchronously!
+		# scroll syncronously!
 		ttk::scrollbar $w.bottom.ysc      -command ::CorrespondenceChess::yview
 
 		set height $::winHeight($w)
@@ -1777,26 +2070,19 @@ namespace eval CorrespondenceChess {
 		# Handle scrolling in the games list by keyboard
 		bind $w <Control-Up>     { ::CorrespondenceChess::PrevGame}
 		bind $w <Control-Down>   { ::CorrespondenceChess::NextGame}
-		bind $w <Up>         { ::CorrespondenceChess::yview scroll -1 units}
-		bind $w <Down>       { ::CorrespondenceChess::yview scroll  1 units}
-		bind $w <Prior>      { ::CorrespondenceChess::yview scroll -1 pages}
-		bind $w <Next>       { ::CorrespondenceChess::yview scroll  1 pages}
-		bindMouseWheel $w "::CorrespondenceChess::yview scroll"
 
 		# Help
 		bind $w <F1>        { helpWindow Correspondence}
 		bind $w "?"         { helpWindow CCIcons}
 
 		bind $w <Configure> { ::CorrespondenceChess::ConsoleResize }
-		bind $w <Destroy>   { ::CorrespondenceChess::EnableEngineAnalysis 1
-			set ::CorrespondenceChess::isOpen 0 }
+		bind $w <Destroy>   { ::CorrespondenceChess::EnableEngineAnalysis 1 }
 
 		foreach f [glob -nocomplain [file join "$CorrespondenceChess::PluginPath" *]] {
 			$w.top.plugins    configure -image tb_CC_pluginactive
 			source $f
 		}
 
-		::createToplevelFinalize $w
 	}
 
 	#--------------------------------------------------------------------------
@@ -1815,7 +2101,7 @@ namespace eval CorrespondenceChess {
 		#----------------------------------------------------------------------
 		# Layout for the gamelist: Xfcc offers more information about
 		# the ongoing game then eMail, hence more is presented to the
-		# user. ToMove and features use icons for easy reading.
+		# user. ToMove and featrues use icons for easy reading.
 		# Xfcc:
 		# ID | ToMove? | White | Black | Event | Site | ClockW | ClockB # | Var | features
 		# eMail:
@@ -1854,7 +2140,7 @@ namespace eval CorrespondenceChess {
 		::utils::tooltip::SetTag $w.bottom.id "$id" id$id
 
 		# ToMove may contain a mixture of text for game results plus
-		# several icons displaying the current game status.
+		# several icons displayin the current game status.
 		if { (($clockW == " 0d  0: 0") || ($clockB == " 0d  0: 0")) && (($toMove == "yes") || ($toMove == "no")) } {
 				$w.bottom.toMove image create end -align center -image tb_CC_outoftime
 		}
@@ -1941,7 +2227,7 @@ namespace eval CorrespondenceChess {
 				$w.bottom.white   image create end -align center -image $wc
 				$w.bottom.white   insert end " "
 			} else {
-				puts stderr "$wc does not exist"
+				puts "$wc does not exist"
 			}
 		}
 		$w.bottom.white   insert end "$white\n"
@@ -1951,7 +2237,7 @@ namespace eval CorrespondenceChess {
 				$w.bottom.black   image create end -align center -image $bc
 				$w.bottom.black   insert end " "
 			} else {
-				puts stderr "$bc does not exist"
+				puts "$bc does not exist"
 			}
 		}
 		$w.bottom.black   insert end "$black\n"
@@ -1981,8 +2267,8 @@ namespace eval CorrespondenceChess {
 		# easily, then lock the entry field from changes by the user.
 		# SetSelection just sets the global $num to the actual row the
 		# user clicked. This has to be a global variable and it has to
-		# be passed to the ProcessServerResult masqueraded to prevent
-		# from interpretation. See also Scid's gamelist.
+		# be passed to the ProcessServerResult mascaraded to prevent
+		# from interpretation. See also Scids gamelist.
 		foreach tag {id toMove event site white black clockW clockB var feature} {
 			bind $w.bottom.$tag <Button-1> {
 				::CorrespondenceChess::SetSelection %x %y
@@ -2014,7 +2300,7 @@ namespace eval CorrespondenceChess {
 	# Visually highlight line $::CorrespondenceChess::num
 	#----------------------------------------------------------------------
 	proc SetHighlightedLine {} {
-		global ::CorrespondenceChess::num
+		global ::CorrespondenceChess::num 
 		set gamecount $::CorrespondenceChess::glgames
 
 		# remove old highlighting
@@ -2024,7 +2310,7 @@ namespace eval CorrespondenceChess {
 
 		# highlight current games line
 		foreach col {id toMove event site white black clockW clockB var feature} {
-			.ccWindow.bottom.$col tag add highlight $num.0 [expr {$num+1}].0
+			.ccWindow.bottom.$col tag add highlight $num.0 [expr {$num+1}].0 
 			.ccWindow.bottom.$col tag configure highlight -background lightYellow2 -font font_Bold
 		}
 		updateConsole "info: switched to game $num/$gamecount"
@@ -2034,7 +2320,7 @@ namespace eval CorrespondenceChess {
 	# Set the global $num to the row the user clicked upon
 	#----------------------------------------------------------------------
 	proc SetSelection {xcoord ycoord} {
-		global ::CorrespondenceChess::num
+		global ::CorrespondenceChess::num 
 		set gamecount $::CorrespondenceChess::glgames
 
 		set num [expr {int([.ccWindow.bottom.id index @$xcoord,$ycoord]) + $::CorrespondenceChess::glccstart - 1 }]
@@ -2078,15 +2364,16 @@ namespace eval CorrespondenceChess {
 
 	#----------------------------------------------------------------------
 	# Opens a config dialog to set the default parameters. Currently
-	# they are not stored to scid's setup though.
+	# they are not stored to scids setup though.
 	#----------------------------------------------------------------------
-	proc config {} {
+	proc config {{parent .}} {
 		set w .correspondenceChessConfig
-		if { [winfo exists $w]} {
+		if { [winfo exists $w]} { 
 			raiseWin $w
 			return
 		}
 		toplevel $w
+		wm state $w withdrawn
 		wm title $w [::tr "CCDlgConfigureWindowTitle"]
 
 		set ::CorrespondenceChess::sortoptlist [list \
@@ -2098,11 +2385,13 @@ namespace eval CorrespondenceChess {
 		]
 
 
-		ttk::button $w.bOk     -text OK -command {
+		frame $w.buttons
+		ttk::button $w.buttons.ok     -text OK -command {
 				::CorrespondenceChess::saveCCoptions
 				destroy .correspondenceChessConfig
 		}
-		ttk::button $w.bCancel -text [::tr "Cancel"] -command "destroy $w"
+		ttk::button $w.buttons.help   -text [::tr "Help"] -command {helpWindow CCSetupDialog}
+		ttk::button $w.buttons.cancel -text [::tr "Cancel"] -command "destroy $w"
 
 		ttk::label  $w.lgeneral -text [::tr "CCDlgCGeneraloptions"]
 		ttk::label  $w.ldb      -text [::tr "CCDlgDefaultDB"]
@@ -2234,11 +2523,15 @@ namespace eval CorrespondenceChess {
 
 
 		# Buttons and ESC-key
-		grid $w.bOk          -column 0    -row 20 -pady 10 -columnspan 2
-		grid $w.bCancel      -column 1    -row 20 -pady 10
-		bind $w <Escape> "$w.bCancel invoke"
+                grid $w.buttons -column 0 -row 20 -pady 5 -columnspan 4
+		pack $w.buttons.ok $w.buttons.help $w.buttons.cancel -side left -padx 10
+
+		bind $w <Escape> "$w.buttons.cancel invoke"
 
 		bind $w <F1> { helpWindow CCSetupDialog}
+		update
+		placeWinOverParent $w $parent
+		wm state $w normal
 	}
 
 	#----------------------------------------------------------------------
@@ -2251,7 +2544,7 @@ namespace eval CorrespondenceChess {
 
 		# the following header tags have to be in this form for cmail to
 		# recognise the mail as an eMail correspondence game.
-		# Additionally scid searched for some of them to retrieve mail
+		# Additonally scid searched for some of them to retrieve mail
 		# addresses automagically and also to recognise this game as
 		# eMail and not Xfcc.
 		set Event         "Email correspondence game"
@@ -2287,6 +2580,7 @@ namespace eval CorrespondenceChess {
 
 		updateBoard -pgn
 		updateTitle
+		updateMenuStates
 
 		# Call gameSave with argument 0 to append to the current
 		# database. This also gives the Save-dialog for additional user
@@ -2311,7 +2605,7 @@ namespace eval CorrespondenceChess {
 	proc newEMailGame {} {
 		global ::CorrespondenceChess::CorrSlot
 
-		# Regardless how the user opened this DB, find it! ;)
+		# Regardless how the user opend this DB, find it! ;)
 		::CorrespondenceChess::CheckForCorrDB
 		# Only proceed if a correspondence DB is already loaded
 		if {$CorrSlot > -1} {
@@ -2395,7 +2689,7 @@ namespace eval CorrespondenceChess {
 	}
 
 	#----------------------------------------------------------------------
-	# Check whether a Correspondence Database is loaded. Note that the
+	# Check wether a Correspondence Database is loaded. Note that the
 	# first one found is used as reference DB for game processing.
 	#----------------------------------------------------------------------
 	proc CheckForCorrDB {} {
@@ -2416,7 +2710,7 @@ namespace eval CorrespondenceChess {
 				set Error [::tr CCErrInboxDir]
 				append Error "\n   $Inbox\n"
 				append Error [::tr CCErrDirNotUsable]
-				tk_messageBox -icon warning -type ok -parent . \
+				tk_messageBox -icon warning -type ok \
 					-title $Title -message $Error
 				return
 			}
@@ -2425,14 +2719,14 @@ namespace eval CorrespondenceChess {
 				set Error [::tr CCErrOutboxDir]
 				append Error "\n   $Outbox\n"
 				append Error [::tr CCErrDirNotUsable]
-				tk_messageBox -icon warning -type ok -parent . \
+				tk_messageBox -icon warning -type ok \
 					-title $Title -message $Error
 				return
 			}
 
 			set typeCorr [lsearch $base_types {Correspondence chess} ]
-			foreach x [sc_base list] {
-					set type [sc_base extra $x type]
+			for {set x 1} {$x <= [ expr [sc_base count]-1 ]} {incr x} {
+					set type [sc_base type $x]
 					if {$type == $typeCorr} {
 						.ccWindow.top.openDB configure -state disabled
 						set CorrSlot $x
@@ -2442,7 +2736,7 @@ namespace eval CorrespondenceChess {
 			if {$CorrSlot < 0} {
 				set Title [::tr CCDlgTitNoCCDB]
 				set Error [::tr CCErrNoCCDB]
-				tk_messageBox -icon warning -type ok -parent . \
+				tk_messageBox -icon warning -type ok \
 					-title $Title -message $Error
 			}
 		}
@@ -2457,9 +2751,9 @@ namespace eval CorrespondenceChess {
 		## set fName [file rootname $CorrBase]
 		set fName $CorrBase
 
-		if {[catch {::file::Open_ $fName} result]} {
+		if {[catch {::file::Open $fName} result]} {
 			set err 1
-			tk_messageBox -icon warning -type ok -parent . \
+			tk_messageBox -icon warning -type ok \
 				-title "Scid: Error opening file" -message $result
 		} else {
 			if {[file extension $fName] == ".si3"} {
@@ -2469,15 +2763,19 @@ namespace eval CorrespondenceChess {
 			}
 			set ::initialDir(base) [file dirname $fName]
 		}
+		::tree::refresh
+		::windows::stats::Refresh
+		updateMenuStates
 		updateBoard -pgn
-		::notify::DatabaseChanged
+		updateTitle
+		updateStatusBar
 
 		::CorrespondenceChess::CheckForCorrDB
 	}
 
 	#----------------------------------------------------------------------
 	# Search for a game by Event, Site, White, Black and CmailGameName
-	# This has to result in only one game matching the criteria.
+	# This has to result in only one game matching the criteria. 
 	# No problem with cmail and Xfcc as GameIDs are unique.
 	#----------------------------------------------------------------------
 	proc SearchGame {Event Site White Black CmailGameName result refresh} {
@@ -2489,6 +2787,13 @@ namespace eval CorrespondenceChess {
 
 		set sPgnlist {}
 		lappend sPgnlist [string trim $CmailGameName]
+
+		# Clear really all filters including potential Tree filters
+		# based on current position.  It is imperative to search the
+		# whole DB regardless of context to find the game that needs to
+		# be updated. Otherwise dupes and unpredictable behaviour will
+		# result.
+		sc_filter clear
 
 		# Search the header for the game retrieved. Use as much info as
 		# possible to get a unique result. In principle $sPgnList should
@@ -2503,12 +2808,14 @@ namespace eval CorrespondenceChess {
 					-white $White    \
 					-black $Black    \
 					-pgn $sPgnlist   \
-					-flag! D \
+					-fDelete no      \
 					-filter 2        \
-					-gnum [list 1 -1] \
+					-gameNumber [list 1 -1] \
 					]
 
 		CorrespondenceChess::updateConsole "info: search [sc_filter count]"
+
+		::windows::stats::Refresh
 
 		# There should be only one result. If so, load it and place the
 		# game pointer to the end of the game ::game::Load also handles
@@ -2533,7 +2840,7 @@ namespace eval CorrespondenceChess {
 			set side   [sc_pos side]
 
 			# Number of moves in the new game in Clipbase
-			sc_base switch $::clipbase_db
+			sc_base switch "clipbase"
 			sc_move end
 			set mnClip [sc_pos moveNumber]
 
@@ -2555,7 +2862,7 @@ namespace eval CorrespondenceChess {
 			if {($plyEnd-$plyStart < 2) && ($Mode == "XFCC") && ($result == "*")} {
 				set Title [::tr CCDlgDBGameToLong]
 				set Error [::tr CCDlgDBGameToLongError]
-				tk_messageBox -icon warning -type ok -parent . \
+				tk_messageBox -icon warning -type ok \
 					-title $Title -message "$Error $mnClip (= ply $plyEnd)"
 			}
 
@@ -2571,7 +2878,7 @@ namespace eval CorrespondenceChess {
 					set basecomment  ""
 					set comment      ""
 
-					sc_base switch $::clipbase_db
+					sc_base switch "clipbase"
 
 					# move to the beginning of the new part
 					sc_move start
@@ -2667,15 +2974,14 @@ namespace eval CorrespondenceChess {
 			}
 			set Title [::tr CCDlgDuplicateGame]
 			set Error [::tr CCDlgDuplicateGameError]
-			tk_messageBox -icon warning -type ok -parent . \
+			tk_messageBox -icon warning -type ok \
 				-title $Title -message $Error
 		}
-		::notify::DatabaseChanged
 	}
 
 	#----------------------------------------------------------------------
 	# If a Correspondence DB is loaded, switch to the clipbase and
-	# use the game with the given id to find headers.
+	# use the game with the given id to find headers. 
 	# PGN file and jump to the game number given. Then extract the
 	# header tags and call "SearchGame" to display the game in question
 	# to the user.
@@ -2684,11 +2990,11 @@ namespace eval CorrespondenceChess {
 		global ::CorrespondenceChess::CorrSlot
 		global emailData
 
-		# Regardless how the user opened this DB, find it! ;)
+		# Regardless how the user opend this DB, find it! ;)
 		::CorrespondenceChess::CheckForCorrDB
 		# Only proceed if a correspondence DB is already loaded
 		if {$CorrSlot > -1} {
-			sc_base switch $::clipbase_db
+			sc_base switch "clipbase"
 			sc_game load $game
 
 			# get the header
@@ -2822,7 +3128,7 @@ namespace eval CorrespondenceChess {
 
 			# eMail/postal games: manual handling for resign and draw is
 			# needed, no standard way/protocol exists => disable the
-			# buttons and menu entries accordingly
+			# buttons and menue entries accordingly
 			.ccWindow.top.resign     configure -state disabled
 			.ccWindow.top.claimDraw  configure -state disabled
 			.ccWindow.top.offerDraw  configure -state disabled
@@ -2858,7 +3164,7 @@ namespace eval CorrespondenceChess {
 		set gamecount $::CorrespondenceChess::glgames
 
 		busyCursor .
-		# Regardless how the user opened this DB, find it! ;)
+		# Regardless how the user opend this DB, find it! ;)
 		::CorrespondenceChess::CheckForCorrDB
 		if {$CorrSlot > -1} {
 			if {$num > 1} {
@@ -2879,7 +3185,7 @@ namespace eval CorrespondenceChess {
 		set gamecount $::CorrespondenceChess::glgames
 
 		busyCursor .
-		# Regardless how the user opened this DB, find it! ;)
+		# Regardless how the user opend this DB, find it! ;)
 		::CorrespondenceChess::CheckForCorrDB
 		if {$CorrSlot > -1} {
 			if {$num < $gamecount} {
@@ -2898,7 +3204,7 @@ namespace eval CorrespondenceChess {
 		global ::CorrespondenceChess::Inbox ::CorrespondenceChess::XfccFetchcmd ::CorrespondenceChess::CorrSlot
 		busyCursor .
 
-		# Regardless how the user opened this DB, find it! ;)
+		# Regardless how the user opend this DB, find it! ;)
 		::CorrespondenceChess::CheckForCorrDB
 		# Only proceed if a correspondence DB is already loaded
 		if {$CorrSlot > -1} {
@@ -2919,7 +3225,7 @@ namespace eval CorrespondenceChess {
 				::CorrespondenceChess::RelayGames $g
 			}
 			# process what was just retrieved
-			::CorrespondenceChess::ReadInbox
+			::CorrespondenceChess::ReadInbox 
 		}
 		unbusyCursor .
 	}
@@ -2978,21 +3284,21 @@ namespace eval CorrespondenceChess {
 			set inpath  "$Inbox/"
 		}
 
-		# Regardless how the user opened this DB, find it! ;)
+		# Regardless how the user opend this DB, find it! ;)
 		::CorrespondenceChess::CheckForCorrDB
 
 		set games 0
 		if {$CorrSlot > -1} {
 
-			# extract the number of the last move using Scid's internal
+			# extract the number of the last move using Scids internal
 			# PGN parser as comments etc. might appear, and this number
 			# is not given via Xfcc. Similar for the event date.
 			sc_clipbase clear
-			sc_base switch $::clipbase_db"
+			sc_base switch "clipbase"
 			set game 0
 			set gamemoves {}
 			foreach f [glob -nocomplain [file join $inpath *]] {
-				catch {sc_base import [sc_base current] $f}
+				catch {sc_base import file $f}
 				set game [expr {$game + 1}]
 				sc_game load $game
 				sc_move end
@@ -3103,7 +3409,7 @@ namespace eval CorrespondenceChess {
 
 			::CorrespondenceChess::emptyGamelist
 			sc_clipbase clear
-			sc_base switch $::clipbase_db
+			sc_base switch "clipbase"
 
 			# Loop over all files and add all game files that are not
 			# Xfcc (ie. eMail chess)
@@ -3118,7 +3424,7 @@ namespace eval CorrespondenceChess {
 			# import the games on basis of the sorted list created above
 			foreach f $filelist {
 				set filename "[file join $inpath [lindex $f 0]].pgn"
-				if {[catch {sc_base import [sc_base current] $filename} result]} {
+				if {[catch {sc_base import file $filename} result]} {
 					::CorrespondenceChess::updateConsole "info Error retrieving server response from $filename"
 				} else {
 					# count the games processed successfully
@@ -3131,25 +3437,30 @@ namespace eval CorrespondenceChess {
 			# For Classic sorting: sort the clipbase, this is easier
 			# to implement than individual sorting upon import.
 			if {$::CorrespondenceChess::ListOrder == $::CorrespondenceChess::CCOrderClassic} {
-				tk_messageBox -message "oops, 300+ lines functions are not maintainable"
+				set sortCriteria "Site, Event, Round, Result, White, Black"
+				progressWindow Scid "Sorting the database..."
+				set err [catch {sc_base sort $sortCriteria \
+										{changeProgressWindow "Sorting..."} \
+									 } result]
+				closeProgressWindow
 			}
 
 
 			if {$glgames > 0} {
-				# work through all games processed and fill in the gamelist
+				# work through all games processed and fill in the gamelist 
 				# in the console window
 
 				for {set game $glccstart} {$game < [expr {$games+1}]} {incr game} {
 
 					set clockW "no update"; set clockB "no update";
 					set var "";             set noDB "";
-					set noBK "";            set noTB "";
+					set noBK "";            set noTB ""; 
 					set noENG "";           set mess ""
 					set TC "";              set drawoffer "false";
 					set wc "";              set bc "";
 					set YM " ? ";
 
-					sc_base switch $::clipbase_db
+					sc_base switch "clipbase"
 					sc_game load $game
 					# get the header
 					set Event  [sc_game tags get Event]
@@ -3306,7 +3617,7 @@ namespace eval CorrespondenceChess {
 				set Error [::tr CCErrInboxDir]
 				append Error "\n   $Inbox\n"
 				append Error [::tr CCErrNoGames]
-				tk_messageBox -icon warning -type ok -parent . \
+				tk_messageBox -icon warning -type ok \
 					-title $Title -message $Error
 			}
 		}
@@ -3316,7 +3627,7 @@ namespace eval CorrespondenceChess {
 	#----------------------------------------------------------------------
 	# Send the move to the opponent via eMail
 	# This requires an external MTA that is capable of sending a pgn file
-	# as attachment (content-type: application/x-chess-pgn). This can be
+	# as attachement (content-type: application/x-chess-pgn). This can be
 	# accomplished by nail with proper /etc/mime.types (default on debian).
 	# Additionally the program has to handle SMTP-Auth in all its flavours
 	# to be of any use in present days.
@@ -3336,7 +3647,7 @@ namespace eval CorrespondenceChess {
 
 		busyCursor .
 
-		# Regardless how the user opened this DB, find it! ;)
+		# Regardless how the user opend this DB, find it! ;)
 		::CorrespondenceChess::CheckForCorrDB
 
 		if {$CorrSlot > -1} {
@@ -3414,7 +3725,7 @@ namespace eval CorrespondenceChess {
 			#            (rfc 2368). This calling convention is supported by
 			#            evolution
 			# -claws   : Claws mailer, seems to be almost mailurl, but needs
-			#            a parameter for attachments
+			#            a parameter for attachements
 			switch -regexp -- $::CorrespondenceChess::mailermode \
 			"mailx" {
 				set callstring "$mailer $subject \"$title\" -b $bccaddr $attache \"$pgnfile\" $to <\"$pgnfile\""
@@ -3436,8 +3747,7 @@ namespace eval CorrespondenceChess {
 			CallExternal $callstring
 
 			# Save the game once the move is sent
-			set num [sc_game number]
-			sc_game save $num
+			::game::Save
 
 			# Hook up with email manager: search the game in its internal
 			# list and add the send flag automatically.
@@ -3463,7 +3773,7 @@ namespace eval CorrespondenceChess {
 		global ::CorrespondenceChess::Outbox
 		global ::CorrespondenceChess::XfccSendcmd
 		global ::CorrespondenceChess::CorrSlot
-		global ::CorrespondenceChess::XfccConfirm
+		global ::CorrespondenceChess::XfccConfirm 
 		global ::CorrespondenceChess::num
 
 		busyCursor .
@@ -3516,7 +3826,7 @@ namespace eval CorrespondenceChess {
 			# yellow while sending in progress,
 			# green if the move was sent in the
 			# current session (ie. without update)
-			.ccWindow.bottom.id tag add hlsent$CmailGameName $num.0 [expr {$num+1}].0
+			.ccWindow.bottom.id tag add hlsent$CmailGameName $num.0 [expr {$num+1}].0 
 			.ccWindow.bottom.id tag configure hlsent$CmailGameName -background yellow -font font_Bold
 
 			set DlgBoxText "[::tr CCDlgConfirmMoveText]\n\n$name-$gameid:\n\t$movecount. $move\n\t{$comment}"
@@ -3532,7 +3842,7 @@ namespace eval CorrespondenceChess {
 				# 1. e4 e5 <resign> => increment ply => ply = 3 => move
 				# number = 1, move number to send = 2
 				if {[sc_pos side] == "white"} {
-					set movecount [expr {$ply / 2 + 1}]
+					set movecount [expr {$ply / 2 + 1}]	
 					::CorrespondenceChess::updateConsole "info Increment ply $movecount"
 				}
 			} elseif {$acceptDraw == 1} {
@@ -3579,7 +3889,7 @@ namespace eval CorrespondenceChess {
 				}
 
 				# Save the game once the move is sent
-				sc_game save [sc_game number]
+				::game::Save
 
 				# setting "noMarkCodes" to 1 would drop the timing comments
 				# inserted e.g. by SchemingMind. Do not overwrite eMail based
@@ -3600,34 +3910,62 @@ namespace eval CorrespondenceChess {
 		unbusyCursor .
 	}
 
-	#- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-	# source the options file to overwrite the above setup
-	if {[catch {source [scidConfigFile correspondence]} ]} {
-	  #::splash::add "Unable to find the options file: [file tail $optionsFile]"
-	} else {
-	  ::splash::add "Correspondence Chess configuration was found and loaded."
-	}
+	set NoHTTPS {tls package not found. Secure https unreachable.}
+	set SeenHTTPS 0
 
-	if {[catch { package require http }]} {
-	  ::splash::add "http package not found, disabling internal Xfcc support"
-		set XfccInternal -1
-	} else {
-		::http::config -useragent $::Xfcc::useragent
-		if {![catch { package require tls }]} {
-			::tls::init -ssl3 false -ssl2 false -tls1 true
-			http::register https 443 ::tls::socket
+	proc CheckHTTPS {uri} {
+
+		if {$::CorrespondenceChess::SeenHTTPS} {
+			return 1
+		}
+
+		### If URI is https, register on default port 443 
+		### todo : make port configurable
+
+		if {[regexp -nocase ^(https://)(.*) $uri]} {
+			if {[catch {package require tls}]} {
+				tk_messageBox -title "Xfcc Oops" -type ok -icon warning -message $::CorrespondenceChess::NoHTTPS
+				return 0
+			} else {
+				::tls::init -ssl3 false -ssl2 false -tls1 true
+				http::register https 443 ::tls::socket
+				set ::CorrespondenceChess::SeenHTTPS 1
+				return 1
+			}
+		} else {
+			return 1
 		}
 	}
 
-	if {[catch {package require tdom}]} {
-		::splash::add "tDOM package not found, disabling internal Xfcc support"
+
+	### All this is run on Scid init
+
+	# Source the options file to overwrite the above setup
+
+	set scidConfigFiles(correspondence) "correspondence.dat"
+	if {[catch {source [scidConfigFile correspondence]} ]} {
+	  ::splash::add "Unable to load Correspondence options file correspondence.dat"
+	} else {
+	  ::splash::add "Correspondence Chess: correspondence.dat loaded."
+	}
+
+	if {[catch {set version [package require http]}]} {
+	  ::splash::add "http package not found, disabling internal Xfcc support"
 		set XfccInternal -1
+	} else {
+		::splash::add "http package $version found"
+		::http::config -useragent $::Xfcc::useragent
+		if {[catch {set version [package require tdom]}]} {
+			::splash::add "tDOM package not found, disabling internal Xfcc support"
+			set XfccInternal -1
+		} else {
+			::splash::add "tDOM package $version found"
+		}
 	}
 
 	::CorrespondenceChess::checkInOutbox
 	::CorrespondenceChess::checkXfccrc
 	::CorrespondenceChess::checkCorrBase
-	#- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 }
 
 

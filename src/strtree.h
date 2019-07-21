@@ -56,11 +56,11 @@
 #ifndef SCID_STRTREE_H
 #define SCID_STRTREE_H
 
-#include "common.h"
-#include "misc.h"
 #include <stdio.h>
 #include <string.h>
 
+#include "error.h"
+#include "misc.h"
 
 
 // nodeT template: a StrTree node.
@@ -145,6 +145,7 @@ class StrTree
     bool  GetAllocateStrings () { return AllocateStrings; }
 
     uint    Size ()    { return TotalSize; }
+    uint    LogSize () { return log2 (TotalSize); }
     uint    Height()   { return TreeHeight; }
     uint    FirstByteSize (byte b) { return TreeSize[b]; }
 
@@ -335,10 +336,9 @@ nodeT<C> *
 StrTree<C>::MakeSubTree (int size, uint depth)
 {
     if (size == 0) { return NULL; }
-    int nLeft, nRight, mid;
+    int nLeft, nRight; 
     nLeft = (size - 1) / 2;
     nRight = size - nLeft - 1;
-    mid = nLeft + 1;
 
     nodeT<C> * leftNode;
     nodeT<C> * root;
@@ -360,7 +360,7 @@ StrTree<C>::MakeSubTree (int size, uint depth)
 // StrTree::MakeTree(): Converts from list to tree structure.
 //      Pre: First is 1st node, right pointer of each node points to
 //           next node in the list.
-//      Post: Each Root[b] is the root of a perfectly balanced tree of
+//      Post: Each Root[b] is the root of a prefectly balanced tree of
 //            all the nodes with string starting with the character 'b'.
 //
 template <class C>
@@ -373,9 +373,14 @@ StrTree<C>::MakeTree ()
             Root[i] = NULL;
         } else {
             Root[i] = MakeSubTree (TreeSize[i], 1);
-            // Assert that this tree has nodes that start with the
-            // correct character:
-            ASSERT ((byte)(Root[i]->name[0]) == i);
+
+	    if ((byte)(Root[i]->name[0]) != i) {
+	        // This can happen with newer mainline Scid versions, in this case
+	        // the namebase is denormalized. Instead of terminating with an
+	        // assertion we will print a warning, this is more kindly, because
+	        // Scid vs PC can handle denormalized namebases.
+	        fprintf(stderr, "warning: namebase is denormalized\n");
+	    }
         }
     }
     First = Last = Iterator = NULL;

@@ -1,12 +1,17 @@
 #!/bin/sh
+#
+# sc_remote: Load a scid databases in an existing Scid instances
+#
+# usage: sc_remote [-nostatus] [ [ [DB ... ] DB ] DB ]
+#
 # Emacs please open me in -*-Tcl-*- mode
 # the next line restarts using wish if it is in the path \
-	exec wish "$0" ${1+"$@"}
-#
+exec `dirname $0`/tkscid "$0" "$@"
+
 ###############################################################################
 #
-#
 # Copyright (C) 2002 Mark Norman Oakden.
+# Copyright (C) Shane Hudson, stevenaaus
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -24,21 +29,11 @@
 #
 ###############################################################################
 #
-# sc_remote: Load a scid databases in an existing Scid instances
-#
-# usage: sc_remote [-nostatus] [ [ [DB ... ] DB ] DB ]
-#
-# Scid is a free chess database app. For more information,
-# visit the Scid website: http://scid.sourceforge.net/
-#
-#
-###############################################################################
-#
 # We are running in wish but don't need the Tk window (although we have to 
 # use wish to get the winfo and send commands).  
 #
 wm withdraw .
-#
+set SCID "[file dirname $::argv0]/scid"
 set debugging 0
 #
 # showStatus determines whether a status window is displayed or not
@@ -187,8 +182,16 @@ proc centreWin {w} {
 #
 proc getScidList {} {
     set ret [list]
-    foreach i [winfo interps] {
-	if { [validScidInterp $i] } {
+    set interps [winfo interps]
+    if {$::debugging} {
+      puts "interps are $interps"
+    }
+    foreach i $interps {
+	set result [validScidInterp $i]
+	if {$::debugging} {
+	  puts "Testing $i gives $result"
+	}
+	if { $result } {
 	    lappend ret $i
 	}
     }
@@ -200,15 +203,17 @@ proc getScidList {} {
 # indeed a contactable Scid.  First the name is matched against the
 # pattern "scid*", then a send is tried with the "sc_info version"
 # command.  Finally, a variable (scidExeDir) which is set within the 
-# scid script is tested for existence. If all three of these tests
+# scid script is tested for existance. If all three of these tests
 # succeed we assume we have a Scid.
 #
 proc validScidInterp { scid } {
+
     if { ! [string match "scid*" $scid] } {
 	return 0
 	# we "catch" the first [send] since we don't yet know if [send]
 	# works
     } elseif { [catch {send $scid sc_info version} res] } {
+        puts $res
 	return 0
     } elseif { ! [send $scid info exists scidExeDir] } {
 	return 0
@@ -230,11 +235,17 @@ proc validScidInterp { scid } {
 proc querySlotStatus { scid } {
     set ret [list]
     set cb [send $scid sc_info clipbase]
-    foreach i [send $scid sc_base list] {
-        if { $i == $cb } { continue }
-        lappend ret $scid,$i
-        set f [send $scid sc_base filename $i]
-        lappend ret $f
+    set max [send $scid sc_base count total]
+    for { set i 1 } { $i <= $max } { incr i } {
+	if { $i == $cb } { continue } 
+	lappend ret $scid,$i
+	set f [send $scid sc_base filename $i]
+	# [<anything>] is assumed to be [empty] or a translation since
+	# we shouldn't see [clipbase] (or translation thereof) here
+	if { [string match {\[*\]} $f] } {
+	    set f "-"
+	}
+	lappend ret $f
     }
     return $ret
 }
@@ -263,14 +274,15 @@ proc indexSlotTable { slotArrName indexArrName } {
 	lappend index($val) $key
     }
 }
-#
+
 # isBusy tests a Scid interp for busy status (assumed busy if cursor of .
 # is "watch") - actually this isn't quite sufficient since scid may be 
 # busy starting up - we also need to check the startup window for the
 # "Startup completed" message...
-#
+
 proc isBusy { interp } {
     set ret 0
+if {0} {
     if { [send $interp winfo exists .splash.t] } {
 	# splash screen text widget exists see if startup is finished
 	set cmd [list .splash.t search "Startup complete" 1.0 end]
@@ -284,13 +296,14 @@ proc isBusy { interp } {
 	dputs "isBusy: no splash screen text widget - assume busy"
 	return 1
     }
+}
     # if we got here then there is a splash screen and it contains 
     # "Startup complete".  Now we go by the cursor status
     dputs "isBusy - using cursor status to determine busy status"
     return [expr { "watch" == "[send $interp . cget -cursor]" }]
 }
 #
-# ldelete removes all occurrences of an item from a list
+# ldelete removes all occurences of an item from a list
 #
 proc ldelete { li el } {
     upvar $li l
@@ -299,35 +312,22 @@ proc ldelete { li el } {
     }
     return
 }
-# 
-# The fullname function is stolen from Scid source (end.tcl)
-# and is Copyright (C) Shane Hudson
-#
-# fullname:
-#   Given a file name, returns its absolute name.
-#
-proc fullname {fname} {
-    # modified MNO - don't immediately return on absolute pathname
-    # - try to add suffix in that case too.
-    if { [file pathtype $fname] != "absolute"} {
-	set old [pwd]
-	if {[catch {cd [file dirname $fname]}]} { return $fname }
-	set fname [file join [pwd] [file tail $fname]]
-	catch {cd $old}
+
+#   Returns a file's canonical name.
+
+proc fullname {fName} {
+    set fName [file dirname [file normalize $fName/__]]
+
+    set ext [file extension $fName]
+    if {$ext == "" || [file readable "$fName.si4"]} {
+      set fName "$fName.si4"
     }
-    # Try adding a suffix like ".si3" or ".pgn" to the filename if
-    # it has no extension, by checking if a file by that name with
-    # a known Scid-readable extension exists:
-    if {[file extension $fname] == ""} {
-        foreach suffix [list si3 si pgn PGN pgn.gz epd EPD epd.gz sor] {
-            if {[file exists "$fname.$suffix"]} {
-                dputs "Assuming suffix \".$suffix\" for \"$fname\""
-                append fname ".$suffix"
-                break
-            }
-        }
+
+    if {$ext == ".sg4" || $ext == ".sn4"} {
+      set fName "[file rootname $fName].si4"
     }
-    return $fname
+
+    return $fName
 }
 #
 ###############################################################################
@@ -357,6 +357,8 @@ foreach arg $argv {
 	    set showStatus 0
 	} elseif { "-status" == $arg } {
 	    set showStatus 1
+	} elseif { "-debug" == $arg } {
+	    set debugging 1
 	} else {
 	    lappend scidArgs $arg
 	}
@@ -471,7 +473,7 @@ while { [llength $toOpen] > 0 } {
 	    # 2. $next may contain spaces.
 	    updateStatus $next "Done (Open new Scid)" green
 	    dputs "Gave up waiting for interp $interp exec a new one for $next"
-	    eval {exec nohup scid} $scidArgs {$next} &
+	    eval {exec nohup $::SCID} $scidArgs {$next} &
 	    # wait a short time for the new Scid to startup so that it 
 	    # will show up in the updated slot list
 	    dputs "waiting 250ms"
@@ -488,7 +490,10 @@ while { [llength $toOpen] > 0 } {
 	# execute scid to open $next.  
 	dputs "Couldn't find any free slots, start a new interp for $next"
 	updateStatus $next "Done (Open new Scid)" green
-	eval {exec nohup scid} $scidArgs {$next} &
+
+        # probably don't want to open a new scid S.A
+
+	eval {exec nohup $::SCID} $scidArgs {$next} &
 	# wait a short time for the new Scid to startup so that it 
 	# will show up in the updated slot list
 	dputs "waiting 250ms"

@@ -15,7 +15,11 @@ Makefile.bak
 .\#*
 *.patch
 
+engines/phalanx/phalanx
 engines/phalanx-scid/phalanx-scid
+engines/toga/src/.depend
+engines/toga/src/a.out
+engines/toga/src/fruit
 engines/togaII1.2.1a/src/.depend
 engines/togaII1.2.1a/src/togaII
 pgnfix
@@ -34,6 +38,7 @@ scidt
 scmerge
 spf2spi
 spliteco
+tcl/sharedir.tcl
 tcscid
 tkscid
 

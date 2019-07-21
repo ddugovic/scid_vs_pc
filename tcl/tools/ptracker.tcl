@@ -55,7 +55,7 @@ proc ::ptrack::select {plist} {
 proc ::ptrack::status {{text ""}} {
   set t .ptracker.status
   if {$text == ""} {
-    $t configure -text "$::tr(Filter): [::windows::gamelist::filterText]"
+    $t configure -text "$::tr(Filter): [filterText]"
   } else {
     $t configure -text $text
   }
@@ -122,8 +122,8 @@ proc ::ptrack::make {} {
   label $w.status -width 1 -anchor w -relief sunken -font font_Small
   pack $w.status -side bottom -fill x
 
-  canvas $w.progress -height 20 -width 400 -bg white -relief solid -border 1
-  $w.progress create rectangle 0 0 0 0 -fill blue -outline blue -tags bar
+  canvas $w.progress -height 20 -width 400  -relief solid -border 1
+  $w.progress create rectangle 0 0 0 0 -fill $::progcolor -outline $::progcolor -tags bar
   $w.progress create text 395 10 -anchor e -font font_Regular -tags time \
     -fill black -text "0:00 / 0:00"
   pack $w.progress -side bottom -pady 2
@@ -146,7 +146,7 @@ proc ::ptrack::make {} {
 
   set ::ptrack::shade {}
   for {set i 0} {$i < 64} {incr i} {
-    label $w.bd.sq$i -image ptrack -background white -border 1 -relief raised
+    label $w.bd.sq$i -image ptrack  -border 1 -relief raised
     set rank [expr {$i / 8}]
     set file [expr {$i % 8} ]
     grid $w.bd.sq$i -row [expr {7 - $rank} ] -column [expr {$file + 1} ]
@@ -165,9 +165,15 @@ proc ::ptrack::make {} {
 
   grid [frame $w.bd.gap1 -height 5] -row 9 -column 0
 
+  ### Initialise the 4 rows of pieces at bottom of screen
+  ### The widgets of interest are .ptracker.bd.p[abcdefgh][1278]
+  ### and the labels need to be changed to canvas widgets to allow for image backgrounds
+  # &&& S.A
+
   foreach file {a b c d e f g h} c {1 2 3 4 5 6 7 8} p {r n b q k b n r} {
     set sq ${file}8
     set b $w.bd.p$sq
+    # canvas $b -height $::ptrack::psize -width $::ptrack::psize -bg lemonchiffon
     label $b -image b$p$::ptrack::psize -border 1 -relief raised
     grid $b -row 10 -column $c
     bind $b <1> "::ptrack::select $sq"
@@ -178,7 +184,7 @@ proc ::ptrack::make {} {
     label $b -image b$p$::ptrack::psize -border 1 -relief raised
     grid $b -row 11 -column $c
     bind $b <1> "::ptrack::select $sq"
-    bind $b <$::MB3> "::ptrack::select {a7 b7 c7 d7 e7 f7 g7 h7}"
+    bind $b <3> "::ptrack::select {a7 b7 c7 d7 e7 f7 g7 h7}"
   }
   grid [frame $w.bd.gap2 -height 5] -row 12 -column 0
   foreach file {a b c d e f g h} c {1 2 3 4 5 6 7 8} p {p p p p p p p p} {
@@ -187,7 +193,7 @@ proc ::ptrack::make {} {
     label $b -image w$p$::ptrack::psize -border 1 -relief raised
     grid $b -row 13 -column $c
     bind $b <ButtonPress-1> "::ptrack::select $sq"
-    bind $b <$::MB3> "::ptrack::select {a2 b2 c2 d2 e2 f2 g2 h2}"
+    bind $b <3> "::ptrack::select {a2 b2 c2 d2 e2 f2 g2 h2}"
   }
   foreach file {a b c d e f g h} c {1 2 3 4 5 6 7 8} p {r n b q k b n r} {
     set sq ${file}1
@@ -199,15 +205,15 @@ proc ::ptrack::make {} {
 
   # Both-piece bindings:
   foreach sq {d1 e1 d8 e8} {
-    bind $w.bd.p$sq <$::MB3> [list ::ptrack::select $sq]
+    bind $w.bd.p$sq <3> [list ::ptrack::select $sq]
   }
   foreach left {a b c} right {h g f} {
     set cmd [list ::ptrack::select [list ${left}1 ${right}1]]
-    bind $w.bd.p${left}1 <ButtonPress-$::MB3> $cmd
-    bind $w.bd.p${right}1 <ButtonPress-$::MB3> $cmd
+    bind $w.bd.p${left}1 <ButtonPress-3> $cmd
+    bind $w.bd.p${right}1 <ButtonPress-3> $cmd
     set cmd [list ::ptrack::select [list ${left}8 ${right}8]]
-    bind $w.bd.p${left}8 <ButtonPress-$::MB3> $cmd
-    bind $w.bd.p${right}8 <ButtonPress-$::MB3> $cmd
+    bind $w.bd.p${left}8 <ButtonPress-3> $cmd
+    bind $w.bd.p${right}8 <ButtonPress-3> $cmd
   }
 
   # Status-bar help:
@@ -236,7 +242,7 @@ proc ::ptrack::make {} {
 
   set f $w.t.text
   pack [frame $f] -side top -fill both -expand yes -padx 2 -pady 2
-  text $f.text -width 28 -height 1 -foreground black -background white \
+  text $f.text -width 28 -height 1 -foreground black  \
     -yscrollcommand "$f.ybar set" -relief sunken -takefocus 0 \
     -wrap none -font font_Small
   set xwidth [font measure [$f.text cget -font] "x"]
@@ -263,11 +269,11 @@ proc ::ptrack::make {} {
       -command "::ptrack::recolor $col"
   }
   $f.b configure -image ptrack_$::ptrack::color
-  label $f.label -text $::tr(GlistColor:) -font font_Bold
+  label $f.label -text $::tr(GlistColor): -font font_Bold
   pack $f.label $f.b -side left -pady 5
 
   set f $w.t.mode
-  label $f.mode -text $::tr(TrackerStat:) -font font_Bold
+  label $f.mode -text $::tr(TrackerStat): -font font_Bold
   grid $f.mode -row 0 -column 0
   radiobutton $f.games -text $::tr(TrackerGames) -anchor w \
     -variable ::ptrack::mode -value "-games"
@@ -277,7 +283,7 @@ proc ::ptrack::make {} {
   grid $f.time -row 2 -column 0 -sticky we
 
   set f $w.t.moves
-  label $f.lfrom -text $::tr(TrackerMoves:) -font font_Bold
+  label $f.lfrom -text $::tr(TrackerMoves): -font font_Bold
   entry $f.from -width 3 -justify right -textvariable ::ptrack::moves(start)
   label $f.lto -text "-"
   entry $f.to -width 3 -justify right -textvariable ::ptrack::moves(end)
@@ -290,7 +296,7 @@ proc ::ptrack::make {} {
   bind $f.to <FocusOut> +::ptrack::status
 
   set f $w.t.buttons
-  button $f.stop -text $::tr(Stop) -command progressBarCancel -state disabled
+  button $f.stop -text $::tr(Stop) -command sc_progressBar -state disabled
   button $f.update -text $::tr(Update) -command ::ptrack::refresh
   button $f.close -text $::tr(Close) -command "destroy $w"
   pack $f.close $f.update $f.stop -side right -padx 3 -pady 5
@@ -316,6 +322,7 @@ proc ::ptrack::refresh {{type "all"}} {
     return
   }
 
+  busyCursor .
   $w.t.buttons.update configure -state disabled
   $w.t.buttons.close configure -state disabled
   $w.t.buttons.stop configure -state normal
@@ -328,19 +335,17 @@ proc ::ptrack::refresh {{type "all"}} {
   set timeMode 0
   if {$::ptrack::mode == "-time"} { set timeMode 1 }
 
-  progressBarSet $w.progress 401 21
-  set err [catch { sc_base piecetrack $::ptrack::mode \
+  sc_progressBar $w.progress bar 401 21 time
+  set data [eval sc_base piecetrack $::ptrack::mode \
               $::ptrack::moves(start) $::ptrack::moves(end) \
-              $::ptrack::select} ::ptrack::data]
+              $::ptrack::select]
+  set ::ptrack::data $data
 
   catch {grab release $w.t.buttons.stop}
   $w.t.buttons.stop configure -state disabled
   $w.t.buttons.update configure -state normal
   $w.t.buttons.close configure -state normal
-
-  if {$err} {
-    return
-  }
+  unbusyCursor .
 
   set dfilter [sc_filter count]
   if {$timeMode} {
@@ -351,13 +356,13 @@ proc ::ptrack::refresh {{type "all"}} {
 
   set max 1
   for {set i 0} {$i < 64} {incr i} {
-    set freq [lindex $::ptrack::data $i]
+    set freq [lindex $data $i]
     if {$freq > $max} {set max $freq}
   }
 
   set ::ptrack::shade {}
   for {set i 0} {$i < 64} {incr i} {
-    set freq [lindex $::ptrack::data $i]
+    set freq [lindex $data $i]
     set x [expr {$freq * 100.0 / $max} ]
     set color [::ptrack::color $x]
     lappend ::ptrack::shade $x
@@ -372,7 +377,7 @@ proc ::ptrack::refresh {{type "all"}} {
     set best -1
     set idx -1
     for {set i 0} {$i < 64} {incr i} {
-      set n [lindex $::ptrack::data $i]
+      set n [lindex $data $i]
       if {$n > $best  &&  ![info exists printed($i)]} {
         set idx $i
         set best $n

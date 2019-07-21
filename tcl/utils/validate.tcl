@@ -1,9 +1,11 @@
+### tcl/utils/validate.tcl
 
+# See http://wiki.tcl.tk/3991 for a better approach to validation
 
 # ::utils::validate::Integer
 #
 #   Used to check the size of integers in entry boxes.
-#
+
 proc ::utils::validate::Integer {maxValue allowQuestionMarks name el op} {
   global $name ${name}_old
   if {[string comp {} $el]} {
@@ -120,15 +122,13 @@ proc ::utils::validate::Regexp {expression name el op} {
   set $old [set $name]
 }
 
-# ::utils::validate::roundScale
-# will round var to the next integer which is a multiple of tickinterval
-# given its current value
-proc ::utils::validate::roundScale { var tickinterval value } {
-  set $var [expr int($value/$tickinterval ) * $tickinterval]
-}
+### Limit var to a certain string length
 
-# ::utils::validate::floatScale
-# returns a float value with 1 decimal
-proc ::utils::validate::floatScale { var tickinterval value } {
-  set $var [format "%.1f" [expr ($value/$tickinterval ) * $tickinterval] ]
+proc ::utils::validate::Length {length name el op} {
+  global $name
+
+  set text [set $name]
+  if {[string length $text] > $length} {
+    set $name [string range $text 0 [expr {$length - 1}]]
+  }
 }

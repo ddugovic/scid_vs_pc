@@ -19,31 +19,43 @@
 // and will hopefully in future also be able to extract the contents of
 // all files in a Zip file, as if they were in one large plain file.
 
+// -------------------------------------------------------------------
+// Extension by Gregor Cramer, 25 March 2014:
+// -------------------------------------------------------------------
+// For reading a whole file and avoiding the time consuming locking we
+// are using memory mapping (file mapping) under Windows.
+//
+// On Linux we have a simpler method, glibc is providing the function
+// getc_unlocked() for this purpose.
+
 
 #ifndef SCID_MFILE_H
 #define SCID_MFILE_H
 
 #include "common.h"
-#include <stdio.h>
+#include "dstring.h"
+#include "error.h"
+
+#ifdef WIN32
+# include "win_mmap.h"
+#endif
 
 enum mfileT {
-    MFILE_REGULAR = 0, MFILE_MEMORY, MFILE_GZIP, MFILE_ZIP, MFILE_SEQREAD
+    MFILE_REGULAR = 0, MFILE_MEMORY, MFILE_GZIP, MFILE_ZIP,
+#ifdef WIN32
+    MFILE_MMAP,
+#endif
 };
 
 class MFile
 {
   private:
-    static const int SEQREADBUFSIZE = 64 * 1024;
     FILE *      Handle;         // For regular files.
     gzFile      GzHandle;       // For Gzip files.
     fileModeT   FileMode;
     mfileT      Type;
     char *      FileName;
-    uint        Capacity;
-    uint        Location;
-    uint        SeqReadLocation;
-    byte *      Data;
-    byte *      CurrentPtr;
+
     // The next few fields are used to improve I/O speed on Gzip files, by
     // avoiding doing a gzgetc() every character, since the zlib file gzio.c
     // simply does a (relatively slow) gzread() for each gzgetc().
@@ -51,28 +63,57 @@ class MFile
     int         GzBuffer_Avail;
     byte *      GzBuffer_Current;
 
-    void Init();
-    void Extend();
-    int  FillGzBuffer();
+    // The next few fields are used for in-memory files.
+    uint        Capacity;
+    uint        Location;
+    byte *      Data;
+    byte *      CurrentPtr;
+
+    char *      FileBuffer;  // Only for files with unusual buffer size.
+
+#ifdef WIN32
+    WinMMap *   MappedFile;  // File mapping for fast read access.
+#endif
+
+    void  Extend();
+    int   FillGzBuffer();
 
   public:
     MFile() { Init(); }
     ~MFile() {
-        if (Handle != NULL) fclose (Handle);
-        if (GzHandle != NULL) gzclose (GzHandle);
-        if (Data != NULL) delete[] Data;
-        if (GzBuffer != NULL) delete[] GzBuffer;
-        if (FileName != NULL) delete[] FileName;
+        if (Handle != NULL) { Close(); }
+        if (Data != NULL) { delete[] Data; }
+        if (FileBuffer != NULL) { delete[] FileBuffer; }
+        if (FileName != NULL) { delete[] FileName; }
+#ifdef WIN32
+        delete MappedFile;
+#endif
     }
+
+    void Init();
+
+    fileModeT Mode() { return FileMode; }
 
     errorT Create (const char * name, fileModeT fmode);
     errorT Open  (const char * name, fileModeT fmode);
+#ifdef WIN32
+    errorT OpenMappedFile (const char * name, fileModeT fmode);
+#endif
+    void   CreateMemory () { Close(); Init(); }
+    errorT Close ();
+
+    void   SetBufferSize (uint bufsize);
+
+    uint   Size ();
+    uint   Tell () { return Location; }
     errorT Seek (uint position);
     errorT Flush ();
     inline bool EndOfFile();
 
     errorT        WriteNBytes (const char * str, uint length);
     errorT        ReadNBytes (char * str, uint length);
+    errorT        ReadLine (char * str, uint maxLength);
+    errorT        ReadLine (DString * dstr);
     inline errorT WriteOneByte (byte value);
     errorT        WriteTwoBytes (uint value);
     errorT        WriteThreeBytes (uint value);
@@ -82,21 +123,36 @@ class MFile
     uint          ReadThreeBytes ();
     uint          ReadFourBytes ();
 
-    const char * GetFileName () { return (FileName == NULL ? "" : FileName); }
+    inline const char * GetFileName ();
+    void skipNonAscii(); // CQL
 };
+
+
+inline const char *
+MFile::GetFileName ()
+{
+    if (FileName == NULL) {
+        return "";
+    } else {
+        return FileName;
+    }
+}
 
 inline bool
 MFile::EndOfFile ()
 {
     switch (Type) {
     case MFILE_MEMORY:
-    case MFILE_SEQREAD:
         return (Location >= Capacity);
     case MFILE_REGULAR:
         return feof(Handle);
     case MFILE_GZIP:
         if (GzBuffer_Avail > 0) { return 0; }
         return gzeof(GzHandle);
+#ifdef WIN32
+    case MFILE_MMAP:
+        return Location >= MappedFile->size();
+#endif
     default:
         return false;
     }
@@ -112,7 +168,6 @@ MFile::WriteOneByte (byte value)
         Location++;
         return OK;
     }
-    if (Type == MFILE_SEQREAD) Seek(Location);
     Location++;
     if (Type == MFILE_GZIP) {
         return (gzputc(GzHandle, value) == EOF) ? ERROR_FileWrite : OK;
@@ -124,19 +179,15 @@ inline int
 MFile::ReadOneByte ()
 {
     ASSERT (FileMode != FMODE_WriteOnly);
-    if (Type == MFILE_MEMORY || Type == MFILE_SEQREAD) {
+    if (Type == MFILE_MEMORY) {
         if (Location >= Capacity) { return EOF; }
-        if (Location == SeqReadLocation && Type == MFILE_SEQREAD) {
-            SeqReadLocation += fread(Data, 1, SEQREADBUFSIZE, Handle);
-            CurrentPtr = Data;
-        }
         byte value = *CurrentPtr;
         Location++;
         CurrentPtr++;
         return (int) value;
     }
-    Location++;
     if (Type == MFILE_GZIP) {
+        Location++;
         if (GzBuffer_Avail <= 0) {
             return FillGzBuffer();
         }
@@ -145,7 +196,22 @@ MFile::ReadOneByte ()
         GzBuffer_Current++;
         return retval;
     }
-    return  getc(Handle);
+#ifdef WIN32
+    if (Type == MFILE_MMAP) {
+        if (Location >= MappedFile->size()) { return EOF; }
+        return *(MappedFile->address() + Location++);
+    } else {
+        Location++;
+        return getc(Handle);
+    }
+#else
+    Location++;
+# ifdef __GNUC__
+    return getc_unlocked(Handle);
+# else
+    return getc(Handle);
+# endif
+#endif
 }
 
 #endif  // SCID_MFILE_H

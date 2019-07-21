@@ -7,7 +7,6 @@
 //  Version:    1.6
 //
 //  Notice:     Copyright (c) 1999  Shane Hudson. all rights reserved.
-//              Copyright (c) 2014  Benini Fulvio. all rights reserved.
 //
 //  Author:     Shane Hudson (sgh@users.sourceforge.net)
 //
@@ -24,34 +23,29 @@ const errorT
 
     // General Error:
     ERROR               =   1,
-    ERROR_UserCancel    =   2,
-    ERROR_BadArg        =   3,
     
     // File I/O
-    ERROR_FileOpen       = 101,
-    ERROR_FileWrite      = 102,
-    ERROR_FileRead       = 103,
-    ERROR_FileSeek       = 104,
-    ERROR_BadMagic       = 105,
-    ERROR_FileNotOpen    = 106,
-    ERROR_FileInUse      = 107,
-    ERROR_FileMode       = 108,
-    ERROR_FileVersion    = 109,
+    ERROR_FileOpen      = 101,
+    ERROR_FileWrite     = 102,
+    ERROR_FileRead      = 103,
+    ERROR_FileSeek      = 104,
+    ERROR_BadMagic      = 105,
+    ERROR_FileNotOpen   = 106,
+    ERROR_FileInUse     = 107,
+    ERROR_FileMode      = 108,
+    ERROR_FileVersion   = 109,
     ERROR_OldScidVersion = 110,
-    ERROR_FileReadOnly   = 111,
 
     // Memory Allocation, corrupt data
     ERROR_MallocFailed   = 151,
     ERROR_CorruptData    = 152,   ERROR_Corrupt = 152,
 
-    // Database errors
-    ERROR_Full = 201,
+    // NameBase, Index errors
+    ERROR_NameBaseFull   = 201,  ERROR_Full = 201,
     ERROR_NameNotFound   = 202,  ERROR_NotFound = 202,
     ERROR_NameExists     = 203,  ERROR_Exists = 203,
     ERROR_NameBaseEmpty  = 204,  ERROR_Empty = 204,
     ERROR_NoMatchFound   = 205,
-    ERROR_NameDataLoss   = 206,
-    ERROR_NameTooLong    = 207,
 
     ERROR_IndexFull      = 251,
 
@@ -72,6 +66,7 @@ const errorT
 
     // Scan Errors
     ERROR_PGNTag = 501,
+    ERROR_PGNTagNull = 502,
 
     // Buffer errors
     ERROR_BufferFull = 601,

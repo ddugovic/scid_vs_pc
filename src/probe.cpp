@@ -12,8 +12,10 @@
 //
 //////////////////////////////////////////////////////////////////////
 
+
+#include <stdlib.h>
+#include "matsig.h"
 #include "probe.h"
-#include "sqmove.h"
 
 #ifdef SCID_USE_TB
 

@@ -20,6 +20,11 @@
 // #include "posix.h"
 #include "util.h"
 
+
+#ifdef WINCE
+#include "../tclmy.h"
+#endif
+
 // variables
 
 static bool Error;

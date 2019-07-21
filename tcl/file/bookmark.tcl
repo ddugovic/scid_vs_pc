@@ -1,5 +1,9 @@
-# bookmark.tcl:
-# Bookmarks list and Recently-used files list in Scid.
+###
+### bookmark.tcl
+###
+
+# Bookmarks, Game History and Recently-used files lists
+# The Game History (RefreshMenuGame) makes heavy use of bookmarks, and for simplicity is included here
 
 set bookmarks(data) {}
 set bookmarks(subMenus) 0
@@ -7,28 +11,27 @@ set bookmarks(subMenus) 0
 # Read the bookmarks file if it exists:
 catch {source [scidConfigFile bookmarks]}
 
-
 namespace eval ::bookmarks {}
 
 # ::bookmarks::PostMenu:
 #   Posts the bookmarks toolbar menu.
-#
+# Currently unused. It's just too clumsy to post menus in the main board
+# without an easy way to cancel them
+
 proc ::bookmarks::PostMenu {} {
-  .main.tb.bkm.menu post [winfo pointerx .] [winfo pointery .]
+  tk_popup .main.tb.bkm.menu [winfo pointerx .] [winfo pointery .]
   if {[::bookmarks::CanAdd]} {
     .main.tb.bkm.menu activate 0
-  } else {
-    .main.tb.bkm.menu activate 2
   }
 }
 
-# ::bookmarks::Refresh:
-#   Updates all bookmarks submenus.
-#
+### Updates all bookmarks and game history submenus
+
 proc ::bookmarks::Refresh {} {
   foreach menu {.menu.file.bookmarks .main.tb.bkm.menu} {
     ::bookmarks::RefreshMenu $menu
   }
+  ::bookmarks::RefreshMenuGame .menu.game
 }
 
 proc ::bookmarks::RefreshMenu {menu} {
@@ -38,28 +41,17 @@ proc ::bookmarks::RefreshMenu {menu} {
   $menu delete 0 end
   # $menu configure -disabledforeground [$menu cget -foreground]
   set numBookmarkEntries [llength $bookmarks(data)]
-  $menu add command -label FileBookmarksAdd -command ::bookmarks::AddCurrent
-  set helpMessage($menu,0) FileBookmarksAdd
-  $menu add cascade -label FileBookmarksFile -menu $menu.file
-  menu $menu.file
-  set helpMessage($menu,1) FileBookmarksFile
-  if {! [::bookmarks::CanAdd]} {
-    $menu entryconfigure 0 -state disabled
-    $menu entryconfigure 1 -state disabled
-  }
-  $menu add command -label FileBookmarksEdit -command ::bookmarks::Edit
-  set helpMessage($menu,2) FileBookmarksEdit
-  if {$bookmarks(subMenus)} {
-    set display List
-    set newval 0
+
+  if {[::bookmarks::CanAdd]} {
+    $menu add command -label FileBookmarksAdd -command ::bookmarks::AddCurrent
   } else {
-    set display Sub
-    set newval 1
+    $menu add command -label FileBookmarksAdd -command ::bookmarks::AddCurrent -state disabled
   }
-  $menu add command -label FileBookmarks$display \
-    -command "set bookmarks(subMenus) $newval; ::bookmarks::Refresh"
-  set helpMessage($menu,3) FileBookmarks$display
-  foreach tag [list Add File Edit $display] {
+  set helpMessage($menu,0) FileBookmarksAdd
+
+  $menu add command -label FileBookmarksEdit -command ::bookmarks::Edit
+  set helpMessage($menu,1) FileBookmarksEdit
+  foreach tag {Add Edit} {
     configMenuText $menu FileBookmarks$tag FileBookmarks$tag $::language
   }
   if {$numBookmarkEntries == 0} { return }
@@ -68,16 +60,9 @@ proc ::bookmarks::RefreshMenu {menu} {
   # Add each bookmark entry:
   set current $menu
   set inSubMenu 0
-  set nfolders 0
   foreach entry $bookmarks(data) {
     if {$entry == ""} { continue }
     set isfolder [::bookmarks::isfolder $entry]
-
-    if {$isfolder} {
-      incr nfolders
-      $menu.file add command -label [::bookmarks::Text $entry] \
-        -command "::bookmarks::AddCurrent $nfolders"
-    }
 
     if {! $bookmarks(subMenus)} {
       if {$isfolder} {
@@ -106,23 +91,55 @@ proc ::bookmarks::RefreshMenu {menu} {
   }
 }
 
+### Update the Game History Menu
+
+proc ::bookmarks::RefreshMenuGame {menu} {
+  global bookmarks helpMessage
+
+  # Remove the old game history
+  $menu delete 21 end
+
+  # Trim menus in case the limit has been reduced.
+  set bookmarks(gamehistory) [lrange $bookmarks(gamehistory) 0 [expr {$::recentFiles(gamehistory) - 1}]]
+  set numBookmarkEntries [llength $bookmarks(gamehistory)]
+
+  if {$numBookmarkEntries == 0} { return }
+
+  $menu add separator
+
+  # Add each bookmark entry:
+  foreach entry $bookmarks(gamehistory) {
+    if {$entry != ""} {
+      set text [::bookmarks::Text $entry]
+      set comma [string first , $text]
+      if {$comma > 0} {
+        set text [string range $text 0 $comma-1]
+      }
+      # doesnt allow for spaces in name
+      # set text [string range [lrange [::bookmarks::Text $entry] 0 3] 0 end-1]
+      $menu add command -label $text -command [list ::bookmarks::Go $entry]
+    }
+  }
+}
+
 # ::bookmarks::CanAdd:
 #   Returns 1 if the current game can be added as a bookmark.
 #   It must be in an open database, not a PGN file, and not game number 0.
 #
 proc ::bookmarks::CanAdd {} {
+  if {! [sc_base inUse]} { return 0 }
   if {[sc_game number] == 0} { return 0 }
-  if {$::curr_db == $::clipbase_db} { return 0 }
-  set fname [sc_base filename $::curr_db]
+  if {[sc_base current] == [sc_info clipbase]} { return 0 }
+  if {[file pathtype [sc_base filename]] != "absolute"} { return 0 }
   foreach suffix {.pgn .PGN .pgn.gz} {
-    if {[string match "*$suffix" "$fname"]} { return 0 }
+    if {[string match "*$suffix" [sc_base filename]]} { return 0 }
   }
   return 1
 }
 
-# ::bookmarks::AddCurrent:
-#   Adds the current game to the bookmarks list.
-#
+### Adds the current game to the bookmarks list.
+## (variable 'folder' seems unused)
+
 proc ::bookmarks::AddCurrent {{folder 0}} {
   global bookmarks
   if {! [sc_base inUse]} {
@@ -138,54 +155,96 @@ proc ::bookmarks::AddCurrent {{folder 0}} {
     }
   }
   set bookmarks(data) [linsert $bookmarks(data) $i $text]
+
   ::bookmarks::Save
   ::bookmarks::Refresh
 }
 
-# ::bookmarks::New:
-#   Returns a bookmarks list entry for the current game or a new folder.
-#
+### Add current game to game history
+
+proc ::bookmarks::AddCurrentGame {} {
+  global bookmarks
+  if {! [sc_base inUse] || [sc_base current] == 9} {
+    return
+  }
+  set text [::bookmarks::New game]
+  # Don't remember ply for game history
+  lset text 4 1
+  set i [lsearch $bookmarks(gamehistory) $text]
+  if {$i > -1} {
+    set bookmarks(gamehistory) [lreplace $bookmarks(gamehistory) $i $i]
+  }
+
+  set bookmarks(gamehistory) [lrange [linsert $bookmarks(gamehistory) 0 $text] 0 $::recentFiles(gamehistory)-1]
+
+  # ::bookmarks::Save
+  ::bookmarks::Refresh
+}
+
+### Returns a bookmarks list entry for the current game or a new folder.
+
 proc ::bookmarks::New {type} {
-  if {$type == "folder"} { return [list "f" ""] }
-  set text "[file tail [sc_base filename $::curr_db]]: [sc_game info result], "
+  if {$type == "folder"} { return [list "f" "new folder"] }
+
+  ### Bookmark format
+  # database: white, black, result, site , ....
+
+  # I changed this text formatting around. Is'ok ? &&& S.A
+  set text "[file tail [sc_base filename]]:  "
   append text "[::utils::string::Surname [sc_game info white]] - "
   append text "[::utils::string::Surname [sc_game info black]], "
-  append text "[::utils::string::CityName [sc_game info site]] "
+  append text "[sc_game info result],  [::utils::string::CityName [sc_game info site]] "
   set round [sc_game info round]
   if {$round != ""  &&  $round != "?"} { append text "($round) " }
   append text "[sc_game info year]"
   set list [list "g" $text]
   sc_game pgn
-  lappend list [sc_base filename ::curr_db] [sc_game number] [sc_pos pgnOffset]
+  lappend list [sc_base filename] [sc_game number] [sc_pos pgnOffset]
   lappend list [sc_game info white] [sc_game info black]
   lappend list [sc_game info year] [sc_game info site]
   lappend list [sc_game info round] [sc_game info result]
   return $list
 }
 
-# ::bookmarks::Go
-#
-#   Jumps to a selected bookmark.
-#
+### Load selected bookmark
+
 proc ::bookmarks::Go {entry} {
   if {[::bookmarks::isfolder $entry]} { return }
   set fname [lindex $entry 2]
   set gnum [lindex $entry 3]
   set ply [lindex $entry 4]
+
+  # Is the base already open ?
   set slot [sc_base slot $fname]
   if {$slot != 0} {
-    sc_base switch $slot
+    if {[sc_base current] != $slot} {
+      sc_base switch $slot
+      ::plist::refresh
+      ::tourney::refresh
+    }
   } else {
     busyCursor .
-    if {[catch { ::file::Open $fname} result]} {
+    ### updateBoard -pgn gets called three times, so try passing "update = 0" to the first two.
+    # ::file::Open, ::game::Load, updateBoard -pgn
+
+    if {[catch {set success [::file::Open $fname . 0]} result]} {
       unbusyCursor .
       tk_messageBox -icon warning -type ok -parent . \
-        -title "Scid" -message "Unable to load the database:\n$fname\n\n$result"
+        -title Scid -message "Unable to load the database:\n$fname\n\n$result"
       return
     }
     unbusyCursor .
-    set ::glist 1
-    ::recentFiles::add "[file rootname $fname].si4"
+    if {$success == -1} {
+      return
+    }
+    ::plist::refresh
+    ::tourney::refresh
+    # PGN can be 'bookmarked' by the recentGames feature, so handle them
+    if {[string compare -nocase [string range $fname end-3 end] .pgn] == 0} {
+      ::recentFiles::add $fname
+    } else {
+      ::recentFiles::add "[file rootname $fname].si4"
+    }
   }
   # Find and load the best database game matching the bookmark:
   set white [lindex $entry 5]
@@ -196,20 +255,37 @@ proc ::bookmarks::Go {entry} {
   set result [lindex $entry 10]
 
   set best [sc_game find $gnum $white $black $site $round $year $result]
-  if {[catch {::game::Load $best}]} {
-    tk_messageBox -icon warning -type ok -parent . \
-      -title "Scid" -message "Unable to load game number: $best"
+
+  # don't reload current game if not necessary
+  if {[sc_game number] != $best} {
+    if {[catch {set success [::game::Load $best 0]}]} {
+      tk_messageBox -icon warning -type ok -parent . -title Scid -message "Unable to load game number: $best"
+      return
+    } else {
+      if {$success == -1} {
+	return
+      }
+      sc_move pgn $ply
+      flipBoardForPlayerNames
+
+      # show this game in gamelist
+      set ::glstart $best
+      set ::glistStart([sc_base current]) $best
+    }
   } else {
     sc_move pgn $ply
+    set ::glstart $best
+    set ::glistStart([sc_base current]) $best
+
+    refreshWindows
   }
-  ::notify::GameChanged
-  ::notify::DatabaseChanged
+  refreshSearchDBs
+  ::bookmarks::AddCurrentGame
+  updateBoard -pgn -switch
 }
 
-# ::bookmarks::DeleteChildren
-#
-#   Deletes all submenus of a bookmark menu.
-#
+### Deletes all submenus of a bookmark menu.
+
 proc ::bookmarks::DeleteChildren {w} {
   foreach child [winfo children $w] {
     ::bookmarks::DeleteChildren $child
@@ -234,36 +310,64 @@ proc ::bookmarks::NewSubMenu {w entry} {
 set bookmarks(edit) ""
 set bookmarks(ismenu) 0
 
+# Button images for bookmark editing:
 
-# ::bookmarks::Edit
-#
-#   Creates the bookmark editing window.
-#
+image create photo bookmark_up -data {
+R0lGODdhGAAYAMIAALu7uwAAAMzM/5mZ/2ZmzP///zMzZgAAACwAAAAAGAAYAAADRgi63P4w
+ykmrvTirEPQKwtBpYChmpUmMVVAI5kCsbfGqMy25dpzPLAfvNij+gBCDUokjLJUUQ9OAkRpn
+1Mvz6el6v+AwOAEAOw==
+}
+
+image create photo bookmark_down -data {
+R0lGODdhGAAYAMIAALu7uzMzZv///8zM/5mZ/2ZmzAAAAAAAACwAAAAAGAAYAAADSQi63P4w
+ykmrvRiHzbcWw0AQRfCFY0l1ATiSLGQINCiSRZ4b0UyjOB1PMgvddIXhxABEKinM1C5jkD4v
+1WSGYbhuv+CweExeJAAAOw==
+}
+
+###  Bookmark Editing toplevel
+
 proc ::bookmarks::Edit {} {
   global bookmarks
+
   set w .bmedit
-  if {[winfo exists $w]} { return }
+  if {[winfo exists $w]} {
+    raiseWin $w
+    return
+  }
   set bookmarks(old) $bookmarks(data)
+
   toplevel $w
-  wm title $w "Scid: [tr FileBookmarksEdit]"
+  wm title $w "[tr FileBookmarksEdit]"
+  setWinSize $w
+  wm withdraw $w
   # wm transient $w .
+
   bind $w <F1> {helpWindow Bookmarks}
-  entry $w.e -width 40 -foreground black -background white \
+  entry $w.e -width 60 -foreground black  \
     -textvariable bookmarks(edit) -font font_Small -exportselection 0
-  bind $w.e <FocusIn>  {.bmedit.e configure -background lightYellow}
-  bind $w.e <FocusOut> {.bmedit.e configure -background white}
+  # bind $w.e <FocusIn>  {.bmedit.e configure -background lightYellow}
+  # bind $w.e <FocusOut> {.bmedit.e configure -background white}
 
   trace variable bookmarks(edit) w ::bookmarks::EditRefresh
-  pack $w.e -side top -fill x
-  pack [frame $w.b2] -side bottom -fill x
-  pack [frame $w.b1] -side bottom -fill x
+  pack [frame $w.b2] -side bottom -fill x -pady 2
+  pack [frame $w.b1] -side bottom -fill x -pady 2
+  pack $w.e -side bottom -fill x
   pack [frame $w.f] -side top -fill both -expand 1
-  listbox $w.f.list -width 50 -height 10 -yscrollcommand "$w.f.ybar set" \
-    -fg black -bg white -exportselection 0 -font font_Small -setgrid 1
+  # hmmm - selectmode browse doesnt work as expected because of our ListboxSelect binding
+  # and trace binding, and some silly issue i couldnt figure. So use single
+  listbox $w.f.list -height 10 -yscrollcommand "$w.f.ybar set" \
+    -exportselection 0 -font font_Small -setgrid 1 -selectmode single
   scrollbar $w.f.ybar -takefocus 0 -command "$w.f.list yview"
   bind $w.f.list <<ListboxSelect>>  ::bookmarks::EditSelect
+  bind $w.f.list <Double-Button-1>  {
+    ::bookmarks::Go [lindex $bookmarks(data) [lindex [.bmedit.f.list curselection] 0]]
+    if {[::bookmarks::CanAdd]} { .bmedit.b1.newGame configure -state normal }
+  }
+  bind $w.f.list <Control-Up> "$w.b1.up invoke ; break"
+  bind $w.f.list <Control-Down> "$w.b1.down invoke ; break"
+  bind $w.f.list <Delete> ::bookmarks::EditDelete
   pack $w.f.ybar -side right -fill y
-  pack $w.f.list -side left -fill x -expand 1
+  pack $w.f.list -side left -fill both -expand yes
   foreach entry $bookmarks(data) {
     $w.f.list insert end [::bookmarks::IndexText $entry]
   }
@@ -272,33 +376,32 @@ proc ::bookmarks::Edit {} {
   dialogbutton $w.b1.newGame -text [tr FileBookmarksAdd] \
     -command {::bookmarks::EditNew game}
   if {! [::bookmarks::CanAdd]} { $w.b1.newGame configure -state disabled }
+
   dialogbutton $w.b1.delete -text $::tr(Delete)  -command ::bookmarks::EditDelete
-  button $w.b2.up -image tb_up -command {::bookmarks::EditMove up}
-  button $w.b2.down -image tb_down -command {::bookmarks::EditMove down}
-  foreach i [list $w.b2.up $w.b2.down] {
-    $i configure -padx 0 -pady 0 -borderwidth 1
-  }
-  dialogbutton $w.b2.ok -text "OK" -command ::bookmarks::EditDone
+  button $w.b1.up -image bookmark_up -command {::bookmarks::EditMove up} -borderwidth 1
+  button $w.b1.down -image bookmark_down -command {::bookmarks::EditMove down}
+
+  checkbutton $w.b2.displaytype -text {Nest Folders} -var bookmarks(subMenus) -command ::bookmarks::Refresh
+
+  dialogbutton $w.b2.ok     -text OK -command ::bookmarks::EditDone
+  dialogbutton $w.b2.help   -text $::tr(Help) -command {helpWindow Bookmarks}
   dialogbutton $w.b2.cancel -text $::tr(Cancel) -command {
     set bookmarks(data) $bookmarks(old)
     catch {grab release .bmedit}
     destroy .bmedit
   }
-  pack $w.b1.newFolder $w.b1.newGame $w.b1.delete -side left -padx 2 -pady 2
-  pack $w.b2.up $w.b2.down -side left -padx 2 -pady 2
-  pack $w.b2.cancel $w.b2.ok -side right -padx 2 -pady 2
+
+  pack $w.b1.up $w.b1.down $w.b1.newGame $w.b1.newFolder $w.b1.delete -side left -padx 2 -pady 2
+  # pack $w.b1.up $w.b1.down -side left -padx 2 -pady 2
+  pack $w.b2.displaytype -side left
+  pack $w.b2.cancel $w.b2.help $w.b2.ok -side right -padx 2 -pady 2
   set bookmarks(edit) ""
 
-  wm withdraw $w
   update idletasks
-  set x [expr {[winfo screenwidth $w]/2 - [winfo reqwidth $w]/2 \
-                 - [winfo vrootx .]}]
-  set y [expr {[winfo screenheight $w]/2 - [winfo reqheight $w]/2 \
-                 - [winfo vrooty .]}]
-  wm geom $w +$x+$y
+  placeWinOverParent $w .
+  bind $w <Configure> "recordWinSize $w"
   wm deiconify $w
   update
-  catch {grab .bmedit}
 }
 
 # ::bookmarks::EditDone
@@ -306,7 +409,7 @@ proc ::bookmarks::Edit {} {
 #    Updates the bookmarks and closes the bookmark editing window.
 #
 proc ::bookmarks::EditDone {} {
-  catch {grab release .bmedit}
+  # catch {grab release .bmedit}
   destroy .bmedit
   ::bookmarks::Save
   ::bookmarks::Refresh
@@ -339,6 +442,7 @@ proc ::bookmarks::EditRefresh {args} {
 #
 proc ::bookmarks::EditSelect {{sel ""}} {
   global bookmarks
+
   set list .bmedit.f.list
   set sel [lindex [$list curselection] 0]
   if {$sel == ""} {
@@ -352,7 +456,9 @@ proc ::bookmarks::EditSelect {{sel ""}} {
   }
   set e [lindex $bookmarks(data) $sel]
   set bookmarks(ismenu) [::bookmarks::isfolder $e]
+  trace variable bookmarks(edit) w {}
   set bookmarks(edit) [::bookmarks::Text $e]
+  trace variable bookmarks(edit) w ::bookmarks::EditRefresh
 }
 
 # ::bookmarks::isfolder:
@@ -410,6 +516,7 @@ proc ::bookmarks::EditMove {{dir "up"}} {
   $list delete $sel
   $list insert $newsel $text
   $list selection set $newsel
+  $list see $newsel
 }
 
 # ::bookmarks::EditDelete
@@ -426,6 +533,7 @@ proc ::bookmarks::EditDelete {} {
   $list selection clear 0 end
   $list delete $sel
   set bookmarks(edit) ""
+  focus .bmedit.f.list
 }
 
 # ::bookmarks::EditNew
@@ -437,9 +545,7 @@ proc ::bookmarks::EditNew {{type "folder"}} {
   global bookmarks
   set w .bmedit
   set list $w.f.list
-  set folder 0
   if {[string index $type 0] == "f"} {
-    set folder 1
     set entry [::bookmarks::New folder]
   } else {
     set entry [::bookmarks::New game]
@@ -461,26 +567,24 @@ proc ::bookmarks::EditNew {{type "folder"}} {
   $list selection clear 0 end
   $list selection set $sel
   $list see $sel
+  focus .bmedit.e
   ::bookmarks::EditSelect
 }
 
-# ::bookmarks::Save
-#
-#   Saves the bookmarks file, reporting any error in a message box if
-#   reportError is true.
-#
+### Saves the bookmarks file, reporting any error in a message box if reportError is true.
+
 proc ::bookmarks::Save {{reportError 0}} {
   global bookmarks
   set f {}
   set filename [scidConfigFile bookmarks]
   if  {[catch {open $filename w} f]} {
     if {$reportError} {
-      tk_messageBox -title "Scid" -type ok -icon warning \
+      tk_messageBox -title Scid -type ok -icon warning \
         -message "Unable to write bookmarks file: $filename\n$f"
     }
     return
   }
-  puts $f "# Scid $::scidVersion bookmarks file\n"
+  puts $f "# $::scidName bookmarks file\n"
   foreach i {subMenus data} {
     puts $f "set bookmarks($i) [list [set bookmarks($i)]]"
     puts $f ""

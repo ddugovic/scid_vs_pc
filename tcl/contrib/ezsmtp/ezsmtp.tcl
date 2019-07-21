@@ -16,7 +16,7 @@ namespace eval ::ezsmtp {
 
     # Make CVS version ID accessible.
     set mail(cvsid) \
-            {$Id: ezsmtp.tcl,v 4.3 2011/02/13 18:12:01 arwagner Exp $}
+            {$Id: ezsmtp.tcl,v 1.1 2008/06/22 22:19:45 pgeorges Exp $}
 
     # Global variables that may be altered through ezsmtp::config.
     set mail(vars) [list verbose mailhost port from batchsize \
@@ -36,7 +36,7 @@ namespace eval ::ezsmtp {
     elseif {[info exists env(USERNAME)]}  {set mail(from) $env(USERNAME)} \
     elseif {[info exists env(USER)]}      {set mail(from) $env(USER)} \
     else   {set mail(from) {}}
-    
+
     # Trim any leading/trailing spaces and add @ current host name
     set mail(from) [string trim $mail(from)]
     if {[string length $mail(from)] > 0} {
@@ -291,7 +291,7 @@ proc ::ezsmtp::private_add_header {var key value} {
         }
         lappend vall $ln
     }
-    
+
     # set in the current send session's array by appending colon to key.
     private_log 6 "Header $key=[join $vall "\n\t"]"
     set cur([set key]:) $vall

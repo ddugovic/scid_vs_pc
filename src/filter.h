@@ -27,65 +27,71 @@
 //    indicating whether that game is included in the filter or not.
 //    A value of 0 indicates the game is excluded, or 1-255 indicates
 //    the game is included, and what position to show when the game
-//    is loaded: 1 means the start position, 2 means the position after
+//    is loaded: 1 means ths start position, 2 means the position after
 //    Whites first move, etc.
+
 class Filter
 {
   private:
-    gamenumT FilterSize;     // Number of values in filter.
-    gamenumT FilterCount;    // Number of nonzero values in filter.
-    gamenumT Capacity;       // Number of values allocated for Data[].
-    byte *   Data;           // The actual filter data.
 
-    Filter(const Filter&);
-    Filter& operator=(const Filter&);
-    void Allocate();
-    void Free();
-    friend class CompressedFilter;
+    uint    FilterSize;     // Number of values in filter.
+    uint    FilterCount;    // Number of nonzero values in filter.
+    uint    Capacity;       // Number of bytes allocated for Data[].
+    byte *  Data;           // The actual filter data.
+    byte *  oldDataTree; // keeps filter data to speed Tree searches (fastMode) 
+    uint    CachedFilteredCount;  // These members cache the most recent
+    uint    CachedIndex;          // filteteredCount to index translation.
     
   public:
-    Filter (gamenumT size) :Data(NULL) { Init (size); }
-    ~Filter() { Free(); }
+    Filter ()           { Init (0); }
+    Filter (uint size)  { Init (size); }
+    ~Filter ()          { if (Data != NULL) { delete[] Data; delete[] oldDataTree; } }
+    Filter *Clone ();
+    void    Init (uint size);
+    uint    Size (void)     { return FilterSize; }
+    uint    Count (void)    { return FilterCount; }
 
-    void    Init (gamenumT size);
-    uint    Size() const { return FilterSize; }
-    uint    Count () const { return FilterCount; }
-    bool    isWhole () const { return FilterCount == FilterSize; }
-    void    Set (gamenumT index, byte value); // Sets the value at index.
-    byte    Get (gamenumT index) const;       // Gets the value at index.
-    void    Fill (byte value);                // Sets all values.
-    void    Append (byte value);              // Appends one value.
-    void    SetCapacity (gamenumT size);
+    void    Set (uint index, byte value);   // Sets the value at index.
+    byte    Get (uint index);               // Gets the value at index.
+    void    Fill (byte value);              // Sets all values.
+    void    Append (byte value);            // Appends one value.
+    void    SetCapacity(uint size);
+    void    SetFilterSize(uint size);
+    uint    IndexToFilteredCount (uint index);
+    uint    FilteredCountToIndex (uint filteredCount);
+    // Used by CompressedFilter class.
+    const byte *  GetData () {
+        return (const byte *) Data;
+    }
+    // Declarations for "fastmode" tree search (should be made private with getters/setters ?)
+    // Used by Tree in fast mode
+    const byte *  GetOldDataTree () {
+         return (const byte *) oldDataTree;
+    }
+    bool isValidOldDataTree; // true if the filter was saved from cache or calculated from all games
+    ushort oldDataTreePly;
+    void saveFilterForFastMode(uint ply);
 };
 
-class HFilter {
-    Filter* f_;
-    const Filter* mask_;
 
-public:
-    explicit HFilter(Filter* f = NULL, const Filter* mask = NULL) : f_(f), mask_(mask) {}
+inline void
+Filter::Set (uint index, byte value)
+{
+    ASSERT (index < FilterSize);
+    CachedFilteredCount = 0;
 
-    bool operator! () const { return f_ == NULL; }
-    bool operator* () const { return f_ != NULL; }
-    bool isWhole() const { return f_->isWhole(); }
-    uint count() const {
-        uint res = f_->Count();
-        if (mask_ == NULL) return res;
-        if (res == f_->Size()) return mask_->Count();
-        for (uint i=0, n = f_->Size(); i < n; i++) {
-            if (f_->Get(i) != 0 && mask_->Get(i) == 0) --res;
-        }
-        return res;
-    }
-    byte get(gamenumT index) const {
-        byte res = f_->Get(index);
-        if (res != 0 && mask_ != NULL) return mask_->Get(index);
-        return res;
-    }
+    // Update the value and count of nonzero values:
+    if (Data[index] != 0) { FilterCount--; }
+    if (value != 0) { FilterCount++; }
+    Data[index] = value;
+}
 
-    void set (gamenumT index, byte value) { return f_->Set(index, value); }
-    void fill (byte value) { return f_->Fill(value); }
-};
+inline byte
+Filter::Get (uint index)
+{
+    ASSERT (index < FilterSize);
+    return (Data[index]);
+}
 
 
 //////////////////////////////////////////////////////////////////////
@@ -95,6 +101,8 @@ public:
 //    Random access to individual values is not possible.
 //    A CompressedFilter is created from, or restored to, a regular
 //    filter with the methods CompressFrom() and UncompressTo().
+
+
 class CompressedFilter
 {
   private:
@@ -106,107 +114,21 @@ class CompressedFilter
 
   public:
     CompressedFilter (void)     { Init(); }
-    ~CompressedFilter (void) {
-        if (CompressedData != NULL) delete[] CompressedData;
-    }
+    ~CompressedFilter (void)    { Clear(); }
 
+    inline void Init();
     inline void Clear();
 
-    uint Size() const { return CFilterSize; }
+    uint Size() { return CFilterSize; }
     uint Count() { return CFilterCount; }
 
     errorT Verify (Filter * filter);
 
     void CompressFrom (Filter * filter);
-    errorT UncompressTo(Filter * filter) const;
-
-  private:
-    CompressedFilter(const CompressedFilter&);
-    void operator=(const CompressedFilter&);
-
-    inline void Init();
+    errorT UncompressTo (Filter * filter);
+    errorT WriteToFile (FILE * fp);
+    errorT ReadFromFile (FILE * fp);
 };
-
-
-inline void Filter::Init (uint size) {
-    Free();
-    FilterSize = size;
-    FilterCount = size;
-    Capacity = size;
-    Data = NULL;
-}
-
-inline void Filter::Allocate()
-{
-    Free();
-    Capacity = FilterSize > Capacity ? FilterSize : Capacity;
-    Data = new byte [Capacity];
-    byte * pb = Data;
-    for (uint i=0; i < FilterSize; i++) { *pb++ = 1; }
-}
-
-inline void Filter::Free()
-{
-    if(Data != NULL) {
-        delete[] Data;
-        Data = NULL;
-    }
-}
-
-inline void Filter::Set (uint index, byte value)
-{
-    ASSERT (index < FilterSize);
-    if (Data == NULL) {
-        if (value == 1) return;
-        Allocate();
-    }
-    if (Data[index] != 0) FilterCount--;
-    if (value != 0) FilterCount++;
-    Data[index] = value;
-}
-
-inline byte Filter::Get (uint index) const
-{
-    ASSERT (index < FilterSize);
-    byte res = (Data == NULL) ? 1 : Data[index];
-    return res;
-}
-
-inline void Filter::Fill (byte value)
-{
-    if (value == 1) {
-        if (Data != NULL) Free();
-        FilterCount = FilterSize;
-    } else {
-        if (Data == NULL) Allocate();
-        FilterCount = (value != 0) ? FilterSize : 0;
-        memset(Data, value, FilterSize);
-    }
-}
-
-inline void Filter::Append (byte value)
-{
-    if (value != 0) FilterCount++;
-    if (value != 1 && Data == NULL) Allocate();
-    if (Data != NULL) {
-        if (FilterSize >= Capacity) SetCapacity(FilterSize + 1000);
-        Data[FilterSize] = value;
-    }
-    FilterSize++;
-}
-
-inline void Filter::SetCapacity(gamenumT size)
-{
-    if (size > Capacity) {
-        Capacity = size;
-        if (Data != NULL) {
-            byte * newData = new byte [Capacity];
-            for (uint i=0; i < FilterSize; i++) newData[i] = Data[i];
-            delete[] Data;
-            Data = newData;
-        }
-    }
-}
 
 inline void
 CompressedFilter::Init ()

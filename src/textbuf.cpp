@@ -12,8 +12,13 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
+#include "error.h"
 #include "textbuf.h"
 #include "misc.h"
+
+#include <stdio.h>
+#include <string.h>
+#include <string>
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //### TextBuffer::Init(): Initialise the textbuffer.
@@ -35,11 +40,7 @@ void
 TextBuffer::Free (void)
 {
     if (Buffer != NULL) {
-#ifdef WINCE
-        my_Tcl_Free( Buffer);
-#else
         delete[] Buffer;
-#endif
         Buffer = NULL;
         BufferSize = 0;
     }
@@ -79,13 +80,9 @@ TextBuffer::AddTranslation (char ch, const char * str)
 void
 TextBuffer::SetBufferSize (uint length)
 {
-#ifdef WINCE
-    if (Buffer != NULL) { my_Tcl_Free( Buffer); }
-    Buffer = my_Tcl_Alloc(sizeof(char[length]));
-#else
     if (Buffer != NULL) { delete[] Buffer; }
-    Buffer = new char[length];
-#endif
+    // NewLine(), Indent(), PrintWord() seem to buffer overrun when '*Current = 0'
+    Buffer = new char[length+1];
     BufferSize = length;
     ByteCount = Column = LineCount = 0; LineIsEmpty = 1;
     Current = Buffer;
@@ -155,9 +152,7 @@ TextBuffer::PrintWord (const char * str)
     if (Column + length >= WrapColumn)    { NewLine(); }
     if (ByteCount + length >= BufferSize) { return ERROR_BufferFull; }
     while (*str != 0) {
-        char ch = *str;
-        AddChar (ch);
-        str++;
+        AddChar (*str++);
         Column++;
     }
     *Current = 0;  // add trailing end-of-string to buffer
@@ -200,19 +195,17 @@ errorT
 TextBuffer::PrintString (const char * str)
 {
     errorT err;
-    char currentWord[1024];  // should be long enough for a word
+
     while (*str != 0) {
-        char * b = currentWord;
-        *b = 0;
+        CurrentWord.clear();
         // get next word and print it:
         while (*str != ' '  && *str != '\n'  &&  *str != '\0') {
-            *b = *str; b++; str++;
+            CurrentWord.push_back(*str++);
         }
         // end of word/line/text reached
-        *b = 0;
-        err = PrintWord (currentWord);
+        err = PrintWord (CurrentWord.c_str());
         if (err != OK) { return err; }
-        if (*str == 0) { return OK; }
+        if (*str == '\0') { return OK; }
         if (*str == '\n'  &&  !ConvertNewlines) {
             err = NewLine();
         } else {
@@ -234,6 +227,29 @@ TextBuffer::PrintInt (uint i, const char * str)
     char temp[255];
     sprintf(temp, "%d%s", i, str);
     return PrintWord(temp);
+}
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//### TextBuffer::ReplaceContent(): Setup new buffer content, the size must include
+//      the nul byte.
+errorT
+TextBuffer::ReplaceContent(const char * newContent, uint size)
+{
+    if (size >= BufferSize)  { return ERROR_BufferFull; }
+
+    ByteCount = size;
+    ::memcpy(Buffer, newContent, size + 1);
+	 return OK;
+}
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//### TextBuffer::DumpToFile(): Output a textbuffer to an open file.
+errorT
+TextBuffer::DumpToFile (FILE * fp)
+{
+    ASSERT (fp != NULL);
+	 fwrite(Buffer, 1, ByteCount, fp);
+    return OK;
 }
 
 ///////////////////////////////////////////////////////////////////////////

@@ -1,4 +1,5 @@
-### lang.tcl: Support for multiple-language menus, buttons, etc.
+### language.tcl
+### Support for multiple-language menus, buttons, etc.
 ### Part of Scid, which is Copyright 2001-2003 Shane Hudson.
 
 array set langEncoding {}
@@ -9,42 +10,39 @@ if {[catch {encoding names}]} {
 } else {
   set hasEncoding 1
 }
-################################################################################
-#  Translation of pieces
-#  Note to adopt also tkscid.cpp to allow for a new langauge as well
-#  as add transPieces to langPieces[] in game.cpp
-################################################################################
+
+###  Translation of pieces
+#  Note - also change tkscid.cpp and game.cpp
+#  Note - not all languages have piece translation 
+
 array set transPieces {}
 
-set transPieces(F)   { P P K R Q D R T B F N C }
+set   transPieces(F) { P P K R Q D R T B F N C }
 set untransPieces(F) { P P R K D Q T R F B C N }
-set transPieces(S)   { P P K R Q D R T B A N C }
+set   transPieces(S) { P P K R Q D R T B A N C }
 set untransPieces(S) { P P R K D Q T R A B C N }
-set transPieces(D)   { P B K K Q D R T B L N S }
+set   transPieces(D) { P B K K Q D R T B L N S }
 set untransPieces(D) { B P K K D Q T R L B S N }
-set transPieces(I)   { P P K R Q D R T B A N C }
+set   transPieces(I) { P P K R Q D R T B A N C }
 set untransPieces(I) { P P R K D Q T R A B C N }
-set transPieces(N)   { P p K K Q D R T B L N P }
+set   transPieces(N) { P p K K Q D R T B L N P }
 set untransPieces(N) { p P K K D Q T R L B P N }
-set transPieces(C)   { P P K K Q D R V B S N J }
+set   transPieces(C) { P P K K Q D R V B S N J }
 set untransPieces(C) { P P K K D Q V R S B J N }
-## TODO Put in the right letters for greek
-set transPieces(G)   { P B K K Q D R T B L N S }
-set untransPieces(G) { B P K K D Q T R L B S N }
-set transPieces(H)   { P G K K Q V R B B F N H }
+set   transPieces(H) { P G K K Q V R B B F N H }
 set untransPieces(H) { G P K K V Q B R F B H N }
-set transPieces(O)   { P B K K Q D R T B L N S }
+set   transPieces(O) { P B K K Q D R T B L N S }
 set untransPieces(O) { B P K K D Q T R L B S N }
-set transPieces(W)   { P B K K Q D R T B L N S }
+set   transPieces(W) { P B K K Q D R T B L N S }
 set untransPieces(W) { B P K K D Q T R L B S N }
-set transPieces(K)   { P P K R Q D R T B A N C }
-set untransPieces(K) { P P R K D Q T R A B C N }
-set transPieces(U)   { P S K K Q D R T B L N R }
-set untransPieces(U) { S P K K D Q T R L B R N }
+set   transPieces(G) { P S K P Q B R [ B A N I }
+set untransPieces(G) { S P P K B Q [ R A B I N }
+set   transPieces(T) { P P K S Q V R K B F N A }
+set untransPieces(T) { P P S K V Q K R F B A N }
 
-################################################################################
-proc trans { msg } {
-  if { $::language == "E" || ! $::translatePieces || $msg == "\[end\]"} {
+
+proc trans {msg} {
+  if { $::language == "E" || ! $::translatePieces || $msg == {[end]} } {
     return $msg
   }
   if { [ catch { set t [string map $::transPieces($::language) $msg ]} ] } {
@@ -52,7 +50,7 @@ proc trans { msg } {
   }
   return $t
 }
-################################################################################
+
 proc untrans { msg } {
   if { $::language == "E"  || ! $::translatePieces || $msg == "\[end\]"} {
     return $msg
@@ -65,63 +63,102 @@ proc untrans { msg } {
 ################################################################################
 #
 ################################################################################
-proc addLanguage {letter name underline encodingSystem filename} {
-  lappend ::languages $letter
-  set ::langName($letter) $name
-  set ::langUnderline($letter) $underline
-  set ::langEncoding($letter) $encodingSystem
-  set ::langSourceFile($letter) $filename
+
+### Now unused
+### Languages are now sourced from menus.tcl -> initLanguageMenus
+
+proc addLanguage {letter name underline {encodingSystem ""}} {
+  return
 }
-################################################################################
-# menuText:
-#    Assigns the menu name and help message for a menu entry and language.
-################################################################################
-proc menuText {lang tag label underline {helpMsg ""}} {
+
+# Also change tcl/lang/langList.tcl
+
+# lang filename menuname underline encoding sc_info_lang
+array set langTable {
+  C {czech    Czech      0 iso8859-2 cz}
+  D {deutsch  Deutsch    0 utf-8     de}
+  L {finnish  Finnish    0 iso8859-1 {}}
+  F {francais Francais   0 iso8859-1 fr}
+  G {greek    Greek      0 utf-8     gr}
+  H {hungary  Hungarian  0 iso8859-2 hu}
+  I {italian  Italian    0 utf-8     it}
+  N {nederlan Nederlands 0 iso8859-1 ne}
+  O {norsk    Norsk      1 utf-8     no}
+  P {polish   Polish     0 utf-8     {}}
+  B {portbr   {Brazil Portuguese} 0 iso8859-1 {}}
+  U {port     Portuguese 0 iso8859-1 {}}
+  R {russian  Russian    0 utf-8     {}}
+  Y {serbian  Serbian    2 iso8859-2 {}}
+  S {spanish  Spanish    1 iso8859-1 es}
+  W {swedish  Swedish    1 iso8859-1 sw}
+  T {turkish  Turkish    0 utf-8     tr}
+}
+
+proc initLanguageMenus {} {
+  global langEncoding languages langTable
+
+  # English 
+  .menu.options.language add radiobutton -label English \
+    -underline 0 -variable language -value E -command setLanguage
+  set langEncoding(E) utf-8
+
+  set dir [file nativename [file join $::scidShareDir lang]]
+
+  set l {}
+  foreach {m n} [array get langTable] {
+    lappend l [list $m [lindex $n 1] $m]
+  }
+  foreach j [lsort -index 1 $l] {
+    set i [lindex $j 0]
+    if {[file exists [file nativename [file join $dir [lindex $langTable($i) 0].tcl]]]} {
+      .menu.options.language add radiobutton -label [lindex $langTable($i) 1] \
+	-underline [lindex $langTable($i) 2] -variable language -value $i -command setLanguage
+    }
+  }
+}
+
+### Assigns the menu name and help message for a menu entry and language.
+
+proc menuText {args} {
+  global hasEncoding langEncoding
+
+  lassign $args lang tag label underline helpMsg
+  if {![string is integer -strict $underline]} {
+    tk_messageBox -icon error -type ok -title "$::scidName Menu Error" \
+      -message "menuText $args\n\nNot enough args, or fourth arg is not an integer."
+    exit
+  }
+
   set ::menuLabel($lang,$tag) $label
   set ::menuUnder($lang,$tag) $underline
   if {$helpMsg != ""} {
     set ::helpMessage($lang,$tag) $helpMsg
   }
 }
-################################################################################
-# helpMsg:
-#    Assigns the help message for a particular language for a button.
-# ################################################################################
-proc helpMsg {lang button message} {
-  set ::helpMessage($lang,$button) $message
-}
 
 array set tr {}
 array set translations {}
-################################################################################
-# translate:
-#    Assigns a translation for future reference.
-################################################################################
+
+###  Assigns a translation for future reference.
+# extra translations for suffixes ":","..." are removed - S.A.
+
 proc translate {lang tag label} {
   regsub {\\n} $label "\n" label
   set ::translations($lang,$tag) $label
   set ::tr($tag) $label
-  foreach extra {":" "..."} {
-    set newtag "${tag}${extra}"
-    set newlabel "${label}${extra}"
-    set ::translations($lang,$newtag) $newlabel
-    set ::tr($newtag) $newlabel
-  }
 }
-################################################################################
-# translateECO:
+
 #    Given a pair list of ECO opening name phrase translations,
 #    assigns the translations for future reference.
-################################################################################
+
 proc translateECO {lang pairList} {
   foreach {from to} $pairList {
     sc_eco translate $lang $from $to
   }
 }
-################################################################################
-# tr:
-#    Given a tag and language, returns the stored text for that tag.
-################################################################################
+
+### translate text or menu
+
 proc tr {tag {lang ""}} {
   global menuLabel tr
   if {$lang == ""} {set lang $::language}
@@ -140,48 +177,61 @@ proc tr {tag {lang ""}} {
   # Finally, just give up and return the original tag
   return $tag
 }
-################################################################################
-#
-################################################################################
-proc setLanguage {} {
-  global menuLabel menuUnder
-  set lang $::language
-  
-  if { $::translatePieces } {
-    switch $lang {
-      C {sc_info language cz}
-      D {sc_info language de}
-      F {sc_info language fr}
-      G {sc_info language gr}
-      H {sc_info language hu}
-      I {sc_info language it}
-      K {sc_info language ca}
-      N {sc_info language ne}
-      O {sc_info language no}
-      S {sc_info language es}
-      U {sc_info language fi}
-      W {sc_info language sw}
-      default {sc_info language en}
-    }
+
+
+proc setLanguage {{lang ""}} {
+  global menuLabel menuUnder oldLang hasEncoding langEncoding langTable
+
+  if {$lang == ""} {
+    set lang $::language
   } else {
-    sc_info language en
-  }
-  
-  if {[catch {
-    if {[info exists ::langSourceFile($lang)]} {
-      source -encoding $::langEncoding($lang) [file nativename [file join "$::scidTclDir" "lang/$::langSourceFile($lang)"]]
-      unset ::langSourceFile($lang)
-    }
-    setLanguage_$lang
-  } err ]} {
-    tk_messageBox -message "Error loading $lang language: $err"
+    set ::language $lang
   }
 
-  # If using Tk, translate all menus:
-  if {[winfo exists .menu]} { setLanguageMenus }
-  # update notation window
-  if {[winfo exists .pgnWin]} { ::pgn::Refresh 1 }
-  
+  if {$lang == "E"} {
+      sc_info language en
+  } else {
+    ### Source language if necessary
+    ### (langEncoding doubles as a way to know if we have inited language yet)
+    if {![info exists langEncoding($lang)]} {
+      set langEncoding($lang) [lindex $langTable($lang) 3]
+      set filename [file nativename [file join $::scidShareDir "lang/[lindex $langTable($lang) 0].tcl"]]
+      if {$langEncoding($lang) == "utf-8"} {
+	source -encoding utf-8 $filename
+      } else {
+	source $filename
+        ### Hmmm. This is probably better, but is untested
+	# source -encoding $langEncoding($lang) $filename
+      }
+    }
+
+    if { $::translatePieces } {
+      set info [lindex $langTable($lang) 4]
+      if {$info == {}} {
+	sc_info language en
+      } else {
+	sc_info language $info
+      }
+    }
+  }
+  if {[catch {setLanguage_$lang} err]} {
+    puts "setLanguage_$lang error: $err"
+  }
+
+  ### Unused
+  # https://wiki.tcl.tk/2616
+  # if {$hasEncoding  && $langEncoding($lang) != ""} {
+  #  # encoding system $langEncoding($lang)
+  # }
+
+  # If using Tk, translate all menus
+  if {! [catch {winfo exists .}]} {
+    setLanguageMenus $lang
+    if {[winfo exists .glistWin]} {
+      ::windows::gamelist::setColumnTitles
+    }
+  }
+
   foreach i [array names ::tr] {
     if {[info exists ::translations($lang,$i)]} {
       set ::tr($i) $::translations($lang,$i)
@@ -189,47 +239,40 @@ proc setLanguage {} {
       set ::tr($i) $::translations(E,$i)
     }
   }
+  set oldLang $lang
+
+  catch {
+    .splash.auto    configure -textvar ::tr(KeepOpen)
+    .splash.dismiss configure -textvar ::tr(Close)
+  }
+
+  ::pgn::Refresh 1
+
+  # Not so important, but update pieces straight away
+  if {$::translatePieces} {
+    ::tree::refresh
+    if {[winfo exists .bookWin] } {::book::refresh}
+    if {[winfo exists .bookTuningWin]} {::book::refreshTuning}
+  }
 }
+
 ################################################################################
 # Will switch language only for Scid backoffice, no UI
 # Used to make callbacks use english by default
 ################################################################################
 proc setLanguageTemp { lang } {
-  switch $lang {
-    C {sc_info language cz}
-    D {sc_info language de}
-    F {sc_info language fr}
-    G {sc_info language gr}
-    H {sc_info language hu}
-    I {sc_info language it}
-    K {sc_info language ca}
-    N {sc_info language ne}
-    O {sc_info language no}
-    S {sc_info language es}
-    U {sc_info language fi}
-    W {sc_info language sw}
-    default {sc_info language en}
+
+  if {$lang == "E"} {
+      sc_info language en
+  } else {
+    set info [lindex $::langTable($lang) 4]
+    if {$info == {}} {
+      sc_info language en
+    } else {
+      sc_info language $info
+    }
   }
 }
 
-addLanguage E English 0 iso8859-1 english.tcl
-addLanguage K Català 2 iso8859-1 catalan.tcl
-addLanguage C Czech 0 iso8859-1 czech.tcl
-addLanguage D Deutsch 0 iso8859-1 deutsch.tcl
-addLanguage F Francais 0 iso8859-1 francais.tcl
-addLanguage G Greek 0 utf-8 greek.tcl
-addLanguage H Hungarian 0 iso8859-1 hungary.tcl
-addLanguage I Italian 0 iso8859-1 italian.tcl
-addLanguage N Nederlands 0 iso8859-1 nederlan.tcl
-addLanguage O Norsk 1 iso8859-1 norsk.tcl
-addLanguage P Polish 0 iso8859-1 polish.tcl
-addLanguage B {Brazil Portuguese} 0 iso8859-1 portbr.tcl
-addLanguage R Russian 1 utf-8 russian.tcl
-addLanguage Y Serbian 2 iso8859-1 serbian.tcl
-addLanguage S Español 1 iso8859-1 spanish.tcl
-addLanguage U Suomi 1 iso8859-1 suomi.tcl
-addLanguage W Swedish 1 iso8859-1 swedish.tcl
-
-setLanguage
-
 ### End of file: lang.tcl
+

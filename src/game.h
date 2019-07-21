@@ -18,25 +18,19 @@
 
 #include "common.h"
 #include "date.h"
-#include "indexentry.h"
+#include "index.h"
 #include "position.h"
 #include "namebase.h"
+#include "textbuf.h"
+#include "bytebuf.h"
 #include "matsig.h"
-#include <vector>
-#include <string>
-class ByteBuffer;
-class TextBuffer;
 
 void transPieces(char *s);
 char transPiecesChar(char c);
 
 // Piece letters translation
 extern int language; // default to english
-//  0 = en, 1 = fr, 2 = es, 3 = de
-extern const char * langPieces[];
-
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-//  Game: Constants
+extern const char *langPieces[];
 
 // Common NAG Annotation symbol values:
 const byte
@@ -140,12 +134,11 @@ struct patternT
 
 // The moveT structure stores all necessary information for one move:
 //
-class moveT
+struct moveT
 {
-    friend class Game;
     simpleMoveT  moveData;      // piece moving, target square etc
     char         san[10];           // SAN representation of move
-    std::string  comment;
+    char       * comment;
     moveT      * prev;
     moveT      * next;
     moveT      * varChild;
@@ -154,17 +147,21 @@ class moveT
     byte         numVariations;
     byte         nagCount;
     byte         nags[MAX_NAGS];
-
-    bool isNull () const { return isNullMove(&moveData); }
 };
 
+inline bool
+isNullMove (moveT * m)
+{
+    return isNullMove(&(m->moveData));
+}
 
 
 // Since we want allocation and freeing of moves to be FAST, we allocate
 // in chunks, and keep a linked list of the chunks allocated.
 // Freed moves can be added to the FreeList, but it is not essential to
 // do so, since all space for moves is deleted when the game is cleared.
-#define MOVE_CHUNKSIZE 100    // Allocate space for 100 moves at a time.
+
+  #define MOVE_CHUNKSIZE 100    // Allocate space for 100 moves at a time.
 
 struct moveChunkT {
     moveT moves [MOVE_CHUNKSIZE];
@@ -192,10 +189,10 @@ enum gameExactMatchT {
 };
 
 enum gameFormatT {
-    PGN_FORMAT_Plain = 0,   // Plain regular PGN output
-    PGN_FORMAT_HTML = 1,    // HTML format
-    PGN_FORMAT_LaTeX = 2,   // LaTeX (with chess12 package) format
-    PGN_FORMAT_Color = 3    // PGN, with color tags <red> etc
+    PGN_FORMAT_Plain = 0,        // Plain regular PGN output
+    PGN_FORMAT_HTML = 1,         // HTML format
+    PGN_FORMAT_Latex = 2,        // Latex format
+    PGN_FORMAT_Color = 3    
 };
 
 #define PGN_STYLE_TAGS             1
@@ -211,6 +208,7 @@ enum gameFormatT {
 #define PGN_STYLE_STRIP_MARKS   1024   // Strip [%mark] and [%arrow] codes.
 #define PGN_STYLE_NO_NULL_MOVES 2048   // Convert null moves to comments.
 #define PGN_STYLE_UNICODE       4096   // Use U+2654..U+2659 for figurine
+#define PGN_STYLE_STRIP_BRACES  8192   // For exporting PGN , convert {} to []
 
 
 void  game_printNag (byte nag, char * str, bool asSymbol, gameFormatT format);
@@ -218,19 +216,12 @@ byte  game_parseNag (const char * str);
 
 uint strGetRatingType (const char * name);
 
-
-//////////////////////////////////////////////////////////////////////
-//  Game:  Class Definition
-
-static Position staticPosition;
-
 class Game
 {
 private:
-    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    //  Game:  Data structures
-
+    gameNumberT GameNumber;     // first game in file is game 0
     bool        NonStandardStart;      // 1 if non-standard start.
+    char *      FenString;      // fen string if non-standard start. (UNUSED)
     colorT      ToMove;         // side to move in starting position
     ushort      NumHalfMoves;
     ushort      CurrentPlyCount;
@@ -249,11 +240,11 @@ private:
     moveChunkT * MoveChunk;
     moveT *     FreeList;
 
-    std::string EventStr;
-    std::string SiteStr;
-    std::string WhiteStr;
-    std::string BlackStr;
-    std::string RoundStr;
+    char *      EventStr;
+    char *      SiteStr;
+    char *      WhiteStr;
+    char *      BlackStr;
+    char *      RoundStr;
     dateT       Date;
     dateT       EventDate;
     resultT     Result;
@@ -278,9 +269,12 @@ private:
     ushort      SavedPlyCount;
     uint        SavedVarDepth;
 
-    const NameBase* NBase;      // needed for referencing id numbers.
+    StrAllocator * StrAlloc;   // For fast compact allocation of memory
+                               // for comments.
 
-    tagT        TagList [	MAX_TAGS];
+    NameBase *  NBase;      // needed for referencing id numbers.
+
+    tagT        TagList [MAX_TAGS];
     uint        NumTags;
 
     uint        NumMovesPrinted; // Used in recursive WriteMoveList method.
@@ -290,28 +284,26 @@ private:
     gameFormatT PgnFormat;       // see PGN_FORMAT macros above.
     uint        HtmlStyle;       // HTML diagram style, see
                                  //   DumpHtmlBoard method in position.cpp.
-    uint        PgnLastMovePos;
-
-    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    //  Game:  Private Functions
-    Game(const Game&);
-    Game& operator=(const Game&);
+    uint        PgnLastMovePos;  // The place of the last move in the
+                                 // PGN output, as a byte offset.
+    uint        PgnNextMovePos;  // The place of the next move in the
+                                 // PGN output, as a byte offset.
 
     void       AllocateMoreMoves ();
     inline moveT *    NewMove();
     inline void       FreeMove (moveT * move);
 
+    errorT     DecodeTags (ByteBuffer * buf, bool storeTags);
     errorT     DecodeVariation (ByteBuffer * buf, byte flags, uint level);
-    bool       calcAbsPlyNumber_ (moveT *m, moveT *s);
 
-    static void encodeMove (ByteBuffer * buf, moveT * m);
-    static errorT encodeVariation (ByteBuffer * buf, moveT * m, 
-                                   uint * subVarCount, uint * nagCount, uint depth);
-    static errorT encodeComments (ByteBuffer * buf, moveT * m, uint * commentCounter);
-    static errorT decodeComments (ByteBuffer * buf, moveT * m);
 
 public:
+    errorT WritePGN_CQL(TextBuffer * tb, uint stoplocation);
+    errorT WriteToPGN_CQL(TextBuffer * tb);
+    void handleinitialcomment_CQL(TextBuffer * tb);
+
     Game()      { Init(); }
+
     ~Game();
 
     void        Clear();
@@ -320,6 +312,8 @@ public:
     void        Init();
 
     // Set and Get attributes -- one-line (inline) methods
+    void         SetNumber (gameNumberT num) { GameNumber = num; }
+    gameNumberT  GetNumber ()                { return GameNumber; }
     void        SetNumHalfMoves (ushort x)  { NumHalfMoves = x; }
     ushort      GetNumHalfMoves ()          { return NumHalfMoves; }
     ushort      GetCurrentPly()             { return CurrentPlyCount; }
@@ -335,6 +329,9 @@ public:
 //    byte        GetCommentsFlag ()          { return CommentsFlag; }
     bool        HasPromotions ()            { return PromotionsFlag; }
     bool        HasUnderPromotions ()       { return UnderPromosFlag; }
+
+    void        SetNameBase (NameBase * nb) { NBase = nb; }
+    NameBase *  GetNameBase ()              { return NBase; }
 
     void        SetStartPos (Position * pos);
     errorT      SetStartFen (const char * fenStr);
@@ -353,6 +350,10 @@ public:
         return &(m->moveData);
     }
 
+    moveT * GetCurrentMoveCQL () {
+        return CurrentMove;
+    }
+
     inline void InitMove (moveT * m);
 
     void     SaveState ();
@@ -365,14 +366,14 @@ public:
     errorT   DeleteVariation (uint varNumber);
     errorT   DeleteVariationAndFree (uint varNumber);
     errorT   FirstVariation (uint varNumber);
-    errorT   MainVariation ();
+    errorT   MainVariation (uint varNumber);
     uint     GetVarNumber();
 
     void     SetMoveComment (const char * comment);
-    const char* GetMoveComment () { return CurrentMove->prev->comment.c_str(); }
+    void     AppendMoveComment (const char * comment);
+    char *   GetMoveComment () { return CurrentMove->prev->comment; }
 
     inline errorT AddNag (byte nag);
-    inline errorT RemoveNag (bool isMoveNag);
     byte *   GetNags () { return CurrentMove->prev->nags; }
     byte *   GetNextNags () { return CurrentMove->nags; }
     void     ClearNags () {
@@ -380,7 +381,6 @@ public:
         CurrentMove->prev->nags[0] = 0;
     }
 
-    void     MoveTo (const std::vector<int>& v);
     void     MoveToPly (ushort hmNumber);
     errorT   MoveForward ();
     errorT   MoveBackup ();
@@ -403,14 +403,15 @@ public:
 
     void     Truncate ();
     void     TruncateAndFree ();
+    void     TruncateAndFreeMove (moveT *);
 
     void     TruncateStart ();
 
-    void     SetEventStr (const char * str) { EventStr = str; }
-    void     SetSiteStr  (const char * str) { SiteStr  = str; }
-    void     SetWhiteStr (const char * str) { WhiteStr = str; }
-    void     SetBlackStr (const char * str) { BlackStr = str; }
-    void     SetRoundStr (const char * str) { RoundStr = str; }
+    void     SetEventStr (const char * str);
+    void     SetSiteStr (const char * str);
+    void     SetWhiteStr (const char * str);
+    void     SetBlackStr (const char * str);
+    void     SetRoundStr (const char * str);
     void     SetDate (dateT date)    { Date = date; }
     void     SetEventDate (dateT date)  { EventDate = date; }
     void     SetResult (resultT res) { Result = res; }
@@ -421,11 +422,11 @@ public:
     void     SetWhiteRatingType (byte b) { WhiteRatingType = b; }
     void     SetBlackRatingType (byte b) { BlackRatingType = b; }
     void     SetEco (ecoT eco)       { EcoCode = eco; }
-    const char* GetEventStr ()       { return EventStr.c_str(); }
-    const char* GetSiteStr ()        { return SiteStr.c_str();  }
-    const char* GetWhiteStr ()       { return WhiteStr.c_str(); }
-    const char* GetBlackStr ()       { return BlackStr.c_str(); }
-    const char* GetRoundStr ()       { return RoundStr.c_str(); }
+    char *   GetEventStr ()          { return EventStr; }
+    char *   GetSiteStr ()           { return SiteStr;  }
+    char *   GetWhiteStr ()          { return WhiteStr; }
+    char *   GetBlackStr ()          { return BlackStr; }
+    char *   GetRoundStr ()          { return RoundStr; }
     dateT    GetDate ()              { return Date; }
     dateT    GetEventDate ()         { return EventDate; }
     resultT  GetResult ()            { return Result; }
@@ -446,13 +447,13 @@ public:
     tagT *   GetExtraTags ()         { return TagList; }
     void     ClearExtraTags ();
 
-    void     MakeHomePawnList (byte * pbPawnList);
+    uint     MakeHomePawnList (byte * pbPawnList);
 
     // Searching
     compareT CompareCurrentPos (Position * p);
 
     void      CopyStandardTags (Game * fromGame);
-    errorT    LoadStandardTags (const IndexEntry* ie, const NameBase* nb);
+    errorT    LoadStandardTags (IndexEntry * ie, NameBase * nb);
     void      ClearStandardTags ();
 
     // PGN conversion
@@ -468,17 +469,14 @@ public:
                              moveT * oldCurrentMove,
                              bool printMoveNum, bool inComment);
     errorT    WritePGN (TextBuffer * tb, uint stopLocation);
-    std::pair<const char*, unsigned> WriteToPGN (uint lineWidth = 0,
-                                                 bool NewLineAtEnd = false,
-                                                 bool newLineToSpaces = true);
-    errorT    MoveToLocationInPGN (uint stopLocation);
+    errorT    WritePGNtoLaTeX(TextBuffer * tb, uint stopLocation);
+    errorT    WritePGNGraphToLatex(TextBuffer * tb);
+    errorT    WriteToPGN (TextBuffer * tb);
+    errorT    MoveToLocationInPGN (TextBuffer * tb, uint stopLocation);
     errorT    WriteExtraTags (FILE * fp);
-
-    uint      GetPgnOffset () {
-                  PgnLastMovePos = 0;
-                  if (!calcAbsPlyNumber_(FirstMove, CurrentMove->prev)) return 1;
-                  return PgnLastMovePos;
-              }
+    uint      GetPgnOffset (byte nextMoveFlag) {
+        return (nextMoveFlag ? PgnNextMovePos : PgnLastMovePos);
+    }
 
     void      ResetPgnStyle (void) { PgnStyle = 0; }
     void      ResetPgnStyle (uint flag) { PgnStyle = flag; }
@@ -495,7 +493,7 @@ public:
     static bool PgnFormatFromString (const char * str, gameFormatT * fmt);
     bool      IsPlainFormat () { return (PgnFormat == PGN_FORMAT_Plain); }
     bool      IsHtmlFormat  () { return (PgnFormat == PGN_FORMAT_HTML); }
-    bool      IsLatexFormat () { return (PgnFormat == PGN_FORMAT_LaTeX); }
+    bool      IsLatexFormat () { return (PgnFormat == PGN_FORMAT_Latex); }    
     bool      IsColorFormat () { return (PgnFormat == PGN_FORMAT_Color); }
 
     void      SetHtmlStyle (uint style) { HtmlStyle = style; }
@@ -527,10 +525,11 @@ public:
     errorT    DecodeStart (ByteBuffer * buf);
     errorT    DecodeNextMove (ByteBuffer * buf, simpleMoveT * sm);
     errorT    Decode (ByteBuffer * buf, byte flags);
-    errorT    DecodeTags (ByteBuffer * buf, bool storeTags);
 
-    std::vector<int> GetCurrentLocation();
-    Game* clone();
+    // StoredLine codes:
+    static ushort GetStoredLineCount (void);
+    static Game * GetStoredLine (ushort i);
+    static const char * GetStoredLineText (ushort i);
 };
 
 
@@ -541,7 +540,7 @@ Game::InitMove (moveT * m)
     m->prev = m->next = m->varParent = m->varChild = NULL;
     m->numVariations = 0;
     //m->varLevel = 0;
-    m->comment.clear();
+    m->comment = NULL;
     m->nagCount = 0;
     m->nags[0] = 0;
     m->marker = NO_MARKER;
@@ -554,61 +553,10 @@ Game::AddNag (byte nag)
     moveT * m = CurrentMove->prev;
     if (m->nagCount + 1 >= MAX_NAGS) { return ERROR_GameFull; }
     if (nag == 0) { /* Nags cannot be zero! */ return OK; }
-	// If it is a move nag replace an existing
-	if( nag >= 1 && nag <= 6)
-		for( int i=0; i<m->nagCount; i++)
-			if( m->nags[i] >= 1 && m->nags[i] <= 6)
-			{
-				m->nags[i] = nag;
-				return OK;
-			}
-	// If it is a position nag replace an existing
-	if( nag >= 10 && nag <= 21)
-		for( int i=0; i<m->nagCount; i++)
-			if( m->nags[i] >= 10 && m->nags[i] <= 21)
-			{
-				m->nags[i] = nag;
-				return OK;
-			}
-	if( nag >= 1 && nag <= 6)
-	{
-		// Put Move Nags at the beginning
-		for( int i=m->nagCount; i>0; i--)  m->nags[i] =  m->nags[i-1];
-		m->nags[0] = nag;
-	}
-	else
-		m->nags[m->nagCount] = nag;
-	m->nagCount += 1;
-	m->nags[m->nagCount] = 0;
-    return OK;
-}
-
-inline errorT
-Game::RemoveNag (bool isMoveNag)
-{
-    moveT * m = CurrentMove->prev;
-	if( isMoveNag)
-	{
-		for( int i=0; i<m->nagCount; i++)
-			if( m->nags[i] >= 1 && m->nags[i] <= 6)
-			{
-				m->nagCount -= 1;
-				for( int j=i; j<m->nagCount; j++)  m->nags[j] =  m->nags[j+1];
-				m->nags[m->nagCount] = 0;
-				return OK;
-			}
-	}
-	else
-	{
-		for( int i=0; i<m->nagCount; i++)
-			if( m->nags[i] >= 10 && m->nags[i] <= 21)
-			{
-				m->nagCount -= 1;
-				for( int j=i; j<m->nagCount; j++)  m->nags[j] =  m->nags[j+1];
-				m->nags[m->nagCount] = 0;
-				return OK;
-			}
-	}
+    m->nags[m->nagCount] = nag;
+    m->nagCount += 1;
+    m->nags[m->nagCount] = 0;
+    //if (nag > 0) NagsFlag = 1;
     return OK;
 }
 

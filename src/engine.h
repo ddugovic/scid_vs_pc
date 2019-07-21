@@ -1,4 +1,3 @@
-
 //////////////////////////////////////////////////////////////////////
 //
 //  FILE:       engine.h
@@ -66,7 +65,7 @@ struct transTableEntryT {
     uint    pawnhash;          // Pawn hash value, for extra safety check.
     short   score;             // Evaluation score.
     ushort  bestMove;          // Best move from/to/promote values.
-    byte    depth;             // Depth of evaluation.
+    byte    depth;             // Depth of evaulation.
     byte    flags;             // Score type, side to move and castling flags.
     byte    sequence;          // Sequence number, for detecting old entries.
     squareT enpassant;         // En passant target square.
@@ -116,9 +115,7 @@ private:
     bool     PostInfo;      // If true, print post info to stdout.
     bool     XBoardMode;    // If true, print info in xboard format.
     bool     Pruning;       // If true, do futility pruning.
-#ifndef WINCE
     FILE *   LogFile;       // Output is to stdout and to this file.
-#endif
     uint     QNodeCount;    // Nodes examined in quiescent search.
     uint     NodeCount;     // Nodes examined in total.
     Timer    Elapsed;       // Timer for interrupting search.
@@ -189,9 +186,7 @@ public:
         SearchTime = 1000;  // Default search time: 1000 ms = one second.
         MinSearchTime = MaxSearchTime = SearchTime;
         MinDepthCheckTime = 4; // will not check time until depth is at least of this value
-#ifndef WINCE
         LogFile = NULL;
-#endif
         Debug = false;
         PostInfo = false;
         XBoardMode = false;
@@ -208,13 +203,10 @@ public:
         NumGameMoves = 0;
         RootPos.StdStart();
         Pos.StdStart();
-        PV[0].length = 0;
+        for (uint i=0; i < ENGINE_MAX_PLY; i++)
+            PV[i].length = 0;
     }
-#ifdef WINCE
-    ~Engine()  { my_Tcl_Free((char*) TranTable);  my_Tcl_Free((char*) PawnTable); }
-#else
     ~Engine()  { delete[] TranTable;  delete[] PawnTable; }
-#endif
     void SetSearchDepth (uint ply) {
         if (ply < 1) { ply = 1; }
         if (ply > ENGINE_MAX_PLY) { ply = ENGINE_MAX_PLY; }
@@ -237,9 +229,7 @@ public:
     void SetXBoardMode (bool b) { XBoardMode = b; }
     bool InXBoardMode (void) { return XBoardMode; }
     void SetPruning (bool b) { Pruning = b; }
-#ifndef WINCE
     void SetLogFile (FILE * fp) { LogFile = fp; }
-#endif
     void SetHashTableKilobytes (uint sizeKB);
     void SetPawnTableKilobytes (uint sizeKB);
     uint NumHashTableEntries (void) { return TranTableSize; }

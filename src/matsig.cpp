@@ -18,31 +18,33 @@
 // that a game with an unusual number of promotions might break.
 // The maximum count for a non-pawn piece is three.
 
+#ifdef _WIN32
+#define NOMINMAX
+#endif
+
 #include "matsig.h"
 
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // matsig_makeString(): Make a string representation of a matsig.
-std::string
-matsig_makeString (matSigT m)
+//      Example: "12228.12228" for the starting position.
+// Currently unused
+// Altered in fulvio's gamelist to show string representation (eg QRRBBNN8:QRRBBNN8 for start position)
+void
+matsig_makeString (char * s, matSigT m)
 {
-    std::string s;
-    s.reserve(32);
-    uint i;
-    for (i=0; i < MATSIG_Count_WQ(m); i++) { s+= 'Q'; }
-    for (i=0; i < MATSIG_Count_WR(m); i++) { s+= 'R'; }
-    for (i=0; i < MATSIG_Count_WB(m); i++) { s+= 'B'; }
-    for (i=0; i < MATSIG_Count_WN(m); i++) { s+= 'N'; }
-    uint wp = MATSIG_Count_WP(m);
-    if (wp > 0) s+= (wp + '0');
-    s+= ':';
-    for (i=0; i < MATSIG_Count_BQ(m); i++) { s+= 'Q'; }
-    for (i=0; i < MATSIG_Count_BR(m); i++) { s+= 'R'; }
-    for (i=0; i < MATSIG_Count_BB(m); i++) { s+= 'B'; }
-    for (i=0; i < MATSIG_Count_BN(m); i++) { s+= 'N'; }
-    uint bp = MATSIG_Count_BP(m);
-    if (bp > 0) s+= (bp + '0');
-    return s;
+    *s++ = (char) MATSIG_Count_WQ(m) + '0';
+    *s++ = (char) MATSIG_Count_WR(m) + '0';
+    *s++ = (char) MATSIG_Count_WB(m) + '0';
+    *s++ = (char) MATSIG_Count_WN(m) + '0';
+    *s++ = (char) MATSIG_Count_WP(m) + '0';
+    *s++ = '.';
+    *s++ = (char) MATSIG_Count_BQ(m) + '0';
+    *s++ = (char) MATSIG_Count_BR(m) + '0';
+    *s++ = (char) MATSIG_Count_BB(m) + '0';
+    *s++ = (char) MATSIG_Count_BN(m) + '0';
+    *s++ = (char) MATSIG_Count_BP(m) + '0';
+    *s = 0;
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -89,7 +91,7 @@ inline static uint min(uint a, uint b) { return a < b ? a : b; }
 matSigT
 matsig_Make (byte * materialCounts)
 {
-    matSigT m = 0;
+    register matSigT m = 0;
     m |= ::min(3, static_cast<uint>(materialCounts[WQ])) << SHIFT_WQ;
     m |= ::min(3, static_cast<uint>(materialCounts[WR])) << SHIFT_WR;
     m |= ::min(3, static_cast<uint>(materialCounts[WB])) << SHIFT_WB;

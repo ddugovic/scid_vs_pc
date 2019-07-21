@@ -5,17 +5,15 @@
 
 namespace eval ::plist {}
 
-set plistWin 0
-
 set ::plist::sort Name
 
 proc ::plist::defaults {} {
   set ::plist::name ""
-  set ::plist::minGames 0
+  set ::plist::minGames 1
   set ::plist::maxGames 9999
   set ::plist::minElo 0
-  set ::plist::maxElo [sc_info limit elo]
-  set ::plist::size 50
+  set ::plist::maxElo 3000
+  set ::plist::size 1000
 }
 
 ::plist::defaults
@@ -25,55 +23,33 @@ trace variable ::plist::maxElo w [list ::utils::validate::Integer [sc_info limit
 trace variable ::plist::minGames w [list ::utils::validate::Integer 9999 0]
 trace variable ::plist::maxGames w [list ::utils::validate::Integer 9999 0]
 
-proc ::plist::toggle {} {
+proc ::plist::Open {} {
   set w .plist
   if {[winfo exists $w]} {
-    destroy $w
-  } else {
-    ::plist::Open
+    raiseWin $w
+    return
   }
-}
-
-proc ::plist::Open {} {
-  global plistWin
-  set w .plist
-  if {[winfo exists .plist]} { return }
-  set plistWin 1
 
   toplevel $w
-  wm title $w "Scid: [tr WindowsPList]"
   setWinLocation $w
   bind $w <Configure> "recordWinSize $w"
 
   bind $w <F1> {helpWindow PList}
   bind $w <Escape> "$w.b.close invoke"
   bind $w <Return> ::plist::refresh
-  bind $w <Destroy> { set plistWin 0 }
-  keyboardShortcuts $w
+  bind $w <Destroy> {}
   bind $w <Up> "$w.t.text yview scroll -1 units"
   bind $w <Down> "$w.t.text yview scroll 1 units"
   bind $w <Prior> "$w.t.text yview scroll -1 pages"
   bind $w <Next> "$w.t.text yview scroll 1 pages"
   bind $w <Key-Home> "$w.t.text yview moveto 0"
   bind $w <Key-End> "$w.t.text yview moveto 0.99"
-
-  menu $w.menu
-  $w configure -menu $w.menu
-  $w.menu add cascade -label PListFile -menu $w.menu.file
-  menu $w.menu.file
-  $w.menu.file add command -label Update -command ::plist::refresh
-  $w.menu.file add command -label Close -command "destroy $w"
-  $w.menu add cascade -label PListSort -menu $w.menu.sort
-  menu $w.menu.sort
-  foreach name {Name Elo Games Oldest Newest} {
-    $w.menu.sort add radiobutton -label $name -variable ::plist::sort \
-      -value $name -command ::plist::refresh
-  }
+  #bindMouseWheel $w $w.t.text
 
   foreach i {t o1 o2 o3 b} {frame $w.$i}
   $w.t configure -relief sunken -borderwidth 1
   text $w.t.text -width 55 -height 25 -font font_Small -wrap none \
-    -fg black -bg white -yscrollcommand "$w.t.ybar set" -setgrid 1 \
+    -fg black  -yscrollcommand "$w.t.ybar set" -setgrid 1 \
     -cursor top_left_arrow -xscrollcommand "$w.t.xbar set" -borderwidth 0
   scrollbar $w.t.ybar -command "$w.t.text yview" -takefocus 0
   scrollbar $w.t.xbar -orient horiz -command "$w.t.text xview" -takefocus 0
@@ -85,60 +61,74 @@ proc ::plist::Open {} {
   }
   $w.t.text configure -tabs $tablist
   $w.t.text tag configure ng -foreground darkBlue
-  $w.t.text tag configure date -foreground darkRed
-  $w.t.text tag configure elo -foreground darkGreen
-  $w.t.text tag configure name -foreground black
-  $w.t.text tag configure title -background lightSteelBlue; #-font font_SmallBold
+  $w.t.text tag configure date -foreground darkGreen
+  $w.t.text tag configure elo -foreground {}
+  $w.t.text tag configure name -foreground steelBlue
+  $w.t.text tag configure title -font font_SmallBold
 
   set font font_Small
   set fbold font_SmallBold
+  bindWheeltoFont $w.t.text
 
   set f $w.o1
-  label $f.nlabel -text $::tr(Player:) -font $fbold
-  ttk::combobox $f.name -textvariable ::plist::name -width 20
-  ::utils::history::SetCombobox ::plist::name $f.name
-  bindFocusColors $f.name
-  focus $f.name
-  label $f.size -text $::tr(TmtLimit:) -font $fbold
-  ttk::combobox $f.esize -width 4 -justify right -textvar ::plist::size -values {50 100 200 500 1000}
-  trace variable ::plist::size w {::utils::validate::Integer 1000 0}
-  bindFocusColors $f.esize
-  # foreach n {50 100 200 500 1000} {
-    # $f.esize list insert end $n
-  # }
-  pack $f.esize $f.size -side right
-  pack $f.nlabel $f.name -side left
 
-  set f $w.o2
-  label $f.elo -text "[tr PListSortElo]:" -font $fbold
-  entry $f.emin -textvariable ::plist::minElo
-  label $f.eto -text "-"
-  entry $f.emax -textvariable ::plist::maxElo
-  label $f.games -text "[tr PListSortGames]:" -font $fbold
+  # Games
+
+  label $f.games -text "[tr PListSortGames]" -font $fbold
   entry $f.gmin -textvariable ::plist::minGames
   label $f.gto -text "-"
   entry $f.gmax -textvariable ::plist::maxGames
+  pack $f.games $f.gmin $f.gto $f.gmax -side left
+
+ foreach entry {gmin gmax} {
+    $f.$entry configure -width 5 -justify right -font $font
+    bindFocusColors $f.$entry
+    bind $f.$entry <FocusOut> +::plist::check
+  }
+
+  # Player
+
+  label $f.nlabel -text $::tr(Player) -font $fbold
+
+  set tmp $::plist::name
+  ttk::combobox $f.name -textvariable ::plist::name -width 20
+  ::utils::history::SetCombobox ::plist::name $f.name
+  set ::plist::name $tmp
+
+  bindFocusColors $f.name
+  pack $f.name $f.nlabel -side right
+
+  set f $w.o2
+
+  # Elo
+
+  label $f.elo -text "[tr PListSortElo]        " -font $fbold
+  entry $f.emin -textvariable ::plist::minElo
+  label $f.eto -text "-"
+  entry $f.emax -textvariable ::plist::maxElo
 
   foreach entry {emin emax} {
-    $f.$entry configure -width 4 -justify right -font $font
+    $f.$entry configure -width 5 -justify right -font $font
     bindFocusColors $f.$entry
     bind $f.$entry <FocusOut> +::plist::check
   }
-
-  foreach entry {gmin gmax} {
-    $f.$entry configure -width 6 -justify right -font $font
-    bindFocusColors $f.$entry
-    bind $f.$entry <FocusOut> +::plist::check
-  }
-  
   pack $f.elo $f.emin $f.eto $f.emax -side left
-  pack $f.gmax $f.gto $f.gmin $f.games -side right
+
+  # List Size
+
+  label $f.size -text $::tr(TmtLimit) -font $fbold
+  ttk::combobox $f.esize -width 7 -justify right -textvar ::plist::size -values {50 100 200 500 1000 10000 100000}
+  trace variable ::plist::size w {::utils::validate::Integer 100000 0}
+  bindFocusColors $f.esize
+
+  pack $f.esize $f.size -side right
 
   dialogbutton $w.b.defaults -text $::tr(Defaults) -command ::plist::defaults
   dialogbutton $w.b.update -text $::tr(Update) -command ::plist::refresh
+  dialogbutton $w.b.help -text $::tr(Help) -command {helpWindow PList}
   dialogbutton $w.b.close -text $::tr(Close) -command "destroy $w"
   packbuttons left $w.b.defaults
-  packbuttons right $w.b.close $w.b.update
+  packbuttons right $w.b.close $w.b.help $w.b.update
 
   pack $w.b -side bottom -fill x
   pack $w.o3 -side bottom -fill x -padx 2 -pady 2
@@ -152,31 +142,17 @@ proc ::plist::Open {} {
   grid rowconfig $w.t 0 -weight 1 -minsize 0
   grid columnconfig $w.t 0 -weight 1 -minsize 0
 
-  ::plist::ConfigMenus
   ::plist::refresh
-}
-
-proc ::plist::ConfigMenus {{lang ""}} {
-  set w .plist
-  if {! [winfo exists $w]} { return }
-  if {$lang == ""} { set lang $::language }
-  set m $w.menu
-  foreach idx {0 1} tag {File Sort} {
-    configMenuText $m $idx PList$tag $lang
-  }
-  foreach idx {0 2} tag {Update Close} {
-    configMenuText $m.file $idx PListFile$tag $lang
-  }
-  foreach idx {0 1 2 3 4} tag {Name Elo Games Oldest Newest } {
-    configMenuText $m.sort $idx PListSort$tag $lang
-  }
 }
 
 proc ::plist::refresh {} {
   set w .plist
   if {! [winfo exists $w]} { return }
 
+  wm title $w "[tr WindowsPList]: [file tail [sc_base filename]]"
+
   busyCursor .
+  update
   ::utils::history::AddEntry ::plist::name $::plist::name
   set t $w.t.text
   $t configure -state normal
@@ -186,14 +162,15 @@ proc ::plist::refresh {} {
   foreach i {Games Oldest Newest Elo Name} {
     $t tag configure s$i -font font_SmallBold
     $t tag bind s$i <1> "set ::plist::sort $i; ::plist::refresh"
-    $t tag bind s$i <Any-Enter> "$t tag config s$i -foreground red"
-    $t tag bind s$i <Any-Leave> "$t tag config s$i -foreground {}"
+    $t tag bind s$i <Any-Enter> "$t tag config s$i -background $::rowcolor"
+    $t tag bind s$i <Any-Leave> "$t tag config s$i -background {}"
     $t insert end "\t" title
     $t insert end [tr PListSort$i] [list title s$i]
   }
   $t insert end "\n" title
 
   update
+
   set err [catch {sc_name plist -name $::plist::name -size $::plist::size \
             -minGames $::plist::minGames -maxGames $::plist::maxGames \
             -minElo $::plist::minElo -maxElo $::plist::maxElo \
@@ -204,7 +181,7 @@ proc ::plist::refresh {} {
     return
   }
 
-  set hc yellow
+  set hc $::rowcolor
   set count 0
   foreach player $pdata {
     incr count
@@ -214,8 +191,8 @@ proc ::plist::refresh {} {
     set elo [lindex $player 3]
     set name [lindex $player 4]
 
-    $t tag bind p$count <ButtonPress-1> [list ::pinfo::playerInfo $name]
-    #$t tag bind p$count <ButtonPress-$::MB3> [list playerInfo $name]
+    $t tag bind p$count <ButtonPress-1> [list playerInfo $name raise]
+    #$t tag bind p$count <ButtonPress-3> [list playerInfo $name raise]
     $t tag bind p$count <Any-Enter> \
       "$t tag configure p$count -background $hc"
     $t tag bind p$count <Any-Leave> \

@@ -1,102 +1,277 @@
+# game.tcl: part of Scid
 
+#   Prompts the user if they want to discard the changes to the
+#   current game. Returns :
+# 0 -> saves then continue
+# 1 -> discard changes and continue
+# 2 -> cancel action
 
-# ::game::Clear
-#
+proc ::game::ConfirmDiscard {} {
+  # This should be rewritten with tk_dialog and "return answer"
+  # rather than "::game::answer" S.A.
+
+  # This is not correct. We can have an altered game , then start Trial mode.
+  # Instead, we should [setTrialMode 0], then check [sc_game altered], but needs lots of testing
+  if {$::trialMode || [sc_base isReadOnly] || ![sc_game altered]} {
+    return 1
+  }
+
+  set w .confirmDiscard
+  toplevel $w
+  wm state $w withdrawn
+  wm title $w Scid
+  set ::game::answer 2
+  pack [frame $w.top] -side top
+  addHorizontalRule $w
+  pack [frame $w.bottom] -expand 1 -fill x -side bottom
+
+  # label $w.top.icon -bitmap question
+  # pack $w.top.icon -side left -padx 20 -pady 5
+
+  label $w.top.txt -text $::tr(ClearGameDialog)
+  pack $w.top.txt -padx 5 -pady 5 -side right
+
+  button $w.bottom.b1 -width 10 -text $::tr(Save)     -command {destroy .confirmDiscard ; set ::game::answer 0}
+  button $w.bottom.b2 -width 10 -text $::tr(DontSave) -command {destroy .confirmDiscard ; set ::game::answer 1}
+  button $w.bottom.b3 -width 10 -text $::tr(Cancel)   -command {destroy .confirmDiscard ; set ::game::answer 2}
+  pack $w.bottom.b1 $w.bottom.b2 $w.bottom.b3 -side left -padx 10 -pady 5
+
+  bind $w <Destroy> {set ::game::answer 2}
+  bind $w <Right> "event generate $w <Tab>"
+  bind $w <Left> "event generate $w <Shift-Tab>"
+
+  update
+  placeWinOverParent $w .
+  wm state $w normal
+
+  catch { grab $w }
+
+  focus $w.bottom.b2
+  vwait ::game::answer
+  return $::game::answer
+}
+
+### New Game
 #   Clears the active game, checking first if it is altered.
 #   Updates any affected windows.
-#
-proc ::game::Clear {} {
-  set confirm [::game::ConfirmDiscard]
-  if {$confirm == 0} { return }
-  if {$confirm == 1} { ::notify::DatabaseModified $::curr_db }
-  if {$confirm == 2} { ::notify::DatabaseModified $::clipbase_db }
-  
+
+proc ::game::Clear {{confirm yes}} {
+  if {$confirm == "yes"} {
+    set confirm [::game::ConfirmDiscard]
+    if {$confirm == 2} { return }
+    if {$confirm == 0} {
+      ::game::Save
+    }
+  }
+
+  setTrialMode 0
   sc_game new
-  ::notify::GameChanged
+  updateBoard -pgn
+  updateTitle
+  updateMenuStates
+  ::tools::graphs::score::Refresh
 }
 
-# ::game::Strip
-#
 #   Strips all comments or variations from a game
-#
-proc ::game::Strip {type} {
-  undoFeature save
+
+proc ::game::Strip {type {parent .}} {
+  sc_game undoPoint
+
   if {[catch {sc_game strip $type} result]} {
-    tk_messageBox -parent . -type ok -icon info -title "Scid" -message $result
+    tk_messageBox -parent $parent -type ok -icon info -title Scid -message $result
     return
   }
   updateBoard -pgn
   updateTitle
+  ::tools::graphs::score::Refresh
 }
 
-# ::game::TruncateBegin
-#
 proc ::game::TruncateBegin {} {
-  undoFeature save
+  sc_game undoPoint
+
   if {[catch {sc_game truncate -start} result]} {
-    tk_messageBox -parent . -type ok -icon info -title "Scid" -message $result
+    tk_messageBox -parent . -type ok -icon info -title Scid -message $result
     return
   }
   updateBoard -pgn
   updateTitle
+  ::tools::graphs::score::Refresh
 }
 
-# ::game::Truncate
-#
 proc ::game::Truncate {} {
-  undoFeature save
+  sc_game undoPoint
+
   if {[catch {sc_game truncate} result]} {
-    tk_messageBox -parent . -type ok -icon info -title "Scid" -message $result
+    tk_messageBox -parent . -type ok -icon info -title Scid -message $result
     return
   }
   updateBoard -pgn
   updateTitle
+  ::tools::graphs::score::Refresh
 }
 
-# game::LoadNextPrev
-#
+proc ::game::Delete {} {
+  sc_game flag delete [sc_game number] invert
+  updateBoard
+  ::windows::gamelist::Refresh
+}
+
 #   Loads the next or previous filtered game in the database.
-#   The parameter <action> should be "previous" or "next".
-#
-proc ::game::LoadNextPrev {action} {
+#   The parameter <action> should be "previous" , "next", "first" or "last"
+
+proc ::game::LoadNextPrev {action {raise 1}} {
   global pgnWin statusBar
+  if {![sc_base inUse]} {
+    set statusBar "  There is no $action game: this is an empty database."
+    return
+  }
   set number [sc_filter $action]
   if {$number == 0} {
     set statusBar "  There is no $action game in the current filter."
     return
   }
-  ::game::Load $number
+  if {$number == [sc_game number]} {
+    set statusBar "  Game $number already loaded."
+    return
+  }
+  ::game::Load $number 1 $raise
 }
 
-# ::game::Reload
-#
 #   Reloads the current game.
-#
+
 proc ::game::Reload {} {
   if {![sc_base inUse]} { return }
   if {[sc_game number] < 1} { return }
   ::game::Load [sc_game number]
 }
 
-# ::game::LoadRandom
-#
 #   Loads a random game from the database.
-#
+
 proc ::game::LoadRandom {} {
-  set db [sc_base current]
-  set filter "dbfilter"
-  set ngames [sc_filter count $db $filter]
+  set ngames [sc_filter size]
   if {$ngames == 0} { return }
-  set r [expr {(int (rand() * $ngames))} ]
-  set gnumber [sc_base gameslist $db $r 1 $filter N+]
-  ::game::Load [split [lindex $gnumber 0] "_"]
+  set r [expr {(int (rand() * $ngames)) + 1} ]
+  set gnumber [sc_filter index $r]
+  ::game::Load $gnumber
 }
 
-# ::game::LoadMenu
+
+# ::game::LoadNumber
 #
+#    Prompts for the number of the game to load.
+
+set ::game::entryLoadNumber ""
+trace variable ::game::entryLoadNumber w {::utils::validate::Regexp {^[0-9]*$}}
+
+proc ::game::LoadNumber {} {
+  set ::game::entryLoadNumber ""
+  if {![sc_base inUse]} { return }
+
+  set confirm [::game::ConfirmDiscard]
+  if {$confirm == 2} { return }
+  if {$confirm == 0} {
+    ::game::Save
+  }
+
+  if {[sc_base numGames] < 1} { return }
+
+  set w [toplevel .glnumDialog]
+  wm title $w "Scid: [tr GameNumber]"
+  wm state $w withdrawn
+
+  label $w.label -text $::tr(LoadGameNumber)
+  pack $w.label -side top -pady 5 -padx 5
+
+  entry $w.entry  -width 10 -textvariable ::game::entryLoadNumber
+  bind $w.entry <Escape> { .glnumDialog.buttons.cancel invoke }
+  bind $w.entry <Return> { .glnumDialog.buttons.load invoke }
+  pack $w.entry -side top -pady 5
+
+  set b [frame $w.buttons]
+  pack $b -side top -fill x
+  dialogbutton $b.load -text "OK" -command {
+    # todo: Can we integrate this into ::file::Open
+    if {[catch {sc_game load $::game::entryLoadNumber} result]} {
+      tk_messageBox -type ok -icon info -title Scid -message $result
+    }
+    focus .main
+    destroy .glnumDialog
+    flipBoardForPlayerNames
+    updateBoard -pgn
+    refreshWindows
+    ::bookmarks::AddCurrentGame 
+  }
+  dialogbutton $b.cancel -text $::tr(Cancel) -command {
+    destroy .glnumDialog
+    focus .main
+  }
+  packbuttons right $b.cancel $b.load
+
+  placeWinOverParent $w .
+  update
+  wm state $w normal
+  focus $w.entry
+}
+
+### Loads a specified game from the active database.
+
+proc ::game::Load { selection {update 1} {raise 1}} {
+  # If an invalid game number, just return:
+  if {$selection < 1 || $selection > [sc_base numGames]} {
+    return
+  }
+  if {[winfo exists .fics] && $::fics::mainGame > -1} {
+    ### Handle cases where fics playing and observing
+    if {($::fics::playing==1 || $::fics::playing==-1)} {
+      ::fics::updateConsole "Scid: game loads disabled while playing a game"
+      return 
+    }
+    ::fics::demote_mainGame
+    set ::fics::mainGame -1
+    set ::fics::autoload {}
+  } else {
+    set confirm [::game::ConfirmDiscard]
+    if {$confirm == 2} { return -1 }
+    if {$confirm == 0} {
+      ::game::Save
+    }
+  }
+
+  setTrialMode 0
+  sc_game load $selection
+  flipBoardForPlayerNames
+  if {$update} {
+    updateBoard -pgn
+  }
+  if {$raise && \
+      ![winfo exists .tourney] && \
+      ![winfo exists .twinchecker] && \
+      ![winfo exists .sb] && \
+      ![winfo exists .sh] && \
+      ![winfo exists .bmedit] && \
+      ![winfo exists .sm] } {
+    raiseWin .
+  }
+  refreshWindows
+  ::bookmarks::AddCurrentGame
+}
+
+### Replaces numerous 'sc_game save [sc_game number]' around the place.
+# New saved games are added to Game History
+
+proc ::game::Save {} {
+    set n [sc_game number]
+    sc_game save $n
+    if {$n == 0} {
+      # add new game to history
+      ::bookmarks::AddCurrentGame
+      updateMenuStates
+    }
+}
+
 #   Produces a popup dialog for loading a game or other actions
 #   such as merging it into the current game.
-#
+
 proc ::game::LoadMenu {w base gnum x y} {
   set m $w.gLoadMenu
   if {! [winfo exists $m]} {
@@ -106,319 +281,61 @@ proc ::game::LoadMenu {w base gnum x y} {
     $m add command -label $::tr(MergeGame)
   }
   $m entryconfigure 0 -command "::gbrowser::new $base $gnum"
-  $m entryconfigure 1 -command "::file::SwitchToBase $base 0; ::game::Load $gnum"
+  $m entryconfigure 1 -command "
+    if {\[sc_base current\] != $base} {
+      sc_base switch $base
+      # These two not now refreshed with game::Load below
+      ::plist::refresh
+      ::tourney::refresh
+    }
+    ::game::Load $gnum"
   $m entryconfigure 2 -command "mergeGame $base $gnum"
-  event generate $w <ButtonRelease-1>
-  $m post $x $y
-  event generate $m <ButtonPress-1>
+  ### Use tk_popup, amd remove the event hacks
+  ### Wish8.7a0 menu's "post" doesn't allow for any way to cancel the menu for some reason - S.A.
+  tk_popup $m $x $y
 }
 
 
-# ::game::moveEntryNumber
-#
 #   Entry variable for GotoMoveNumber dialog.
-#
 set ::game::moveEntryNumber ""
 trace variable ::game::moveEntryNumber w {::utils::validate::Regexp {^[0-9]*$}}
 
-# ::game::GotoMoveNumber
-#
 #    Prompts for the move number to go to in the current game.
-#
+
 proc ::game::GotoMoveNumber {} {
   set ::game::moveEntryNumber ""
   set w [toplevel .mnumDialog]
   wm title $w "Scid: [tr GameGotoMove]"
-  grab $w
-  
+
   label $w.label -text $::tr(GotoMoveNumber)
   pack $w.label -side top -pady 5 -padx 5
-  
-  entry $w.entry -background white -width 10 -textvariable ::game::moveEntryNumber
+
+  entry $w.entry -width 8 -textvariable ::game::moveEntryNumber -borderwidth 0 ; # -justify right
   bind $w.entry <Escape> { .mnumDialog.buttons.cancel invoke }
   bind $w.entry <Return> { .mnumDialog.buttons.load invoke }
   pack $w.entry -side top -pady 5
-  
+
   set b [frame $w.buttons]
   pack $b -side top -fill x
   dialogbutton $b.load -text "OK" -command {
-    grab release .mnumDialog
     if {$::game::moveEntryNumber > 0} {
-      catch {sc_move ply [expr {($::game::moveEntryNumber - 1) * 2}]}
+      catch {sc_move ply [expr {($::game::moveEntryNumber - 1) * 2}] ; sc_move forward}
     }
-    focus .
+    focus .main
     destroy .mnumDialog
-    updateBoard -pgn
+    # updateBoard -pgn
+    updateBoard
   }
   dialogbutton $b.cancel -text $::tr(Cancel) -command {
-    focus .
-    grab release .mnumDialog
+    focus .main
     destroy .mnumDialog
-    focus .
+    focus .main
   }
   packbuttons right $b.cancel $b.load
-  
-  set x [ expr {[winfo width .] / 4 + [winfo rootx .] } ]
-  set y [ expr {[winfo height .] / 4 + [winfo rooty .] } ]
-  wm geometry $w "+$x+$y"
-  
+
+  placeWinOverParent $w .
+
   focus $w.entry
 }
 
-################################################################################
-# merge game gnum in base srcBase in current game in base destBase
-# then switch to destbase
-################################################################################
-proc ::game::mergeInBase { srcBase destBase gnum } {
-  ::file::SwitchToBase $destBase
-  mergeGame $srcBase $gnum
-}
-
-
-
-# Scid (Shane's Chess Information Database)
-#
-# Copyright (C) 2012-2015 Fulvio Benini
-#
-# Scid is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation.
-
-# ::game::Load
-#
-#   Loads a specified game from the active database.
-#
-proc ::game::Load { selection {ply ""} } {
-  ::gameHistory::updatePos $::curr_db [sc_game number] [sc_pos location]
-
-  set confirm [::game::ConfirmDiscard]
-  if {$confirm == 0} { return 0}
-  if {$confirm == 1} { ::notify::DatabaseModified $::curr_db }
-  if {$confirm == 2} { ::notify::DatabaseModified $::clipbase_db }
-
-  if {[catch {sc_game load $selection}]} {
-    ERROR::MessageBox
-    return 0
-  }
-
-  if {$ply != ""} { eval "sc_move ply $ply" }
-
-  ::gameHistory::pushBack $::curr_db [sc_game number] [sc_pos location]
-
-  set extraTags [sc_game tag get Extra]
-  regexp {FlipB "([01])"\n} $extraTags -> flipB
-  if {![info exists flipB]} { set flipB -1 }
-  ::board::flipAuto .main.board $flipB
-
-  ::notify::GameChanged
-}
-
-
-# ::game::ConfirmDiscard
-#   Prompts the user if they want to discard the changes to the
-#   current game. Returns :
-# 0 -> cancel action
-# 1 -> continue (saved)
-# 2 -> continue (added to clipbase)
-# 3 -> continue (discarded or no changes)
-#
-# If the game has been saved (res == 1 || res == 2) the caller should
-# ::notify::DatabaseModified
-#
-proc ::game::ConfirmDiscard {} {
-  if {! [sc_game altered]} { return 3 }
-
-  #Default value: cancel action
-  set ::game::answer 0
-
-  set fname [file tail [sc_base filename $::curr_db]]
-  set gnum [sc_game number]
-  set players "[sc_game info white] - [sc_game info black]\n"
-  if {[string equal " - \n" $players]} { set players "" }
-
-  set w .confirmDiscard
-  set bgcolor [ttk::style lookup Button.label -background]
-  toplevel $w -background $bgcolor
-  wm resizable $w 0 0
-  wm title $w "Scid: [tr Save]"
-
-  ttk::frame $w.msg
-  ttk::label $w.msg.image -image tb_iconSave
-  ttk::frame $w.msg.txt
-  label $w.msg.txt.l1 -text "$players$fname: [tr game] $gnum" -background $bgcolor -relief groove
-  ttk::label $w.msg.txt.l2 -text $::tr(ClearGameDialog) -wraplength 360 -font font_Bold -justify left
-  grid $w.msg.txt.l1 -row 0 -sticky news -pady 4 -padx 2
-  grid $w.msg.txt.l2 -row 1 -sticky news
-  grid $w.msg.txt   -row 0 -column 0 -pady 6 -padx 10 -sticky w
-  grid $w.msg.image -row 0 -column 1 -pady 6 -padx 6 -sticky ne
-
-  #The first button that gets keyboard focus when pressing <tab>
-  #Coincide with default value
-  ttk::button $w.backBtn -text $::tr(GoBack) -command {
-    destroy .confirmDiscard
-  }
-
-  ttk::label $w.saveTxt -text [tr SaveAndContinue]
-  ttk::button $w.saveBtn -image tb_BD_Save -command {
-    set gnum [sc_game number]
-    if {[catch {sc_game save $gnum $::curr_db}]} {
-      ERROR::MessageBox
-      set ::game::answer 0
-    } else {
-      ::gameHistory::updatePos $::curr_db $gnum [sc_pos location]
-      set ::game::answer 1
-	}
-    destroy .confirmDiscard
-  }
-
-  ttk::label $w.clipbaseTxt -text [tr EditCopy]
-  ttk::button $w.clipbaseBtn -image tb_BD_SaveAs -command {
-    if {[catch {sc_game save 0 $::clipbase_db}]} {
-      ERROR::MessageBox
-      set ::game::answer 0
-    } else {
-	  set gnum [sc_base numGames $::clipbase_db]
-      ::gameHistory::pushBack $::clipbase_db $gnum [sc_pos location]
-      set ::game::answer 2
-    }
-    destroy .confirmDiscard
-  }
-
-  ttk::label $w.discardTxt -text [tr DiscardChangesAndContinue]
-  ttk::button $w.discardBtn -image tb_BD_VarDelete -command {
-    set ::game::answer 3
-    destroy .confirmDiscard
-  }
-
-  grid $w.msg         -row 0 -columnspan 3
-  grid $w.saveBtn     -row 1 -sticky w -padx 10 -pady 4
-  grid $w.saveTxt     -row 1 -column 1 -sticky w
-  grid $w.clipbaseBtn -row 2 -sticky w -padx 10 -pady 4
-  grid $w.clipbaseTxt -row 2 -column 1 -sticky w
-  grid $w.discardBtn  -row 3 -sticky w -padx 10 -pady 4
-  grid $w.discardTxt  -row 3 -column 1 -sticky w
-  grid $w.backBtn     -row 3 -column 2 -sticky e -padx 10 -pady 4
-  grid [ttk::frame $w.pad] -row 4 -columnspan 3 -pady 3
-  grid columnconfigure $w 2 -weight 1
-
-  tk::PlaceWindow $w
-  grab $w
-  tkwait window $w
-  return $::game::answer
-}
-
-
-namespace eval ::gameHistory {
-  set list_ {}
-
-  proc updatePos {db game pos} {
-    global gameHistory::list_
-
-    set idx [lsearch -index 0 $list_ "$db $game"]
-    if {$idx < 0} { return }
-
-    set elem [list "$db $game" "$pos"]
-    set list_ [lreplace $list_ $idx $idx $elem]
-  }
-
-  proc pushBack {db game pos} {
-    global gameHistory::list_
-    if {$game == 0} { return }
-
-    set list_ [lsearch -index 0 -all -inline -not $list_ "$db $game"]
-    if {[llength $list_] > 20} {
-      set list_ [lrange $list_ end-19 end]
-    }
-
-    set elem [list "$db $game" "$pos"]
-    lappend list_ $elem
-  }
-
-  proc removeDB {db} {
-    global gameHistory::list_
-    set list_ [lsearch -index 0 -all -inline -not $list_ "$db *"]
-  }
-
-}
-
-
-# Grouping intercommunication between windows
-# When complete this should be moved to a new notify.tcl file
-namespace eval ::notify {
-  # To be called when the current game change or the Header infos (player names, site, result, etc) are modified
-  proc GameChanged {} {
-    global gamePlayers
-    set gamePlayers(nameW) [sc_game info white]
-    set eloW [sc_game info welo]
-    if {$eloW == 0} { set gamePlayers(eloW) "" } else { set gamePlayers(eloW) "($eloW)" }
-    set ::gamePlayers(clockW) ""
-    set gamePlayers(nameB) [sc_game info black]
-    set eloB [sc_game info belo]
-    if {$eloB == 0} { set gamePlayers(eloB) "" } else { set gamePlayers(eloB) "($eloB)" }
-    set ::gamePlayers(clockB) ""
-
-    ::notify::PosChanged -pgn
-    ::windows::gamelist::Refresh 0
-  }
-
-  # To be called when the current position changes
-  # - draw the new position
-  # @-animate: if true will try to animate the moving piece
-  #            ignored if more than one piece is in a different position
-  #
-  # - inform the other modules that the current position is changed
-  # @-pgn: must be true if the pgn notation is different (new moves, new tags, etc)
-  #
-  proc PosChanged {args} {
-    set pgnNeedsUpdate 0
-    set animate 0
-    foreach arg $args {
-        if {! [string compare $arg "-pgn"]} { set pgnNeedsUpdate 1 }
-        if {! [string compare $arg "-animate"]} { set animate 1 }
-    }
-
-    ::pgn::Refresh $pgnNeedsUpdate
-
-    ::board::setmarks .main.board [sc_pos getComment]
-    ::board::update .main.board [sc_pos board] $animate
-
-    after cancel ::notify::privPosChanged
-    update idletasks
-    after idle ::notify::privPosChanged
-  }
-
-  # To be called when the position of the current game change
-  proc privPosChanged {} {
-    moveEntry_Clear
-    updateStatusBar
-    updateMainToolbar
-    updateTitle
-    if {$::showGameInfo} { updateGameInfo }
-    updateAnalysis 1
-    updateAnalysis 2
-    ::windows::gamelist::PosChanged
-    ::commenteditor::Refresh
-    ::tb::results
-    if {[winfo exists .twinchecker]} { updateTwinChecker }
-    if {[winfo exists .bookWin]} { ::book::refresh }
-    if {[winfo exists .bookTuningWin]} { ::book::refreshTuning }
-    updateNoveltyWin
-    ::tree::refresh
-  }
-
-  # To be called when the current database change or a new base is opened
-  proc DatabaseChanged {} {
-    set ::curr_db [sc_base current]
-    ::windows::switcher::Refresh
-    ::windows::stats::Refresh
-    set ::treeWin [winfo exists .treeWin$::curr_db]
-    menuUpdateBases
-  }
-
-  # To be called after modifying data in a database
-  proc DatabaseModified {{dbase} {filter -1}} {
-    ::windows::gamelist::DatabaseModified $dbase $filter
-    ::windows::switcher::Refresh
-    ::windows::stats::Refresh
-  }
-}
+### End of file: game.tcl

@@ -19,10 +19,10 @@
 #include "sqlist.h"
 #include "sqset.h"
 #include "hash.h"
-#include "sqmove.h"
-#include "dstring.h"
+
+#include <stdio.h>
+#include <ctype.h>
 #include <string.h>
-#include <stdlib.h>
 
 static uint hashVal [16][64];
 static uint stdStartHash = 0;
@@ -31,6 +31,11 @@ static uint stdStartPawnHash = 0;
 // HASH and UNHASH are identical: XOR the hash value for a (piece,square).
 #define HASH(h,p,sq)    (h) ^= hashVal[(p)][(sq)]
 #define UNHASH(h,p,sq)  (h) ^= hashVal[(p)][(sq)]
+
+Position::Position(const Position& p)
+{
+    memcpy (this, &p, sizeof(Position));
+}
 
 inline void
 Position::AddHash (pieceT p, squareT sq)
@@ -223,6 +228,7 @@ Position::AddLegalMove (MoveList * mlist, squareT from, squareT to, pieceT promo
     // We do NOT set the pre-move castling/ep flags, or the captured
     // piece info, here since that is ONLY needed if the move is
     // going to be executed with DoSimpleMove() and then undone.
+
     sm->from = from;
     sm->to = to;
     sm->promote = promo;
@@ -608,57 +614,62 @@ Position::Clear (void)
 //      Set up the standard chess starting position. For performance the data is copied from a 
 //      template.
 //
-const Position& Position::getStdStart()
+static Position *startPositionTemplate = NULL;
+
+void
+Position::StdStart (void)
 {
-    static Position startPositionTemplate;
-    static bool init = true;
+    if( this == startPositionTemplate){
+        Clear();
+        Material[WK] = Material[BK] = 1;
+        Material[WQ] = Material[BQ] = 1;
+        Material[WR] = Material[BR] = 2;
+        Material[WB] = Material[BB] = 2;
+        Material[WN] = Material[BN] = 2;
+        Material[WP] = Material[BP] = 8;
+        Count[WHITE] = Count[BLACK] = 16;
 
-    if (init){
-        init = false;
-        Position* p = &startPositionTemplate;
-        p->Clear();
-        p->Material[WK] = p->Material[BK] = 1;
-        p->Material[WQ] = p->Material[BQ] = 1;
-        p->Material[WR] = p->Material[BR] = 2;
-        p->Material[WB] = p->Material[BB] = 2;
-        p->Material[WN] = p->Material[BN] = 2;
-        p->Material[WP] = p->Material[BP] = 8;
-        p->Count[WHITE] = p->Count[BLACK] = 16;
-
-        p->AddToBoard(WK, E1);  p->List[WHITE][0] = E1;  p->ListPos[E1] = 0;
-        p->AddToBoard(BK, E8);  p->List[BLACK][0] = E8;  p->ListPos[E8] = 0;
-        p->AddToBoard(WR, A1);  p->List[WHITE][1] = A1;  p->ListPos[A1] = 1;
-        p->AddToBoard(BR, A8);  p->List[BLACK][1] = A8;  p->ListPos[A8] = 1;
-        p->AddToBoard(WN, B1);  p->List[WHITE][2] = B1;  p->ListPos[B1] = 2;
-        p->AddToBoard(BN, B8);  p->List[BLACK][2] = B8;  p->ListPos[B8] = 2;
-        p->AddToBoard(WB, C1);  p->List[WHITE][3] = C1;  p->ListPos[C1] = 3;
-        p->AddToBoard(BB, C8);  p->List[BLACK][3] = C8;  p->ListPos[C8] = 3;
-        p->AddToBoard(WQ, D1);  p->List[WHITE][4] = D1;  p->ListPos[D1] = 4;
-        p->AddToBoard(BQ, D8);  p->List[BLACK][4] = D8;  p->ListPos[D8] = 4;
-        p->AddToBoard(WB, F1);  p->List[WHITE][5] = F1;  p->ListPos[F1] = 5;
-        p->AddToBoard(BB, F8);  p->List[BLACK][5] = F8;  p->ListPos[F8] = 5;
-        p->AddToBoard(WN, G1);  p->List[WHITE][6] = G1;  p->ListPos[G1] = 6;
-        p->AddToBoard(BN, G8);  p->List[BLACK][6] = G8;  p->ListPos[G8] = 6;
-        p->AddToBoard(WR, H1);  p->List[WHITE][7] = H1;  p->ListPos[H1] = 7;
-        p->AddToBoard(BR, H8);  p->List[BLACK][7] = H8;  p->ListPos[H8] = 7;
+        AddToBoard(WK, E1);  List[WHITE][0] = E1;  ListPos[E1] = 0;
+        AddToBoard(BK, E8);  List[BLACK][0] = E8;  ListPos[E8] = 0;
+        AddToBoard(WR, A1);  List[WHITE][1] = A1;  ListPos[A1] = 1;
+        AddToBoard(BR, A8);  List[BLACK][1] = A8;  ListPos[A8] = 1;
+        AddToBoard(WN, B1);  List[WHITE][2] = B1;  ListPos[B1] = 2;
+        AddToBoard(BN, B8);  List[BLACK][2] = B8;  ListPos[B8] = 2;
+        AddToBoard(WB, C1);  List[WHITE][3] = C1;  ListPos[C1] = 3;
+        AddToBoard(BB, C8);  List[BLACK][3] = C8;  ListPos[C8] = 3;
+        AddToBoard(WQ, D1);  List[WHITE][4] = D1;  ListPos[D1] = 4;
+        AddToBoard(BQ, D8);  List[BLACK][4] = D8;  ListPos[D8] = 4;
+        AddToBoard(WB, F1);  List[WHITE][5] = F1;  ListPos[F1] = 5;
+        AddToBoard(BB, F8);  List[BLACK][5] = F8;  ListPos[F8] = 5;
+        AddToBoard(WN, G1);  List[WHITE][6] = G1;  ListPos[G1] = 6;
+        AddToBoard(BN, G8);  List[BLACK][6] = G8;  ListPos[G8] = 6;
+        AddToBoard(WR, H1);  List[WHITE][7] = H1;  ListPos[H1] = 7;
+        AddToBoard(BR, H8);  List[BLACK][7] = H8;  ListPos[H8] = 7;
 
         for (uint i=0; i < 8; i++) {
-            p->AddToBoard(WP, A2+i); p->List[WHITE][i+8] = A2+i; p->ListPos[A2+i] = i+8;
-            p->AddToBoard(BP, A7+i); p->List[BLACK][i+8] = A7+i; p->ListPos[A7+i] = i+8;
+            AddToBoard(WP, A2+i); List[WHITE][i+8] = A2+i; ListPos[A2+i] = i+8;
+            AddToBoard(BP, A7+i); List[BLACK][i+8] = A7+i; ListPos[A7+i] = i+8;
         }
 
-        p->Castling = 0;
-        p->SetCastling (WHITE, QSIDE, true);  p->SetCastling (WHITE, KSIDE, true);
-        p->SetCastling (BLACK, QSIDE, true);  p->SetCastling (BLACK, KSIDE, true);
-        p->EPTarget = NULL_SQUARE;
-        p->ToMove = WHITE;
-        p->PlyCounter = 0;
-        p->HalfMoveClock = 0;
-        p->Board [NULL_SQUARE] = END_OF_BOARD;
-        p->Hash = stdStartHash;
-        p->PawnHash = stdStartPawnHash;
+        Castling = 0;
+        SetCastling (WHITE, QSIDE, true);  SetCastling (WHITE, KSIDE, true);
+        SetCastling (BLACK, QSIDE, true);  SetCastling (BLACK, KSIDE, true);
+        EPTarget = NULL_SQUARE;
+        ToMove = WHITE;
+        PlyCounter = 0;
+        HalfMoveClock = 0;
+        Board [NULL_SQUARE] = END_OF_BOARD;
+        Hash = stdStartHash;
+        PawnHash = stdStartPawnHash;
     }
-    return startPositionTemplate;
+    else {
+        if (startPositionTemplate == NULL){
+            startPositionTemplate = new Position();
+            startPositionTemplate->StdStart();
+        }
+        memcpy (this, startPositionTemplate, sizeof(Position));
+	}
+    return;
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -690,7 +701,6 @@ Position::AddPiece (pieceT p, squareT sq)
 {
     ASSERT (p != EMPTY);
     colorT c = piece_Color(p);
-    ASSERT (c != NOCOLOR);
 
     if (Count[c] == 16) { return ERROR_PieceCount; }
     ASSERT(Count[c] <= 15);
@@ -801,16 +811,17 @@ Position::GenPieceMoves (MoveList * mlist, squareT fromSq,
 //    If the specified pieceType is not EMPTY, then only legal
 //    moves for that type of piece are generated.
 void
-Position::GenerateMoves (MoveList* mlistRes, pieceT pieceType,
+Position::GenerateMoves (MoveList * mlist, pieceT pieceType,
                          genMovesT genType, bool maybeInCheck)
 {
     bool genNonCaptures = (genType & GEN_NON_CAPS);
     bool capturesOnly = !genNonCaptures;
 
-    if (LegalMoves.Size() > 0 && pieceType == EMPTY && genType == GEN_ALL_MOVES) {
-        if (mlistRes != NULL) *mlistRes = LegalMoves;
-        return;
-    }
+	if (LegalMoves.Size() > 0 && pieceType == EMPTY && genType == GEN_ALL_MOVES) {
+		if(mlist != NULL)
+			memcpy (mlist, &LegalMoves, sizeof(MoveList));
+		return;
+	}
 
     uint mask = 0;
     if (pieceType != EMPTY) {
@@ -821,8 +832,9 @@ Position::GenerateMoves (MoveList* mlistRes, pieceT pieceType,
     }
 
     // Use the objects own move list if none was provided:
-    MoveList* mlist = (mlistRes != NULL) ? mlistRes : &LegalMoves;
-    mlist->Clear();
+	if( mlist == NULL)
+		mlist = &LegalMoves;
+	mlist->Clear();
 
     // Compute which pieces of the side to move are pinned to the king:
     CalcPins();
@@ -889,9 +901,8 @@ Position::GenerateMoves (MoveList* mlistRes, pieceT pieceType,
         GenKingMoves (mlist, genType, castling);
     }
 
-    if (pieceType == EMPTY && genType == GEN_ALL_MOVES) {
-        if (mlist != &LegalMoves) LegalMoves = *mlist;
-    }
+	if (pieceType == EMPTY && genType == GEN_ALL_MOVES && mlist != NULL)
+		memcpy (&LegalMoves, mlist, sizeof(MoveList));
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1392,35 +1403,6 @@ Position::GenCheckEvasions (MoveList * mlist, pieceT mask, genMovesT genType,
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// Position::TreeCalcAttacks():
-//      Calculate attack score for a side on a square,
-//      using a recursive tree search.
-int
-Position::TreeCalcAttacks(colorT side, squareT target)
-{
-  int maxScore = -2;
-  uint moveCount = 0, zeroCount = 0;
-  MoveList moveList;
-  GenerateCaptures(&moveList);
-  for (uint i=0; i < moveList.Size(); i++) {
-    simpleMoveT *smPtr = moveList.Get(i);
-    if (smPtr->to == target) {
-      if (piece_IsKing(Board[target])) return -1;
-      moveCount++;
-      DoSimpleMove(smPtr);
-      int score = TreeCalcAttacks(color_Flip(side), target);
-      UndoSimpleMove(smPtr);
-      if (!score && ++zeroCount > 1) return -2;
-      if (score > maxScore) maxScore = score;
-    }
-  }
-
- if (!moveCount) return 0;
- if (!maxScore) return -1;
- return -maxScore;
-}
-
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Position::CalcAttacks():
 //      Calculate the number of attacks by a side on a square.
 //      This function also puts a list of the attacking piece squares
@@ -1446,11 +1428,11 @@ Position::CalcAttacks (colorT side, squareT target, SquareList * fromSquares)
     squareT sq;
 
     // Bishop/Queen/Rook attacks: look at each of the 8 directions
-    pieceT king, queen, rook, bishop, knight;
+    pieceT queen, rook, bishop, knight;
     if (side == WHITE) {
-        king = WK; queen = WQ; rook = WR; bishop = WB; knight = WN;
+        queen = WQ; rook = WR; bishop = WB; knight = WN;
     } else {
-        king = BK; queen = BQ; rook = BR; bishop = BB; knight = BN;
+        queen = BQ; rook = BR; bishop = BB; knight = BN;
     }
 
     uint numQueensRooks = Material[queen] + Material[rook];
@@ -1543,7 +1525,7 @@ Position::CalcAttacks (colorT side, squareT target, SquareList * fromSquares)
 
     // Now pawn attacks:
     if (side == WHITE) {
-        if (square_Rank(target) != RANK_1) {  //if (Material[WP] > 0) {
+        if (square_Rank(target) != RANK_1) {  //if (Material[WP] > 0) 
             sq = square_Move (target, DOWN_LEFT);
             if (Board[sq] == WP)  {
                 fromSquares->Add(sq);
@@ -1554,7 +1536,7 @@ Position::CalcAttacks (colorT side, squareT target, SquareList * fromSquares)
             }
         }
     } else {
-        if (square_Rank(target) != RANK_8) {  //if (Material[BP] > 0) {
+        if (square_Rank(target) != RANK_8) {  //if (Material[BP] > 0) 
             sq = square_Move (target, UP_LEFT);
             if (Board[sq] == BP)  {
                 fromSquares->Add(sq);
@@ -1565,11 +1547,6 @@ Position::CalcAttacks (colorT side, squareT target, SquareList * fromSquares)
             }
         }
     }
-
-    // King attacks:
-    const squareT *destPtr = kingAttacks[target];
-    do if (Board[*destPtr] == king) fromSquares->Add(*destPtr);
-    while (*++destPtr != NULL_SQUARE);
 
     return fromSquares->Size();
 }
@@ -1756,8 +1733,19 @@ Position::IsKingInMate (void)
     CalcPins ();
     MoveList mlist;
     GenCheckEvasions (&mlist, EMPTY, GEN_ALL_MOVES, &checkSquares);
-    if (mlist.Size() == 0) { return true; }
-    return false;
+    return (mlist.Size() == 0);
+}
+
+bool
+Position::IsStaleMate (void)
+{
+    SquareList checkSquares;
+    uint numChecks = CalcNumChecks (GetKingSquare(ToMove), &checkSquares);
+    if (numChecks > 0) { return false; }
+    CalcPins ();
+    MoveList mlist;
+    GenerateMoves (&mlist, EMPTY, GEN_ALL_MOVES, false);
+    return (mlist.Size() == 0);
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2196,11 +2184,12 @@ Position::MakeSANString (simpleMoveT * m, char * s, sanFlagT flag)
         } else {
             // disambiguate moves here:
             // SHOULD handle 3-way ambiguity!  Looks like it does ok.
-            bool ambiguous_fyle = false;
-            bool ambiguous_rank = false;
-            char r, f, f2;
-            f = square_FyleChar(from);
-            r = square_RankChar(from);
+            // This part is the corrected version of Mike Curtis, 2017-01-14.
+            bool unique_fyle = true;
+            bool unique_rank = true;
+            bool ambiguity = false;
+            char f = square_FyleChar(from);
+            char r = square_RankChar(from);
             MoveList mlist;
             MatchLegalMove (&mlist, p, to);
 
@@ -2209,18 +2198,21 @@ Position::MakeSANString (simpleMoveT * m, char * s, sanFlagT flag)
                 squareT from2 = m2->from;
                 pieceT p2 = piece_Type(Board[from2]);
                 if ((to == m2->to) && (from != from2) && (p2 == p)) {
-                    /* we have an ambiguity */
-                    f2 = square_FyleChar (from2);
-                    if (f == f2) {  // ambiguous fyle, so print rank
-                        ambiguous_fyle = true;
-                    } else {        // ambiguous rank, so print fyle
-                        ambiguous_rank = true;
+                    ambiguity = true;
+                    if (f == square_FyleChar(from2)) {
+                        unique_fyle = false;
+                    }
+                    if (r == square_RankChar(from2)) {
+                        unique_rank = false;
                     }
                 }
             }
-            if (ambiguous_rank) { *c++ = f; }  // print from-fyle
-            if (ambiguous_fyle) { *c++ = r; }  // print from-rank
-
+            if (ambiguity) {
+                if (!unique_rank || unique_fyle)
+                    { *c++ = f; }  // print from-fyle
+                if (!unique_fyle)
+                    { *c++ = r; }  // print from-rank
+            }
             if (Board[to] != EMPTY) { *c++ = 'x'; }
             *c++ = square_FyleChar (to);
             *c++ = square_RankChar (to);
@@ -2230,7 +2222,7 @@ Position::MakeSANString (simpleMoveT * m, char * s, sanFlagT flag)
     // Now do the check or mate symbol:
     if (flag != SAN_NO_CHECKTEST) {
         // Now we make the move to test for check:
-		MoveList backup = LegalMoves;
+        MoveList backup = LegalMoves;
         DoSimpleMove (m);
         if (CalcNumChecks (GetKingSquare()) > 0) {
             char ch = '+';
@@ -2242,7 +2234,7 @@ Position::MakeSANString (simpleMoveT * m, char * s, sanFlagT flag)
             *c++ = ch;
         }
         UndoSimpleMove (m);
-		LegalMoves = backup;
+        LegalMoves = backup;
     }
     *c = 0;
 }
@@ -2285,8 +2277,8 @@ Position::MakeUCIString (simpleMoveT * m, char * s)
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Position::ReadCoordMove():
-//      Given a non-promotion move in coordinate notation,
-//      e.g. "e2e4" or "g1f3", generates the legal move it represents.
+//      Given a move in coordinate notation,
+//      e.g. "e2e4" or "g7g8q", generates the legal move it represents.
 //      Returns: OK or ERROR_InvalidMove.
 //      If "reverse" is true, coordinates in reverse order are acceptable,
 //      e.g. "f3g1" for 1.Nf3.
@@ -2383,6 +2375,7 @@ Position::ReadMove (simpleMoveT * m, const char * str, tokenT token)
     if (token == TOKEN_Move_Pawn  ||  token == TOKEN_Move_Promote) {
 
         pieceT promo = EMPTY;
+
         if (token == TOKEN_Move_Promote) {
             // Last char must be Q/R/B/N.
             // Accept the move even if it is of the form "a8Q" not "a8=Q":
@@ -2430,6 +2423,12 @@ Position::ReadMove (simpleMoveT * m, const char * str, tokenT token)
         toRank = rank_FromChar (s[slen-1]);
         to = square_Make (toFyle, toRank);
         if (to == NS) { return ERROR_InvalidMove; }
+
+	// Handle default promotions: e.g. a move like 'b1' will be interpreted as 'b1=Q'.
+	if (token == TOKEN_Move_Pawn && (toRank == RANK_1 || toRank == RANK_8)) {
+	    token = TOKEN_Move_Promote;
+	    promo = QUEEN;
+	}
 
         if (MatchPawnMove (&mlist, frFyle, to, promo) != OK) {
             return ERROR_InvalidMove;
@@ -2510,10 +2509,9 @@ Position::ReadMove (simpleMoveT * m, const char * str, tokenT token)
 }
 
 
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// Position::ParseMove():
-//      Parse a single move from SAN-style notation.
-//
+//  Parse a single move from SAN-style notation.
+//  Only used by scidlet - S.A
+
 errorT
 Position::ParseMove (simpleMoveT * sm, const char * line)
 {
@@ -2641,6 +2639,19 @@ Position::CalcSANStrings (sanListT *sanList, sanFlagT flag)
     sanList->current = true;
 }
 
+void
+Position::CalcUCIStrings (sanListT *sanList)
+{
+	if( LegalMoves.Size() == 0) {
+        GenerateMoves();
+	}
+    for (ushort i=0; i < LegalMoves.Size(); i++) {
+        MakeUCIString (LegalMoves.Get(i), sanList->list[i]);
+    }
+    sanList->num = LegalMoves.Size();
+    sanList->current = true;
+}
+
 errorT
 Position::ReadFromLongStr (const char * str)
 {
@@ -2679,7 +2690,7 @@ Position::ReadFromLongStr (const char * str)
 //      with white pieces in upper case, black pieces in lower case,
 //      and empty squares as dots) then a space, and finally "w" or "b"
 //      indicating the side to move. Example for the starting position:
-//      "RNBQKBNRPPPPPPPP................................pppppppprbnqkbnr w"
+//      "RNBQKBNRPPPPPPPP................................pppppppprnbqkbnr w"
 //
 void
 Position::MakeLongStr (char * str)
@@ -3148,7 +3159,7 @@ Position::DumpHtmlBoard (DString * dstr, uint style, const char * dir, bool flip
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// Position::DumpLatexBoard():
+// Is this used now ? - S.A 
 //      Prints the board in a format used by a chess package that is
 //      available for the LaTeX  or TeX typesetting language.
 void
@@ -3193,6 +3204,17 @@ Position::Compare (Position * p)
     return (ToMove - p->GetToMove());
 }
 
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Position::CopyFrom():
+//      Copy another position to this one.
+//
+void
+Position::CopyFrom (Position * src)
+{
+  memcpy (this, src, sizeof(Position));
+}
+
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Position::GetSquares
 //    Adds to the provided square list all squares containing the specified
@@ -3216,10 +3238,10 @@ Position::GetSquares (pieceT piece, SquareList * sqlist)
 //    Given a string such as "KRPKR" or "KRP-kr", sets up a
 //    random position with that material configuration.
 inline squareT
-randomSquare (void) { return rand() % 64; }
+randomSquare (void) { return random32() % 64; }
 
 inline squareT
-randomPawnSquare (void) { return (rand() % 48) + A2; }
+randomPawnSquare (void) { return (random32() % 48) + A2; }
 
 errorT
 Position::Random (const char * material)
@@ -3273,7 +3295,7 @@ Position::Random (const char * material)
     // position is found:
     while (1) {
         Clear();
-        ToMove = (rand() % 2) ? WHITE : BLACK;
+        ToMove = (random32() % 2) ? WHITE : BLACK;
         AddPiece (WK, wk);
         AddPiece (BK, bk);
 

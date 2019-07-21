@@ -5,23 +5,22 @@
 
 # The "\" at the end of the comment line below is necessary! It means
 #   that the "exec" line is a comment to Tcl but not to /bin/sh.
-# The next line restarts using tkscid, the Scid Tcl interpreter: \
-exec tkscid "$0" "$@"
+# The next line restarts using tcscid, the Scid Tcl interpreter: \
+exec tcscid "$0" "$@"
 
 if {$argc != 1} { 
-    puts "Usage: scidpgn database"
-    puts "Example: scidpgn  mybase"
+    puts "scidpgn: prints the PGN representation of all games in a Scid database, with all comments and variations."
+    puts "Usage:   scidpgn database"
     exit 1
 }
 
 set baseName [file rootname [ lindex $argv 0 ]]
-if {[catch { sc_base open $baseName } baseId]} {
-    puts "Error: could not open database"
+if {[catch { sc_base open -fast -readonly $baseName } err]} {
+    puts "Error: could not open database: $err"
     exit 1
 }
 
-set nGames [sc_base numGames $baseId]
-for {set i 1} {$i <= $nGames} {incr i} {
+for {set i 1} {$i <= [sc_base numGames]} {incr i} {
     if {[catch { sc_game load $i }]} {
         puts "Error: could not load game number $i"
         exit 1

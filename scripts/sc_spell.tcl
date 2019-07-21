@@ -6,8 +6,8 @@
 #
 # Usage:  sc_spell <scid-database> <spellcheck-file>
 
-# The next line restarts using tkscid: \
-exec tkscid "$0" "$@"
+# The next line restarts using tcscid: \
+exec tcscid "$0" "$@"
 
 set args [llength $argv]
 if {$args != 2} {
@@ -28,8 +28,7 @@ if {[catch {sc_base open $basename} result]} {
     puts stderr "Error opening database \"$basename\": $result"
     exit 1
 }
-set curr_db [sc_base current]
-if {[sc_base isReadOnly $curr_db]} {
+if {[sc_base isReadOnly]} {
     puts stderr "Error: database \"$basename\" is read-only."
     exit 1
 }
@@ -42,13 +41,13 @@ foreach nameType {player event site round} {
             puts stderr "Error correcting $nameType names"
             exit 1
         }
-        puts "  Number of games corrected: [lindex $result 2]\n"
+        puts "  $result"
     } else {
         puts "  0 $nameType names were corrected."
     }
 }
 
 puts "Checking for duplicate games..."
-set result [sc_base duplicates [sc_base current] ]
+set result [sc_base duplicates]
 puts "  Found $result duplicate games."
-sc_base close $curr_db
+sc_base close

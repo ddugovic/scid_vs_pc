@@ -5,8 +5,8 @@
 #
 # Usage:  sc_spell <scid-database> <eco-file>
 
-# The next line restarts using tkscid: \
-exec tkscid "$0" "$@"
+# The next line restarts using tcscid: \
+exec tcscid "$0" "$@"
 
 set args [llength $argv]
 if {$args != 2} {
@@ -27,12 +27,11 @@ if {[catch {sc_base open $basename} result]} {
     puts stderr "Error opening database \"$basename\": $result"
     exit 1
 }
-set curr_db [sc_base current]
-if {[sc_base isReadOnly $curr_db]} {
+if {[sc_base isReadOnly]} {
     puts stderr "Error: database \"$basename\" is read-only."
     exit 1
 }
 
 puts "Classifying games..."
 puts [sc_eco base 1 1]
-sc_base close $curr_db
+sc_base close

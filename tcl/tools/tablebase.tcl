@@ -1,22 +1,26 @@
 ### tools/tablebase.tcl:
 ###   Tablebase display routines for Scid.
 
-set ::tb::isOpen 0
 set tbTraining 0
+set tbOnline 0
 set tbBoard 0
 set tbStatus ""
 
-if { [catch {package require http} ] } {
-  set ::tb::online_available 0
-} else  {
-  set ::tb::online_available 1
-}
+set ::tb::online_available [expr ! [catch {package require http} ] ]
 
 namespace eval ::tb {
-  set url "http://k4it.de/egtb/fetch.php"
+  set url "http://www.lokasoft.nl/tbweb/tbapi.asp"
   # proxy configuration
   set proxyhost "127.0.0.1"
   set proxyport 3128
+  set token {}
+  # caching results of queries
+  set afterid(update) {}
+  set afterid(connect) {}
+  array set hash {}
+  set history {}
+  # helper for a flick-free display
+  set noresult 0
 }
 
 set tbInfo(section) 21
@@ -114,113 +118,140 @@ set tbInfo(42) [list \
     knppkq knppkr knppkb knppkn knppkp \
     kpppkq kpppkr kpppkb kpppkn kpppkp ]
 
-# ::tb::isopen
-#   Returns boolean value of whether the tablebase window is open.
-#
 proc ::tb::isopen {} {
   return [winfo exists .tbWin]
 }
 
-# ::tb::Open
-#   Open the tablebase window.
-#
 proc ::tb::Open {} {
   global tbInfo
+
   set w .tbWin
-  if {[winfo exists $w]} { return }
+  if {[winfo exists $w]} {
+    raiseWin $w
+    return
+  }
   ::createToplevel $w
+  catch {wm state $w withdrawn}
   setWinLocation $w
-  ::setTitle $w "Scid: [tr WindowsTB]"
-  pack [ttk::frame $w.b] -side bottom -fill x
-  pack [ttk::frame $w.info] -side left -fill y
-  addVerticalRule $w
-  pack [ttk::frame $w.pos] -side right -fill both -expand yes
-  
-  # Left frame: tablebase browser and summary info
-  
+  setWinSize $w
+  setTitle $w "[tr WindowsTB]"
+
+  pack [frame $w.b] -side bottom -fill x ;# buttons
+  pack [frame $w.info] -side left -fill y ;# summary
+  pack [frame $w.pos] -side left -fill both -expand yes -padx 5 -pady 3 ;# results
+
+  ### Tablebase browser and Summary
+
   set f $w.info
-  pack [ttk::frame $f.sec] -side top -fill x
+  pack [frame $f.sec] -side top -pady 3
+
+  label $f.sec.label -text Summary
+  menubutton $f.sec.menu -text {2-1} -menu $f.sec.menu.m -relief raised -indicatoron 1 
+  menu $f.sec.menu.m -tearoff 0
   foreach i $tbInfo(sections) {
     set name "[string index $i 0]-[string index $i 1]"
-    ttk::radiobutton $f.sec.b$i -text " $name " -variable tbInfo(section) -value $i -command "::tb::section $i" ;# -indicatoron 0
-    pack $f.sec.b$i -side left -pady 1 -padx 1
+    $f.sec.menu.m add command -label $name -command "
+      $f.sec.menu configure -text $name
+      set tbInfo(section) $i
+      ::tb::section $i
+    "
   }
+  pack $f.sec.label $f.sec.menu -side left -pady 1 -padx 10
+
   autoscrollframe $f.list text $f.list.text \
       -width 35 -height 7 -font font_Fixed -wrap none \
-      -foreground black -background white -cursor top_left_arrow
+      -foreground black  -cursor top_left_arrow
+  $f.list configure -relief flat
   pack $f.list -side top
-  pack [ttk::frame $f.separator -height 2]
+
+  # pack [frame $f.separator -height 2]
   # addHorizontalRule $f
-  
+
   autoscrollframe $f.data text $f.data.text \
       -width 35 -height 0 -font font_Fixed -wrap none \
-      -foreground black -background white -cursor top_left_arrow
+      -foreground black  -cursor top_left_arrow
+  $f.data configure -relief flat
   pack $f.data -side top -fill y -expand yes
-  
+
   $f.list.text tag configure avail -foreground blue
   $f.list.text tag configure unavail -foreground gray40
   $f.data.text tag configure fen -foreground blue
-  
-  # Right frame: tablebase results for current position
-  
+
+  ### Results for current position
+
   set f $w.pos
-  autoscrollframe $f text $f.text -width 30 -height 20 -font font_Small \
-      -wrap word -foreground black -background white -setgrid 1
-  $f.text tag configure indent -lmargin2 [font measure font_Fixed  "        "]
+
+  pack [frame $f.results] -side top -pady 3
+
+  pack [label $f.results.label -text Results] -side left
+
+  if { $::tb::online_available } {
+    ### reactivated with new server: http://www.lokasoft.nl
+    checkbutton $f.results.online -text Online -variable tbOnline -relief raised -command ::tb::results -padx 10 -pady 3 -justify right
+    pack $f.results.online -side right -padx 6 -pady 2
+  }
   
+  text $f.text -font font_Fixed -relief flat -wrap word -foreground black
+  pack $f.text -side top -fill both -expand yes
+
+  $f.text tag configure indent -lmargin2 [font measure font_Fixed  "        "]
+  $f.text tag configure title -font font_Regular -justify center
+
+  ### Board
+
   ::board::new $f.board 25
   $f.board configure -relief solid -borderwidth 1
+  if {$::tbBoard} {
+    pack $f.board -side bottom -before $f.text -pady 3
+  }
+
   for {set i 0} {$i < 64} {incr i} {
     ::board::bind $f.board $i <Button-1> [list ::tb::resultsBoard $i]
   }
-  if {$::tbBoard} {
-    grid $f.board -row 0 -column 2 -rowspan 2
-  }
-  
-  ttk::checkbutton $w.b.training -text $::tr(Training) -variable tbTraining -command ::tb::training ;# -padx 4 -pady 5
-  # button $w.b.online -text Online -command ::tb::updateOnline -relief raised -padx 4 -pady 5
-  if { !$::tb::online_available } {
-    catch { $w.b.online configure -state disabled }
-  }
-  ttk::button $w.b.random -text "Random" -command ::tb::random
-  ttk::button $w.b.showboard -image tb_coords -command ::tb::showBoard
-  dialogbutton $w.b.help -text $::tr(Help) -command { helpWindow TB }
-  dialogbutton $w.b.close -text $::tr(Close) -command "destroy $w"
-  ttk::label $w.b.status -width 1 -textvar tbStatus -font font_Small -relief flat -anchor w ;# -height 0
-  packbuttons right $w.b.close $w.b.help
-  pack $w.b.training -side left -padx 2 -pady 2
-  catch { pack $w.b.online -side left -padx 2 -pady 2 }
-  pack $w.b.random $w.b.showboard -side left -padx 2 -pady 2
+
+  ### Buttons
+
+  checkbutton $w.b.training -text $::tr(Training) -variable tbTraining -command ::tb::training -relief raised -padx 4 -pady 5
+  button $w.b.random -text "Random" -command ::tb::random
+  button $w.b.showboard -image tb_coords -command ::tb::showBoard
+  button $w.b.help -text $::tr(Help) -command { helpWindow TB }
+  button $w.b.close -text $::tr(Close) -command "destroy $w"
+  label $w.b.status -width 1 -textvar tbStatus -font font_Small \
+      -relief flat -anchor w -height 0
+  packbuttons right $w.b.close $w.b.help $w.b.showboard 
+  pack $w.b.training $w.b.random -side left -padx 8 -pady 2
   pack $w.b.status -side left -fill x -expand yes
-  bind $w <Destroy> { set ::tb::isOpen 0; set tbTraining 0 }
-  bind $w <F1> { helpWindow TB }
+  bind $w <Destroy> {set tbTraining 0}
+  bind $w <Escape> "destroy $w"
+  bind $w <F1> {helpWindow TB}
   bind $w <Configure> "recordWinSize $w"
-  wm minsize $w 15 20
-  ::createToplevelFinalize $w
+  wm minsize $w 15 15
   set ::tbTraining 0
   ::tb::section
   ::tb::summary
   ::tb::results
+
+  update
+  catch {wm state $w normal}
+  ::createToplevelFinalize $w
 }
 
-# ::tb::showBoard
-#   Toggles the results board.
-#
+###  Toggle the results board.
+
 proc ::tb::showBoard {} {
   global tbBoard
   set f .tbWin.pos
   if {$tbBoard} {
     set tbBoard 0
-    grid forget $f.board
+    pack forget $f.board
   } else {
     set tbBoard 1
-    grid $f.board -row 0 -column 2 -rowspan 2
+    pack $f.board -side bottom -before $f.text -pady 3
   }
 }
 
-# ::tb::resultsBoard
-#   Updates theresultsBoard board for a particular square.
-#
+### Updates the resultsBoard board for a particular square.
+
 proc ::tb::resultsBoard {sq} {
   set f .tbWin.pos
   set board [sc_pos board]
@@ -233,9 +264,9 @@ proc ::tb::resultsBoard {sq} {
   # Retrieve tablebase scores:
   busyCursor .
   set scores [sc_pos probe board $sq]
-  set text(X) X; set color(X) red; set shadow(X) white
-  set text(=) =; set color(=) blue; set shadow(=) white
-  set text(?) "?"; set color(?) red; set shadow(?) white
+  set text(X) X; set color(X) red4; set shadow(X) grey
+  set text(=) =; set color(=) blue; set shadow(=) grey
+  set text(?) "?"; set color(?) red4; set shadow(?) grey
   set text(+) "#"; set text(-) "#"
   if {[sc_pos side] == "white"} {
     set color(+) white; set color(-) black
@@ -254,9 +285,8 @@ proc ::tb::resultsBoard {sq} {
   unbusyCursor .
 }
 
-# ::tb::name
-#   Converts a material string like "kqkr" or "KQKR" to "KQ-KR".
-#
+### Converts a material string like "kqkr" or "KQKR" to "KQ-KR".
+
 proc ::tb::name {s} {
   set s [string toupper $s]
   set idx [string last "K" $s]
@@ -266,9 +296,17 @@ proc ::tb::name {s} {
   return $new
 }
 
-# ::tb::section
-#   Updates the tablebase list for the specified section.
-#
+### Clear the text widget.
+
+proc ::tb::clearText {t} {
+  $t configure -state normal
+  $t delete 1.0 end
+  $t configure -state disabled
+  set ::tb::noresult 0
+}
+
+### Updates the tablebase list for the specified section.
+
 proc ::tb::section {{sec 0}} {
   global tbInfo
   set w .tbWin
@@ -277,15 +315,18 @@ proc ::tb::section {{sec 0}} {
   set tbInfo(section) $sec
   if {! [info exists tbInfo($sec)]} { return }
   set t $w.info.list.text
+  ::tb::clearText $t
+  set ::tb::tagonline 0
   $t configure -state normal
-  $t delete 1.0 end
   $t configure -height 10
   set count 0
   set linecount 1
   foreach tb $tbInfo($sec) {
+    if {$count == 5} { set count 0; incr linecount; $t insert end "\n" }
     if {$tb == "-"} {
       $t insert end [format "%-7s" ""]
     } else {
+      # This doesn't test that *both* the white and black tb files are available
       set avail [sc_info tb available $tb]
       if {$avail} {
         set taglist [list avail $tb]
@@ -296,48 +337,47 @@ proc ::tb::section {{sec 0}} {
       $t insert end " "
       # Bind tags for enter/leave/buttonpress on this tb:
       $t tag bind $tb <Any-Enter> \
-          [list $t tag configure $tb -foreground yellow -background darkBlue]
+          [list $t tag configure $tb -background grey]
       $t tag bind $tb <Any-Leave> \
-          [list $t tag configure $tb -foreground {} -background {}]
+          [list $t tag configure $tb -background {}]
       $t tag bind $tb <ButtonPress-1> [list ::tb::summary $tb]
     }
     incr count
-    if {$count == 5} { set count 0; incr linecount; $t insert end "\n" }
   }
+
   if {$linecount > 10} { set linecount 10 }
   $t configure -height $linecount
   $t configure -state disabled
 }
 
-# ::tb::summary
-#   Shows the tablebase information for the specified tablebase.
-#
+### Shows the tablebase information for the specified tablebase.
+
 proc ::tb::summary {{material ""}} {
   global tbInfo tbs
   set w .tbWin
   if {! [winfo exists $w]} { return }
-  
+
   if {$material == ""} { set material $tbInfo(material) }
   set tbInfo(material) $material
   set t $w.info.data.text
+  ::tb::clearText $t
   $t configure -state normal
-  $t delete 1.0 end
-  $t insert end [format "%-6s" [::tb::name $material]]
+  $t insert end [format "%-6s" [::tb::name $material]] fen
   if {! [info exists tbs($material)]} {
     $t insert end "\nNo summary for this tablebase."
     $t configure -state disabled
     return
   }
   set data $tbs($material)
-  
+
   $t insert end [format "    %5u games per million\n\n" [lindex $data 0]]
-  
+
   # Longest-mate and result-percentage stats:
-  
+
   $t insert end "Side    Longest    %     %     %\n"
   $t insert end "to move   mate    Win  Draw  Loss\n"
   $t insert end "---------------------------------\n"
-  
+
   # Stats for White:
   $t insert end "White     "
   set len [lindex $data 1]
@@ -347,9 +387,9 @@ proc ::tb::summary {{material ""}} {
     append fen " w"
     $t insert end [format "%3s" $len] [list fen $fen]
     $t tag bind $fen <Any-Enter> \
-        [list $t tag configure $fen -foreground yellow -background darkBlue]
+        [list $t tag configure $fen -background grey]
     $t tag bind $fen <Any-Leave> \
-        [list $t tag configure $fen -foreground {} -background {}]
+        [list $t tag configure $fen -background {}]
     $t tag bind $fen <ButtonPress-1> [list ::tb::setFEN $fen]
   } else {
     $t insert end [format "%3s" $len]
@@ -359,7 +399,7 @@ proc ::tb::summary {{material ""}} {
   $t insert end [format " %5s" [lindex $data 6]]
   $t insert end [format " %5s" [lindex $data 7]]
   $t insert end "\n"
-  
+
   # Stats for Black:
   $t insert end "Black     "
   set len [lindex $data 3]
@@ -369,9 +409,9 @@ proc ::tb::summary {{material ""}} {
     append fen " b"
     $t insert end [format "%3s" $len] [list fen $fen]
     $t tag bind $fen <Any-Enter> \
-        [list $t tag configure $fen -foreground yellow -background darkBlue]
+        [list $t tag configure $fen -background grey]
     $t tag bind $fen <Any-Leave> \
-        [list $t tag configure $fen -foreground {} -background {}]
+        [list $t tag configure $fen -background {}]
     $t tag bind $fen <ButtonPress-1> [list ::tb::setFEN $fen]
   } else {
     $t insert end [format "%3s" $len]
@@ -381,7 +421,7 @@ proc ::tb::summary {{material ""}} {
   $t insert end [format " %5s" [lindex $data 9]]
   $t insert end [format " %5s" [lindex $data 10]]
   $t insert end "\n\n"
-  
+
   set mzugs [lindex $data 11]
   $t insert end "Mutual zugzwangs: "
   if {$mzugs >= 0} { $t insert end "$mzugs\n" } else { $t insert end "?\n" }
@@ -389,7 +429,7 @@ proc ::tb::summary {{material ""}} {
     $t configure -state disabled
     return
   }
-  
+
   # Extra Zugzwang info:
   set nBtmLoses [lindex $data 12]
   set nWtmLoses [lindex $data 14]
@@ -409,7 +449,7 @@ proc ::tb::summary {{material ""}} {
     $t insert end [lindex $zugnames 2]
     $t insert end [format "%5d\n" $nBothLose]
   }
-  
+
   # Selected zugzwang positions:
   set btmFens [lindex $data 13]
   set wtmFens [lindex $data 15]
@@ -422,7 +462,7 @@ proc ::tb::summary {{material ""}} {
     $t configure -state disabled
     return
   }
-  
+
   # Print the lists of selected zugzwang positions:
   $t insert end "\nSelected zugzwang positions:"
   foreach n [list $nBtmFens $nWtmFens $nBothFens] \
@@ -440,126 +480,270 @@ proc ::tb::summary {{material ""}} {
           append fen " $tomove"
           $t insert end [format "%2d" [expr $count + 1]] [list fen $fen]
           $t tag bind $fen <Any-Enter> \
-          [list $t tag configure $fen -foreground yellow -background darkBlue]
+          [list $t tag configure $fen -background grey]
           $t tag bind $fen <Any-Leave> \
-          [list $t tag configure $fen -foreground {} -background {}]
+          [list $t tag configure $fen -background {}]
           $t tag bind $fen <ButtonPress-1> [list ::tb::setFEN $fen]
         }
       }
-  
+
   $t configure -state disabled
 }
 
-# ::tb::results
-#   Called when the main window board changes, to display tablebase
-#   results for all moves from the current position.
-#
+### Called when the main window board changes, to display tablebase
+### results for all moves from the current position.
+
 proc ::tb::results {} {
-  global tbTraining
-  set w .tbWin
-  if {! [winfo exists $w]} { return }
-  
+  global tbTraining tbOnline
+  set f .tbWin.pos
+  if {! [winfo exists $f]} { return }
+
   # Reset results board:
-  ::board::clearText $w.pos.board
-  ::board::update $w.pos.board [sc_pos board]
-  
+  ::board::clearText $f.board
+  ::board::update $f.board [sc_pos board]
+
+  set t $f.text
+
   # Update results panel:
-  set t $w.pos.text
-  $t delete 1.0 end
   if {$tbTraining} {
-    $t insert end "\n (Training mode; results are hidden)"
+    ::tb::clearText $t
+    ::tb::insertText "\n (Training mode; results are hidden)"
   } else {
-    $t insert end [sc_pos probe report] indent
+    if { $tbOnline } {
+      if {!$::tb::noresult} {
+        ::tb::clearText $t
+      }
+      if { $::tb::online_available} {
+        set cmd ::tb::updateOnline
+      } else {
+        set cmd {}
+      }
+    } else {
+      ::tb::clearText $t
+      set cmd [list ::tb::insertText [sc_pos probe report] indent]
+    }
+    if {[llength $cmd]} {
+      variable afterid
+      after cancel $afterid(update)
+      set afterid(update) [after 100 $cmd]
+    }
   }
 }
 
-################################################################################
-#
-################################################################################
-proc ::tb::updateOnline {} {
-  global tbTraining
-  set w .tbWin
-  if {! [winfo exists $w]} { return }
-  
-  # proxy configuration - needs UI
-  # ::http::config -proxyhost $::tb::proxyhost -proxyport $::tb::proxyport
-  
-  set t $w.pos.text
-  if { ! $tbTraining } {
-    set query [ ::http::formatQuery hook null action egtb fen [sc_pos fen] ]
-    ::http::geturl $::tb::url -timeout 5000 -query $query -command { ::tb::httpCallback }
-  }
+proc ::tb::insertText {s {tag {}}} {
+  set t .tbWin.pos.text
+  $t configure -state normal
+  $t insert end $s {*}$tag
+  $t configure -state disabled
 }
-################################################################################
-#
-################################################################################
-proc ::tb::httpCallback { token } {
-  
-  upvar #0 $token state
-  
-  set w .tbWin
-  if {! [winfo exists $w]} { return }
-  set t $w.pos.text
-  
-  # delete previous online output
-  foreach tag {tagonline} {
+
+if { $::tb::online_available } {
+
+  proc ::tb::zeroOnline {} {
+    set t .tbWin.pos.text
+    $t configure -state normal
+    # delete previous online output
     while {1} {
-      set del [$t tag nextrange $tag 1.0]
+      set del [$t tag nextrange tagonline 1.0]
       if {$del == ""} {break}
       catch {$t delete [lindex $del 0] [lindex $del 1]}
     }
+    $t configure -state disabled
+    set ::tb::noresult 0
   }
-  
-  if {$state(status) != "ok"} {
-    $t insert end $state(status) tagonline
-    return
+
+  proc ::tb::insertNoResult {} {
+    variable noresult
+
+    # This proc will be called often, so don't
+    # update text widget with same content,
+    # otherwise the display is flickering.
+    if {!$noresult} {
+      set t .tbWin.pos.text
+      ::tb::zeroOnline
+      ::tb::insertText "Online: No result" tagonline
+      set noresult 1
+    }
   }
-  
-  set b $state(body)
-  set result ""
-  
-  if {[sc_pos side] == "black"} {
-    set tmp ""
-    set found 0
-    foreach line [split $b "\n" ] {
-      if {$line == "NEXTCOLOR"} {
-        set found 1
-        continue
+
+  proc ::tb::updateOnline {} {
+    global env
+    variable token
+    variable hash
+    variable afterid
+
+    set afterid(update) {}
+
+    set w .tbWin
+    if {! [winfo exists $w]} { return }
+
+    set pieceCount [sc_pos pieceCount]
+    if {$pieceCount > 6 || 2 >= $pieceCount} {
+      ::tb::insertNoResult
+      return
+    }
+
+    set fen [sc_pos fen]
+    if {![catch { set result $hash($fen) }]} {
+      # show result from cache
+      ::tb::showResult $fen {*}$result
+      return
+    }
+
+    if {[llength $token]} {
+      # reset current http request
+      ::http::reset $token ignore
+      ::http::cleanup $token
+      set token {}
+    }
+
+    if {[info exists env(http_proxy)]} {
+      set http_proxy $env(http_proxy)
+      set i [string last : $http_proxy]
+      if {$i >= 0} {
+        set host [string range $http_proxy 0 [expr {$i - 1}]]
+        set port [string range $http_proxy [expr {$i + 1}] end]
+        if {[string is integer -strict $port]} {
+          ::http::config -proxyhost $host -proxyport $port
+        }
       }
-      if {$found} {
-        append tmp "$line\n"
+    }
+
+    append envelope \
+      "<?xml version=\"1.0\" encoding=\"utf-8\" ?>\n" \
+      "<soapenv:Envelope" \
+      "    xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"" \
+      "    xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\"" \
+      "    xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\"" \
+      "    xmlns:mes=\"http://lokasoft.nl/message/\">\n" \
+      "  <soapenv:Header/>\n" \
+      "  <soapenv:Body>\n" \
+      "    <mes:GetBestMoves soapenv:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">\n" \
+      "      <fen xsi:type=\"xsd:string\">$fen</fen>\n" \
+      "    </mes:GetBestMoves>\n" \
+      "  </soapenv:Body>\n" \
+      "</soapenv:Envelope>\n" \
+      ;
+
+    lappend headers \
+      Content-Length [string length $envelope] \
+      SOAPAction http://lokasoft.nl/action/TB2ComObj.GetBestMoves \
+      ;
+
+    # Delay the contacting message a bit, this avoids flickering in most cases.
+    after cancel $afterid(connect)
+    set afterid(connect) [after 500 ::tb::showContactMsg]
+
+    set cmd [list ::tb::httpCallback $fen]
+    if {[catch {::http::geturl $::tb::url -timeout 5000 -headers $headers -query $envelope -command $cmd} ::tb::token]} {
+      # Cancel contact message.
+      after cancel $afterid(connect)
+      set afterid(connect) {}
+      set token {} ;# to be sure
+      # Connection failed, flash old message before issuing "No connection"
+      after 100
+      ::tb::zeroOnline
+      ::tb::insertText "No connection." tagonline
+    }
+  }
+
+  proc ::tb::showContactMsg {} {
+    variable afterid
+    set afterid(connect) {}
+    ::tb::zeroOnline
+    ::tb::insertText "Contacting server" tagonline
+  }
+
+  proc ::tb::httpCallback { fen token } {
+    # Cancel contact message.
+    variable afterid
+    after cancel $afterid(connect)
+    set afterid(connect) {}
+
+    if {[winfo exists .tbWin] && [::http::status $token] != "ignore"} {
+      ::tb::showResult $fen {*}[::tb::getResult $fen $token]
+    }
+
+    ::http::cleanup $token
+    set ::tb::token {}
+  }
+
+  proc ::tb::getResult { fen token } {
+    set data [::http::data $token]
+    set result ""
+    set err ""
+
+    if {[::http::status $token] != "ok"} {
+      set err [::http::status $token]
+    } else {
+      set code [::http::ncode $token]
+      switch $code {
+        200     { # ok }
+        400     { set err "400 - Bad request" }
+        404     { set err "404 - Not found" }
+        500     { set data "<Result></Result>" }
+        default { set err "HTTP code $code received" }
       }
     }
-    set b $tmp
-  }
-  
-  foreach line [split $b "\n" ] {
-    if {$line == "NEXTCOLOR"} {
-      break
-    }
-    if { $line == "No information available" } {
-      append result "$line\n"
-    }
-    if {[string match "hook|null|value|*" $line]} {
-      append result "Online : [string range $line 16 end ]\n"
-      continue
-    }
-    if {[scan $line "%d-%d:%s" sq1 sq2 tmp] == 3} {
-      set p1 [ string toupper [string index [sc_pos board] $sq1 ] ]
-      set p2 [string index [sc_pos board] $sq2 ]
-      set take ""
-      if {$p2 != "."} {
-        set take "x"
+
+    if {[string length $err] == 0} {
+      set i [string first "<Result>" $data]
+      set k [string first "</Result>" $data $i]
+
+      if {$i == -1 || $k == -1} {
+        set err "Bad return value"
+      } else {
+        variable hash
+        variable history
+
+        set result [string trim [string range $data [expr {$i + 8}] [expr {$k - 1}]]]
+
+        # cache the result, but not more than 500 queries
+        if {[llength $history] > 500} {
+          array unset hash [lindex $history 0]
+          set history [lrange $history 1 end]
+        }
+        lappend history $fen
+        set hash($fen) [list $err $result]
       }
-      append result "$p1[::board::san $sq1]$take[::board::san $sq2] [string range $line [string first : $line] end]\n"
     }
+
+    return [list $err $result]
   }
-  ::http::cleanup state
-  $t insert end $result tagonline
+
+  proc ::tb::showResult { fen err result } {
+    ::tb::zeroOnline
+    set t .tbWin.pos.text
+    $t configure -state normal
+    # $t insert end \n tagonline
+
+    if {[string length $err]} {
+      $t insert end "Online: $err" tagonline
+    } else {
+      set empty 1
+
+      foreach l [split $result "\n"] {
+        if {![string match {*\?\?\?*} $l]} {
+          if {$empty} {
+            $t insert end "All results\n" tagonline
+            set empty 0
+          }
+          $t insert end "  $l\n" tagonline
+        }
+      }
+
+      if {$empty} {
+        variable hash
+        if {[info exists hash($fen)]} {
+          set hash($fen) [list "No Result" ""]
+        }
+        $t insert end "Online: No result" tagonline
+      }
+    }
+
+    $t configure -state disabled
+  }
 }
-################################################################################
-#
-################################################################################
 
 # ::tb::random
 #   Sets up a random position with the material of the tablebase
@@ -568,7 +752,7 @@ proc ::tb::httpCallback { token } {
 proc ::tb::random {} {
   global tbInfo
   if {[catch {sc_game startBoard "random:$tbInfo(material)"} err]} {
-    tk_messageBox -title "Scid" -icon warning -type ok -message $err
+    tk_messageBox -title Scid -icon warning -type ok -message $err
     return
   }
   # The material is valid, so clear the game and regenerate a
@@ -582,10 +766,10 @@ proc ::tb::random {} {
 #   Called when an item in the Tablebase info browser with an
 #   associated FEN position is selected with the left mouse button,
 #   causing the position to be set in the main window.
-#
+
 proc ::tb::setFEN {fen} {
   if {[catch {sc_game startBoard $fen} err]} {
-    tk_messageBox -title "Scid" -icon info -type ok -message $err
+    tk_messageBox -title Scid -icon info -type ok -message $err
     return
   }
   # The FEN is valid, so clear the game and reset the FEN:
@@ -614,7 +798,7 @@ proc ::tb::training {} {
 # ::tb::move
 #   Finds and executes the best move in the current position,
 #   if one can be determined from the tablebases.
-#
+
 proc ::tb::move {} {
   global tbTraining tbStatus
   if {! $tbTraining} { return }

@@ -20,13 +20,23 @@ proc ::utils::date::today {{type all}} {
   }
 }
 
+proc ::utils::date::time {} {
+  return [clock format [clock seconds] -format {%H:%M:%S}]
+}
+
+image create photo ::utils::date::calendar -data {
+R0lGODdhFgAUAMIAANnZ2VFR+wAAAP////oTQP//AAAAAAAAACwAAAAAFgAUAAADTwi63A4h
+yklrVAFruDO0lCCO5NMIw4CqqWAya9ySdG3LbI7He+vrsxthSLiJfitCoUBAzpwDJRNqFBCL
+RqpW1QN6q+DRdrfomsvh2mvtSAAAOw==
+}
+
 # ::utils::date::chooser
 #
 #   Produce a date-selection dialog box.
 #   Originally based on code from Effective Tcl/Tk Programming by
 #   Mark Harrison, but with lots of changes and improvements.
 #
-proc ::utils::date::chooser {{date "now"}} {
+proc ::utils::date::chooser {{date now} {parent .}} {
   set time [clock seconds]
   if {$date != "now"} {
     catch {set time [clock scan $date]}
@@ -36,6 +46,8 @@ proc ::utils::date::chooser {{date "now"}} {
 
   set win .dateChooser
   toplevel $win
+  wm state $win withdrawn
+
   canvas $win.cal -width 300 -height 220
   pack [frame $win.b] -side bottom -fill x
   button $win.b.ok -text "OK" -command "destroy $win"
@@ -64,9 +76,15 @@ proc ::utils::date::chooser {{date "now"}} {
 
   wm minsize $win 250 200
   wm title $win "Scid: Choose Date"
-  focus $win
+
+  placeWinOverParent $win $parent
+  wm state $win normal
+  update
+
+  # grab and tkwait are bad... should be fixed S.A.
   grab $win
   tkwait window $win
+
   if {$::utils::date::_selected == ""} { return {} }
   set time [clock scan $::utils::date::_selected]
   return [list \
@@ -170,12 +188,18 @@ proc ::utils::date::_redraw {win} {
 }
 
 proc ::utils::date::_layout {time} {
+  set m [clock format $time -format "%m"]
   set month [string trimleft [clock format $time -format "%m"] 0]
   set year  [clock format $time -format "%Y"]
 
-  foreach lastday {31 30 29 28} {
-    if {[catch {clock scan "$year-$month-$lastday"}] == 0} { break }
+  foreach lastday {29 30 31 32} {
+    # 'clock' does not have a validation command (?), so make our own
+    if {"$year-$m-$lastday" != [clock format [clock scan $year-$m-$lastday] -format {%Y-%m-%d}]} {
+      break
+    }
   }
+  incr lastday -1
+
   set seconds [clock scan "$year-$month-1"]
   set firstday [clock format $seconds -format %w]
   set weeks [expr {ceil(double($lastday+$firstday)/7)} ]

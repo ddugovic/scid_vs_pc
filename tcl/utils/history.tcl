@@ -1,4 +1,3 @@
-
 ### history.tcl
 ### Text entry history functions for Scid.
 ### Copyright (C) 2004 Shane Hudson.
@@ -44,7 +43,7 @@ proc ::utils::history::AddEntry {key entry} {
   if {$entry == "" } {
     return
   }
-  
+
   if {[info exists listData($key)]} {
     # Take out this entry if it exists, so it will not appear twice:
     set index [lsearch -exact $listData($key) $entry]
@@ -60,14 +59,15 @@ proc ::utils::history::AddEntry {key entry} {
     set listData($key) [list $entry]
   }
   RefillCombobox $key
-  
+
   if { [llength [GetList $key]] > 0 } {
     set cb [ GetCombobox $key ]
     if { $cb != "" && [winfo exists $cb]} {
       $cb current 0
+      $cb icursor end
     }
   }
-  
+
 }
 
 
@@ -114,7 +114,7 @@ proc ::utils::history::GetCombobox {key} {
 # ::utils::history::SetCombobox
 #
 #   Associates the specified widget (which must be a megawidget created
-#   with ::combobox::combobox, see contrib/combobox.tcl) with the specific
+#   with ::combobox::combobox, see contrib/combobox.tcl) with the specifiec
 #   history key. Whenever the list for this history key is modified, the
 #   combobox widget will be updated.
 #
@@ -131,14 +131,14 @@ proc ::utils::history::SetCombobox {key cbWidget} {
 #
 proc ::utils::history::RefillCombobox {key} {
   variable comboboxWidget
-  
+
   set cbWidget [GetCombobox $key]
   if {$cbWidget == ""} { return }
-  
+
   # If the combobox widget is part of a dialog which is generated as needed,
   # it may not exist right now:
   if {! [winfo exists $cbWidget]} { return }
-  
+
   $cbWidget delete 0 end
   set entries [GetList $key]
   $cbWidget configure -values $entries
@@ -151,20 +151,19 @@ proc ::utils::history::RefillCombobox {key} {
 #
 proc ::utils::history::Save {{reportError 0}} {
   variable listData
-  
+
   set f {}
   set filename [scidConfigFile history]
-  
+
   if  {[catch {open $filename w} f]} {
     if {$reportError} {
-      tk_messageBox -title "Scid" -type ok -icon warning \
+      tk_messageBox -title Scid -type ok -icon warning \
           -message "Unable to write file: $filename\n$f"
     }
     return
   }
-  
-  puts $f "# Scid $::scidVersion combobox history lists"
-  puts $f ""
+
+  puts $f "# $::scidName combobox history lists\n"
   foreach i [lsort [array names listData]] {
     puts $f "set ::utils::history::listData($i) [list $listData($i)]"
   }

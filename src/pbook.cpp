@@ -18,6 +18,7 @@
 
 
 #include "common.h"
+#include "error.h"
 #include "pbook.h"
 #include "misc.h"
 #include "mfile.h"
@@ -33,6 +34,22 @@ static const uint PBOOK_HASH_BYTES = (PBOOK_HASH_BITS >> 3);
 
 typedef char compactBoardStr [36];
 
+
+PBook::~PBook ()
+{
+    bookNodeT * node;
+
+    for (uint i=0; i <= PBOOK_MAX_MATERIAL; i++) {
+        Tree[i]->IterateStart();
+        while ((node = Tree[i]->Iterate()) != NULL) {
+            delete[] node->data.comment;
+        }
+        delete Tree[i];
+    }
+    delete[] FileName;
+    delete[] HashFlags;
+    delete[] NodeList;
+}
 
 void
 PBook::SetHashFlag (Position * pos) {
@@ -100,19 +117,30 @@ PBook::Init ()
     HashFlags = NULL;
 }
 
-PBook::~PBook()
+void
+PBook::Clear ()
 {
+    bookNodeT * node;
+
+    Altered = false;
     for (uint i=0; i <= PBOOK_MAX_MATERIAL; i++) {
         Tree[i]->IterateStart();
-        bookNodeT* node;
         while ((node = Tree[i]->Iterate()) != NULL) {
             delete[] node->data.comment;
         }
         delete Tree[i];
+        Tree[i] = new StrTree<bookDataT>;
     }
-    if (FileName != NULL) { delete[] FileName; }
-    if (HashFlags != NULL) delete[] HashFlags;
-    delete [] NodeList;
+    NodeListCount = 0;
+    if (FileName) { delete[] FileName; }
+    FileName = NULL;
+    NextIndex = 0;
+    LeastMaterial = PBOOK_MAX_MATERIAL;
+    Stats_PositionBytes = 0;
+    Stats_CommentBytes = 0;
+    delete[] HashFlags;
+
+    HashFlags = NULL;
 }
 
 void
@@ -186,7 +214,7 @@ PBook::Find (Position * pos, const char ** ptrComment)
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // PBook::FindOpcode():
-//    Finds a position and extracts the requested opcode.
+//    Finds a positition and extracts the requested opcode.
 errorT
 PBook::FindOpcode (Position * pos, const char * opcode, DString * target)
 {
@@ -263,9 +291,34 @@ PBook::FindNext (Position * pos, bool forwards)
         } while (NodeList[NextIndex] == NULL);
     }
 
-
     bookNodeT * node = NodeList[NextIndex];
-    ASSERT (node != NULL);
+    errorT err = pos->ReadFromCompactStr ((const byte *) node->name);
+    if (err != OK) { return err; }
+    pos->SetEPTarget (node->data.enpassant);
+
+    // Now print to FEN and re-read, to ensure the piece lists are in
+    // the order produced by a FEN specification -- this is necessary
+    // since a game with a specified start position has the piece lists
+    // in the FEN-generated order:
+
+    char temp[200];
+    pos->PrintFEN (temp, FEN_CASTLING_EP);
+    err = pos->ReadFromFEN (temp);
+    return err;
+}
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// PBook::FindByIndex():
+// Find a position by index and set it.
+errorT
+PBook::FindByIndex (Position * pos, uint idx)
+{
+    ASSERT (pos != NULL);
+    uint totalSize = Size();
+    if (totalSize == 0 || idx < 0 || idx >= NodeListCount) { return ERROR_NotFound; }
+    if (NodeList[idx] == NULL) { return ERROR_NotFound; }
+
+    bookNodeT * node = NodeList[idx];
     errorT err = pos->ReadFromCompactStr ((const byte *) node->name);
     if (err != OK) { return err; }
     pos->SetEPTarget (node->data.enpassant);
@@ -316,6 +369,32 @@ PBook::Insert (Position * pos, const char * comment)
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// PBook::SetIndex():
+//    Set the FindNext() index...
+int
+PBook::SetIndex (uint idx)
+{
+    if (idx < 0 || idx >= NodeListCount) { return -1; }
+    NextIndex = idx;
+    return NextIndex;
+}
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// PBook::GetIndex():
+//    Get the index into the node list for the given position.
+int
+PBook::GetIndex (Position * pos)
+{
+    uint material = pos->GetCount(WHITE) + pos->GetCount(BLACK);
+    compactBoardStr cboard;
+    pos->PrintCompactStr (cboard);
+    bookNodeT * node = Tree[material]->Lookup (cboard);
+    if (!node) return -1;
+    else return node->data.id;
+}
+
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // PBook::Delete():
 //    Delete a position from the PBook.
 errorT
@@ -331,7 +410,6 @@ PBook::Delete (Position * pos)
     // Delete the comment string:
     delete[] node->data.comment;
     delete node;
-
     Altered = true;
     return OK;
 }
@@ -355,6 +433,32 @@ PBook::EcoSummary (const char * ecoPrefix, DString * dstr)
                 continue;
             }
             prevEcoStr = ecoStr;
+            while (*ecoStr != '\n'  &&  *ecoStr != 0) {
+                dstr->AddChar (*ecoStr);
+                ecoStr++;
+            }
+            dstr->Append ("  ");
+            while (*movesStr != '\n'  &&  *movesStr != 0) {
+                dstr->AddChar (*movesStr);
+                movesStr++;
+            }
+            dstr->AddChar ('\n');
+        }
+    }    
+}
+
+void
+PBook::EcoFind (const char * find, DString * dstr)
+{
+    // uint depth = strLength (ecoPrefix);
+    // const char * prevEcoStr = "";
+    for (uint i=0; i < NodeListCount; i++) {
+        bookNodeT * node = NodeList[i];
+        if (node == NULL) { continue; }
+        const char * comment = node->data.comment;
+        const char * ecoStr = epd_findOpcode (comment, "eco");
+        const char * movesStr = epd_findOpcode (comment, "moves");
+        if (ecoStr != NULL  &&  strContains (ecoStr,find)) {
             while (*ecoStr != '\n'  &&  *ecoStr != 0) {
                 dstr->AddChar (*ecoStr);
                 ecoStr++;
@@ -414,8 +518,7 @@ PBook::StripOpcode (const char * opcode)
             while (*s != 0  &&  *s != '\n') { s++; }
             if (*s == '\n') { s++; }
             while (*s != 0) { dstr.AddChar (*s);  s++; }
-
-            delete[] node->data.comment;
+        delete[] node->data.comment;
             node->data.comment = strDuplicate (dstr.Data());
         }
     }
@@ -523,19 +626,13 @@ PBook::ReadEcoFile ()
             // Position already exists: just ignore it.
         }
     }
+    fp.Close();
     return OK;
 corrupt:
+    fp.Close();
     return ERROR_Corrupt;
 }
 
-void ReadLine (DString* s, MFile * fp)
-{
-    int ch = fp->ReadOneByte();
-    while (ch != '\n'  &&  ch != EOF) {
-        if (ch != '\r') s->AddChar (ch);
-        ch = fp->ReadOneByte();
-    }
-}
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // PBook::ReadFile(): read in a file.
 errorT
@@ -555,16 +652,16 @@ PBook::ReadFile ()
     LineCount = 1;
     Position * pos = new Position;
     DString * line = new DString;
-    ReadLine(line, &fp);
+    fp.ReadLine (line);
     DString dstr;
     
-    while (line->Length() || ! fp.EndOfFile()) {
+    while (! fp.EndOfFile()) {
 
         if (pos->ReadFromFEN (line->Data()) != OK) {
             fprintf (stderr, "Error reading line: %u\n", LineCount);
             LineCount++;
             line->Clear();
-            ReadLine(line, &fp);
+            fp.ReadLine (line);
             continue;
             //exit (1);
         }
@@ -604,15 +701,15 @@ PBook::ReadFile ()
         }
         LineCount++;
         line->Clear();
-        ReadLine(line, &fp);
+        fp.ReadLine (line);
     }
     delete pos;
     delete line;
+    fp.Close();
     Altered = false;
     NextIndex = NodeListCount - 1;
     return OK;
 }
-
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // PBook::WriteFile(): writes the entire PBook to a file.
 errorT

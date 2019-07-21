@@ -1,6 +1,6 @@
 #!/bin/sh
 # \
-exec tkscid "$0" "$@"
+exec tcscid "$0" "$@"
 
 # spliteco:
 #   Takes a Scid-format database and produces a number of smaller
@@ -36,7 +36,7 @@ proc main {} {
     set basename [file rootname $basename]
   }
   # Try to open the database:
-  if {[catch {sc_base open $basename} frombase]} {
+  if {[catch {sc_base open -fast -readonly $basename} frombase]} {
     err "Error opening database \"$basename\": $frombase"
     exit 1
   }
@@ -111,10 +111,10 @@ proc split {frombase newbasename startECO endECO} {
     exit 1
   }
   sc_base switch $frombase
-  sc_filter set $frombase dbfilter 1
+  sc_filter reset
   sc_search header -eco [list $startECO $endECO]
-  set ngames [sc_filter count]
-  if {[catch {sc_base copygames $frombase dbfilter $tobase} err]} {
+  set ngames [sc_filter size]
+  if {[catch {sc_filter copy $frombase $tobase} err]} {
     err "Error copying games to \"$newbasename\": $err"
     exit 1
   }

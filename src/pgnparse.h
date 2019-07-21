@@ -24,10 +24,13 @@
 
 #include "common.h"
 #include "tokens.h"
-#include "mfile.h"
+#include "game.h"
+#include "dstring.h"
+
 #include <string>
 
-class Game;
+class CharsetConverter;
+class CharsetDetector;
 
 #define MAX_UNGETCHARS 16
 static const uint MAX_IGNORED_TAGS = 16;
@@ -43,14 +46,21 @@ class PgnParser
     uint   GameCounter;
     int    EndChar;
     uint   BytesSeen;
-    std::string ErrorBuffer;
+#ifndef WINCE
+    FILE * ErrorFile;
+#endif
+    DString * ErrorBuffer;
     uint   NumErrors;
+
+    CharsetConverter * CharConverter;
+    CharsetDetector  * CharDetector;
 
     enum { PARSE_Searching, PARSE_Header, PARSE_Game } ParseMode;
 
     bool   StorePreGameText;
     bool   EndOfInputWarnings;
     bool   ResultWarnings;
+    bool   NewlinesToSpaces;   // Whether to convert newlines in comments
 
     uint   NumIgnoredTags;
     char * IgnoredTags [MAX_IGNORED_TAGS];
@@ -61,11 +71,13 @@ class PgnParser
     inline int    GetChar();
     inline void   UnGetChar (int ch);
 
-    void   Init (const char * inbuffer);
+    void   Init();
+    void   CreateCharsetDetector();
     void   Reset();
+    bool   CheckUTF8BOM();
     void   LogError (const char * errMessage, const char * text);
     void   GetLine (char * buffer, uint bufSize);
-    std::string GetComment();
+    void   GetComment (char * buffer, uint bufSize);
     void   GetRestOfSuffix (char * buffer, char firstChar);
     void   GetRestOfWord_NoDots (char * buffer);
     void   GetRestOfWord_WithDots (char * buffer);
@@ -78,24 +90,56 @@ class PgnParser
     tokenT GetRestOfPawnMove (char * buffer);
     tokenT GetGameToken (char * buffer, uint bufSize);
 
+    void MapChessBaseFigurine(Game * game);
+    void DoCharsetConversion(Game * game);
+    void ConvertComments(Game * game);
+    std::string ConvertToUTF8(char * str);
+
   public:
+#ifdef WINCE
+  void* operator new(size_t sz) {
+    void* m = my_Tcl_Alloc(sz);
+    return m;
+  }
+  void operator delete(void* m) {
+    my_Tcl_Free((char*)m);
+  }
+  void* operator new [] (size_t sz) {
+    void* m = my_Tcl_AttemptAlloc(sz);
+    return m;
+  }
+
+  void operator delete [] (void* m) {
+    my_Tcl_Free((char*)m);
+  }
+
+#endif
     // Constructors: PgnParser is initialised with a file pointer or
     //    a pointer to a buffer, or it defaults to an empty buffer.
     PgnParser (void) { Init ((const char *) ""); }
+    PgnParser (MFile * infile) { Init (infile); }
     PgnParser (const char * inbuffer) { Init (inbuffer); }
-    ~PgnParser() { ClearIgnoredTags(); }
+    ~PgnParser();
+
+    void   Init (MFile * infile);
+    void   Init (const char * inbuffer);
 
     void   Reset (MFile * infile);
     void   Reset (const char * inbuffer);
 
     uint   BytesUsed (void) { return BytesSeen; }
     uint   ErrorCount() { return NumErrors; }
-    const char* ErrorMessages() { return ErrorBuffer.c_str(); }
+    const char * ErrorMessages() { return ErrorBuffer->Data(); }
+    void   ClearErrors();
+#ifndef WINCE
+    void   SetErrorFile (FILE * fp) { ErrorFile = fp; }
+#endif
     void   KeepPreGameText() { StorePreGameText = true; }
     void   IgnorePreGameText() { StorePreGameText = false; }
     void   SetPreGameText (bool b) { StorePreGameText = b; }
     void   SetEndOfInputWarnings (bool b) { EndOfInputWarnings = b; }
     void   SetResultWarnings (bool b) { ResultWarnings = b; }
+    void   SetNewlinesToSpaces (bool b) { NewlinesToSpaces = b; }
 
     void   AddIgnoredTag (const char * tag);
     void   ClearIgnoredTags ();
@@ -110,18 +154,42 @@ class PgnParser
 };
 
 
-class CodecPgn {
-    MFile file_;
-    PgnParser parser_;
-    uint fileSize_;
 
-public:
-    errorT open(const char* filename);
-    errorT parseNext(Game* g) { return parser_.ParseGame(g); }
-    uint countParsed()        { return parser_.BytesUsed(); }
-    uint countTotal()         { return fileSize_; }
-    const char* getErrors()   { return parser_.ErrorMessages(); }
-};
+inline int
+PgnParser::GetChar ()
+{
+    int ch = 0;
+    BytesSeen++;
+    if (UnGetCount > 0) {
+        UnGetCount--;
+        ch = UnGetCh[UnGetCount];
+    } else if (InFile != NULL) {
+        ch =  InFile->ReadOneByte();
+    } else {
+        ch = *InCurrent;
+        if (ch != 0) { InCurrent++; }
+    }
+    if (ch == '\n') { LineCounter++; }
+    return ch;
+}
+
+inline void
+PgnParser::UnGetChar (int ch)
+{
+    if (UnGetCount == MAX_UNGETCHARS) { return; }
+    UnGetCh[UnGetCount] = ch;
+    UnGetCount++;
+    BytesSeen--;
+    if (ch == '\n') { LineCounter--; }
+}
+
+
+inline void
+PgnParser::ClearErrors (void)
+{
+    ErrorBuffer->Clear();
+    NumErrors = 0;
+}
 
 
 #endif // idndef SCID_PGNPARSE_H

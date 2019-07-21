@@ -116,7 +116,7 @@ typedef	int	piece;
 #define	L_bev_limaxx	(-L_tbbe_ssL - 1)	/* mated in 32766 moves */
 #define	L_bev_miminx	(-L_tbbe_ssL - 2)	/* mate in 32767 moves */
 
-// Conversion from 8-bit to 16-bit score
+// Convertion from 8-bit to 16-bit score
 // UNDONE: Maybe implement via lookup table?
 
 #define	S_to_L(tbt)\
@@ -239,7 +239,7 @@ static void* PvMalloc
 #endif
 	if (NULL == pv)
 		{
-		printf ("*** Cannot allocate %d bytes of memory\n", cb);
+		printf ("*** Cannot allocate %lu bytes of memory\n", (unsigned long) cb);
 		exit (1);
 		}
 	cbAllocated += cb;
@@ -253,7 +253,7 @@ static void* PvMalloc
 
 #define	INF	4000
 
-// Enumeration: valid positions with 2 kings on board; white king restricted to
+// Enumaration: valid positions with 2 kings on board; white king restricted to
 // a1-d1-d4 triangle; also, if it's at a1-d4 half-diagonal, then black king
 // must be in a1-h1-h8 triangle
 
@@ -837,7 +837,7 @@ static const bool rgfInLargeTriangle[64] =
 
 // Calculate index - a lot of functions...
 
-// Enumeration tables
+// Enumaration tables
 
 static BYTE		*rgprgsqPiece[6];	// Enumeration for each piece (0 - black pawn)
 									// For each position of the King, all legal squares
@@ -846,7 +846,7 @@ static BYTE		rgcLegal[6][64];	// # of enumerated positions for each piece and ea
 									// location of enemy king
 
 // Enumerations - indexed by [piece] and [kings enumeration].
-// In each table for each [piece] and [king enumeration] we store # of preceding positions.
+// In each table for each [piece] and [king enumeration] we store # of preceeding positions.
 
 static ULONG	*rgprgulSinglePawnless[6];
 static ULONG	*rgprgulPairPawnless[6][6];
@@ -910,52 +910,52 @@ static void VInitSquaresTable
 				{
 			case x_piecePawn:
 				if (
-					( 0 != TbColumn (sq) && sqKing == sq+7 ) ||
-					( 7 != TbColumn (sq) && sqKing == sq+9 )
+					(0 != TbColumn (sq) && sqKing == sq+7) ||
+					(7 != TbColumn (sq) && sqKing == sq+9)
 				   )
 				   continue;
 				break;
 			case x_pieceKnight:
 				if (
-					( TbRow (sq) >= 2 && TbColumn (sq) >= 1 && sqKing == sq-17 ) ||
-					( TbRow (sq) >= 2 && TbColumn (sq) <= 6 && sqKing == sq-15 ) ||
-					( TbRow (sq) >= 1 && TbColumn (sq) >= 2 && sqKing == sq-10 ) ||
-					( TbRow (sq) >= 1 && TbColumn (sq) <= 5 && sqKing == sq-6 ) ||
-					( TbRow (sq) <= 6 && TbColumn (sq) >= 2 && sqKing == sq+6 ) ||
-					( TbRow (sq) <= 6 && TbColumn (sq) <= 5 && sqKing == sq+10 ) ||
-					( TbRow (sq) <= 5 && TbColumn (sq) >= 1 && sqKing == sq+15 ) ||
-					( TbRow (sq) <= 5 && TbColumn (sq) <= 6 && sqKing == sq+17 )
+					(TbRow (sq) >= 2 && TbColumn (sq) >= 1 && sqKing == sq-17) ||
+					(TbRow (sq) >= 2 && TbColumn (sq) <= 6 && sqKing == sq-15) ||
+					(TbRow (sq) >= 1 && TbColumn (sq) >= 2 && sqKing == sq-10) ||
+					(TbRow (sq) >= 1 && TbColumn (sq) <= 5 && sqKing == sq-6) ||
+					(TbRow (sq) <= 6 && TbColumn (sq) >= 2 && sqKing == sq+6) ||
+					(TbRow (sq) <= 6 && TbColumn (sq) <= 5 && sqKing == sq+10) ||
+					(TbRow (sq) <= 5 && TbColumn (sq) >= 1 && sqKing == sq+15) ||
+					(TbRow (sq) <= 5 && TbColumn (sq) <= 6 && sqKing == sq+17)
 				   )
 					continue;
 				break;
 			case x_pieceBishop:
 				if (
-					( 0 != TbRow (sq) && 0 != TbColumn (sq) && sqKing == sq-9 ) ||
-					( 0 != TbRow (sq) && 7 != TbColumn (sq) && sqKing == sq-7 ) ||
-					( 7 != TbRow (sq) && 0 != TbColumn (sq) && sqKing == sq+7 ) ||
-					( 7 != TbRow (sq) && 7 != TbColumn (sq) && sqKing == sq+9 )
+					(0 != TbRow (sq) && 0 != TbColumn (sq) && sqKing == sq-9) ||
+					(0 != TbRow (sq) && 7 != TbColumn (sq) && sqKing == sq-7) ||
+					(7 != TbRow (sq) && 0 != TbColumn (sq) && sqKing == sq+7) ||
+					(7 != TbRow (sq) && 7 != TbColumn (sq) && sqKing == sq+9)
 				   )
 					continue;
 				break;
 			case x_pieceRook:
 				if (
-					( 0 != TbColumn (sq) && sqKing == sq-1 ) ||
-					( 7 != TbColumn (sq) && sqKing == sq+1 ) ||
-					( 0 != TbRow (sq) && sqKing == sq-8 ) ||
-					( 7 != TbRow (sq) && sqKing == sq+8 )
+					(0 != TbColumn (sq) && sqKing == sq-1) ||
+					(7 != TbColumn (sq) && sqKing == sq+1) ||
+					(0 != TbRow (sq) && sqKing == sq-8) ||
+					(7 != TbRow (sq) && sqKing == sq+8)
 				   )
 					continue;
 				break;
 			case x_pieceQueen:
 				if (
-					( 0 != TbColumn (sq) && sqKing == sq-1 ) ||
-					( 7 != TbColumn (sq) && sqKing == sq+1 ) ||
-					( 0 != TbRow (sq) && sqKing == sq-8 ) ||
-					( 7 != TbRow (sq) && sqKing == sq+8 ) ||
-					( 0 != TbRow (sq) && 0 != TbColumn (sq) && sqKing == sq-9 ) ||
-					( 0 != TbRow (sq) && 7 != TbColumn (sq) && sqKing == sq-7 ) ||
-					( 7 != TbRow (sq) && 0 != TbColumn (sq) && sqKing == sq+7 ) ||
-					( 7 != TbRow (sq) && 7 != TbColumn (sq) && sqKing == sq+9 )
+					(0 != TbColumn (sq) && sqKing == sq-1) ||
+					(7 != TbColumn (sq) && sqKing == sq+1) ||
+					(0 != TbRow (sq) && sqKing == sq-8) ||
+					(7 != TbRow (sq) && sqKing == sq+8) ||
+					(0 != TbRow (sq) && 0 != TbColumn (sq) && sqKing == sq-9) ||
+					(0 != TbRow (sq) && 7 != TbColumn (sq) && sqKing == sq-7) ||
+					(7 != TbRow (sq) && 0 != TbColumn (sq) && sqKing == sq+7) ||
+					(7 != TbRow (sq) && 7 != TbColumn (sq) && sqKing == sq+9)
 				   )
 					continue;
 				break;
@@ -1082,7 +1082,7 @@ static void VInitTriple
 
 #endif
 
-// Initialize all enumeration tables
+// Initialize all enumaration tables
 
 static bool fEnumerationInitted = false;
 
@@ -1201,7 +1201,7 @@ static void VInitEnumerations (void)
 								rgcTriplePawnless[pi1][pi2][pi3]);
 					}
 #endif
-		printf ("\nAllocated %dk\n\n", (cbAllocated + 1023)/1024);
+		printf ("\nAllocated %luk\n\n", (unsigned long)(cbAllocated + 1023UL)/1024UL);
 		}
 	}
 
@@ -1246,7 +1246,7 @@ public:
 		// Can we remove one extra square?
 		if ((piw1>x_pieceKnight) || ((BYTE)-1 != rgprgsqPiece[piw1][sqbk*64+sqwk]))
 			ind -= (sqw1 > sqwk);
-		// Add enumerated square to the # of the preceding positions
+		// Add enumerated square to the # of the preceeding positions
 		return ind + (fPawns ? rgprgulSinglePawnPresent[piw1][ulKings] : rgprgulSinglePawnless[piw1][ulKings]);
 		}
 	};
@@ -1302,24 +1302,24 @@ public:
 				ind1 -= (sqw1 > sqwk);
 				ind2 -= (sqw2 > sqwk);
 				}
-			// Add enumerated squares to the # of the preceding positions
+			// Add enumerated squares to the # of the preceeding positions
 			return	ind2*(ind2-1)/2 + ind1 +
 					(fPawns ? rgprgulPairPawnPresent[piw1][piw2][ulKings] : rgprgulPairPawnless[piw1][piw2][ulKings]);
 			}
 		else
 			{
-			// Can we remove WK square from 1st piece enumeration?
+			// Can we remove WK square from 1st piece enumaration?
 			if ((piw1>x_pieceKnight) || ((BYTE)-1 != rgprgsqPiece[piw1][sqbk*64+sqwk]))
 				ind1 -= (sqw1 > sqwk);
 			// Get # of enumerated positions of 2nd piece
 			cInd2 = rgcLegal[piw2][sqbk];
-			// Can we remove WK square from 2nd piece enumeration?
+			// Can we remove WK square from 2nd piece enumaration?
 			if ((piw2>x_pieceKnight) || ((BYTE)-1 != rgprgsqPiece[piw2][sqbk*64+sqwk]))
 				{
 				cInd2 --;
 				ind2 -= (sqw2 > sqwk);
 				}
-			// Add enumerated square to the # of the preceding positions
+			// Add enumerated square to the # of the preceeding positions
 			return cInd2*ind1 + ind2 + (fPawns ? rgprgulPairPawnPresent[piw1][piw2][ulKings] : rgprgulPairPawnless[piw1][piw2][ulKings]);
 			}
 		}
@@ -1394,7 +1394,7 @@ public:
 				ind2 -= (sqw2 > sqwk);
 				ind3 -= (sqw3 > sqwk);
 				}
-			// Add enumerated squares to the # of the preceding positions
+			// Add enumerated squares to the # of the preceeding positions
 			return	ind3*(ind3-1)*(ind3-2)/6 + ind2*(ind2-1)/2 + ind1 +
 					(fPawns ? rgprgulTriplePawnPresent[piw1][piw2][piw3][ulKings] :
 							  rgprgulTriplePawnless[piw1][piw2][piw3][ulKings]);
@@ -1409,13 +1409,13 @@ public:
 				}
 			// Get # of enumerated positions of 3rd piece
 			cInd3 = rgcLegal[piw3][sqbk];
-			// Can we remove WK square from 3rd piece enumeration?
+			// Can we remove WK square from 3rd piece enumaration?
 			if ((piw3>x_pieceKnight) || ((BYTE)-1 != rgprgsqPiece[piw3][sqbk*64+sqwk]))
 				{
 				cInd3 --;
 				ind3 -= (sqw3 > sqwk);
 				}
-			// Add enumerated squares to the # of the preceding positions
+			// Add enumerated squares to the # of the preceeding positions
 			return	(ind2*(ind2-1)/2 + ind1)*cInd3 + ind3 +
 					(fPawns ? rgprgulTriplePawnPresent[piw1][piw2][piw3][ulKings] :
 							  rgprgulTriplePawnless[piw1][piw2][piw3][ulKings]);
@@ -1430,25 +1430,25 @@ public:
 				}
 			// Get # of enumerated positions of 1st piece
 			cInd1 = rgcLegal[piw1][sqbk];
-			// Can we remove WK square from 3rd piece enumeration?
+			// Can we remove WK square from 3rd piece enumaration?
 			if ((piw1>x_pieceKnight) || ((BYTE)-1 != rgprgsqPiece[piw1][sqbk*64+sqwk]))
 				{
 				cInd1 --;
 				ind1 -= (sqw1 > sqwk);
 				}
-			// Add enumerated squares to the # of the preceding positions
+			// Add enumerated squares to the # of the preceeding positions
 			return	(ind3*(ind3-1)/2 + ind2)*cInd1 + ind1 +
 					(fPawns ? rgprgulTriplePawnPresent[piw1][piw2][piw3][ulKings] :
 							  rgprgulTriplePawnless[piw1][piw2][piw3][ulKings]);
 			}
 		else
 			{
-			// Can we remove WK square from 1st piece enumeration?
+			// Can we remove WK square from 1st piece enumaration?
 			if ((piw1>x_pieceKnight) || ((BYTE)-1 != rgprgsqPiece[piw1][sqbk*64+sqwk]))
 				ind1 -= (sqw1 > sqwk);
 			// Get # of enumerated positions of 2nd piece
 			cInd2 = rgcLegal[piw2][sqbk];
-			// Can we remove WK square from 2nd piece enumeration?
+			// Can we remove WK square from 2nd piece enumaration?
 			if ((piw2>x_pieceKnight) || ((BYTE)-1 != rgprgsqPiece[piw2][sqbk*64+sqwk]))
 				{
 				cInd2 --;
@@ -1456,13 +1456,13 @@ public:
 				}
 			// Get # of enumerated positions of 3rd piece
 			cInd3 = rgcLegal[piw3][sqbk];
-			// Can we remove WK square from 3rd piece enumeration?
+			// Can we remove WK square from 3rd piece enumaration?
 			if ((piw3>x_pieceKnight) || ((BYTE)-1 != rgprgsqPiece[piw3][sqbk*64+sqwk]))
 				{
 				cInd3 --;
 				ind3 -= (sqw3 > sqwk);
 				}
-			// Add enumerated square to the # of the preceding positions
+			// Add enumerated square to the # of the preceeding positions
 			return	cInd3*(cInd2*ind1 + ind2) + ind3 +
 					(fPawns ? rgprgulTriplePawnPresent[piw1][piw2][piw3][ulKings] :
 							  rgprgulTriplePawnless[piw1][piw2][piw3][ulKings]);
@@ -3042,7 +3042,7 @@ typedef struct		// Hungarian: tbd
 	}
 	CTbDesc;
 
-#define	TB(name, funW, funB, cbW, cbB)	{ tbid_##name, { funW, funB }, #name, { cbW, cbB } },
+#define	TB(name, funW, funB, cbW, cbB)	{ tbid_##name, funW, funB, #name, { cbW, cbB } },
 
 #define	P	x_piecePawn
 #define	N	x_pieceKnight
@@ -3380,7 +3380,7 @@ int	IDescFindByName
 
 static CUTbReference *PutbrCreateSubtable
 	(
-	int	cPieces,	//	IN | # of pieces remaining on board
+	int	cPieces,	//	IN | # of pieces ramaining on board
 	int	iDepth		//	IN | Recursion depth (# of piece classes left)
 	)
 	{
@@ -3467,6 +3467,10 @@ static bool FRegisterTb
 // File mapping - Win32 code only
 
 #if defined (_WIN32)
+
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
 
 #include <windows.h>
 
@@ -3704,8 +3708,8 @@ extern "C" int FReadTableToMemory
 			printf ("*** Seek in %s failed\n", pszName);
 			exit (1);
 			}
-		cb = ftell (fp);
-		if (-1 == cb)
+		cb = (INDEX) ftell (fp);
+		if (cb == (INDEX)-1)
 			{
 			printf ("*** Cannot find length of %s\n", pszName);
 			exit (1);
@@ -4156,7 +4160,7 @@ extern "C" int TB_FASTCALL L_TbtProbeTable
 //
 //	Global initialization
 
-int FCheckExistence
+int FCheckExistance
 	(
 	char	*pszPath,
 	int		iTb,
@@ -4385,12 +4389,12 @@ extern "C" int IInitializeTb
 		szTemp[i] = '\0';
 		for (iTb = 1; iTb < cTb; iTb ++)
 			{
-			if (FCheckExistence (szTemp, iTb, x_colorWhite))
+			if (FCheckExistance (szTemp, iTb, x_colorWhite))
 				{
 				if (iTb > iMaxTb)
 					iMaxTb = iTb;
 				}
-			if (FCheckExistence (szTemp, iTb, x_colorBlack))
+			if (FCheckExistance (szTemp, iTb, x_colorBlack))
 				{
 				if (iTb > iMaxTb)
 					iMaxTb = iTb;

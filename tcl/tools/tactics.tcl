@@ -1,723 +1,810 @@
 ### tactics.tcl: part of Scid.
 ### Copyright (C) 2007  Pascal Georges
-### Copyright (C) 2015 Fulvio Benini
 ###
 ######################################################################
 ### Solve tactics (mate in n moves for example)
 # use Site token in pgn notation to store progress
 #
+# S.A: Updated a little 6 Sept, 2010
+# "Show Solution" checkbox now adds solution as PGN for browsing, and pauses main loop
+# ... I still havent checked the "Win Won" functionality
 
 namespace eval tactics {
-    
-    set infoEngineLabel ""
-    set solved "problem solved"
-    set failed "problem failed"
-    set prevScore 0
-    set prevLine ""
-    set nextEngineMove ""
-    set matePending 0
+
+  set infoEngineLabel ""
+
+  set basePath $::scidBasesDir
+
+  set baseList {}
+  set solved "problem solved"
+  set failed "problem failed"
+  set prevScore 0
+  set prevLine ""
+  set nextEngineMove ""
+  set matePending 0
+  set cancelScoreReset 0
+  set askToReplaceMoves_old 0
+  set showSolution 0
+  set labelSolution {}
+  # set labelSolution {. . . . . . }
+  set lastGameLoaded 0
+  set prevFen ""
+
+  # Don't try to find the exact best move but to win a won game (that is a mate in 5 is ok even if there was a pending mate in 2)
+  set winWonGame 0
+
+
+  ### Current base must contain games with Tactics flag and special **** markers
+  # (as prepared by the Find Best Move in analysis annotation).
+  # The first var should contain the best move (the next best move
+  # is at least 1.0 point away.
+  # TODO preset the filter on flag == Tactics to speed up searching
+
+  proc findBestMove {} {
+    bind .main.board  <Double-Button-1> ::tactics::findBestMove
+    set ::gameInfo(hideNextMove) 1
+    if {[winfo exists .pgnWin]} {
+      destroy .pgnWin
+    }
+
+    set found 0
+
+    if {![sc_base inUse] || [sc_base numGames] == 0} {
+      tk_messageBox -type ok -icon info -title {Find Best Move} -message "No games in database"     
+      return
+    }
+   
+    busyCursor .
+    update
+   
+    # Try to find in current game, from current pos (exit vars first)
+    catch {
+      # if gamenumber == 0, sc_game flag T returns no boolean
+      if {[sc_game flag T [sc_game number]]} {
+	while {[sc_var level] != 0} { sc_var exit }
+	  if {[llength [gotoNextTacticMarker] ] != 0} {
+	    set found 1
+	  }
+      }
+    }
+
+    if {!$found} {
+      # Then search other 'T' flagged games in DB
+      for {set g [expr [sc_game number] +1] } { $g <= [sc_base numGames]} { incr g} {
+        if {![sc_game flag T $g]} {
+          continue
+        }
+        sc_game load $g
+        # go through all moves and look for tactical markers ****D->
+        if {[llength [gotoNextTacticMarker] ] != 0} {
+          set found 1
+          break
+        } else {
+          # A tactical flagged game (without ****D-> markers) with non-standard start position,
+	  # begins probably with a tactical position.
+          if {[sc_game startBoard]} {
+	    sc_move start
+            set found 1
+            break
+          }
+        }
+      }
+    }
+   
+    unbusyCursor .
+   
+    if { ! $found } {
+      tk_messageBox -type ok -icon info -title {Find Best Move} -message "No (more) relevant games found."     
+      sc_game load 1
+    } else  {
+      sideToMoveAtBottom
+    }
+    updateBoard -pgn
+    ::windows::gamelist::Refresh
+    updateTitle
+  }
+
+  ################################################################################
+  # returns a list with depth score prevscore
+  # or an empty list if marker not found
+
+  proc gotoNextTacticMarker {} {
+    while {![sc_pos isAt end]} {
+      sc_move forward
+      set cmt [sc_pos getComment]
+
+      if {[string match {*\*\*\*\*D*->*} $cmt]} {
+        # anything non-null
+        return $cmt
+      }
+    }
+    return {}
+  }
+
+
+  ### Configuration dialog for Mate in N puzzle
+  # (Had some associated core dumps here, possibly when scidBasesDir is wrongly set in config S.A)
+
+  proc config {} {
+    global ::tactics::basePath ::tactics::baseList ::tactics::baseDesc
+    set basePath $::scidBasesDir
+
+    if {[winfo exists .tacticsWin]} {
+      destroy .tacticsWin
+    }
+
+    set w .configTactics
+    if {[winfo exists $w]} {
+      raiseWin $w
+      return
+    }
+
+    update
+    toplevel $w
+    wm title $w $::tr(ConfigureTactics)
+    setWinLocation $w
+
+    if {[sc_base count free] == 0} {
+      tk_messageBox -type ok -icon info -title Scid -message "Too many databases are open; close one first"
+      return
+    }
+
+    set prevBase [sc_base current]
+    # go through all bases and take descriptions
+    set baseList {}
+    set baseDesc {}
+    set fileList [  lsort -dictionary [ glob -nocomplain -directory $basePath *.si4 ] ]
+    foreach file  $fileList {
+      if {[sc_base slot $file] == 0} {
+        sc_base open [file rootname $file]
+        set wasOpened 0
+      } else  {
+        sc_base switch [sc_base slot $file]
+        set wasOpened 1
+      }
+      
+      set solvedCount 0
+      for {set g 1 } { $g <= [sc_base numGames]} { incr g} {
+        sc_game load $g
+        if {[sc_game tags get "Site"] == $::tactics::solved} { incr solvedCount }
+      }
+      lappend baseList "$file" "[sc_base description]  ($solvedCount/[sc_base numGames])"
+      lappend baseDesc [sc_base description]
+      if {! $wasOpened } {
+        sc_base switch $prevBase
+        sc_base close [sc_base slot $file]
+      }
+    }
+
+    updateMenuStates
+    updateStatusBar
+    updateTitle
+
+    frame $w.fconfig -relief raised -borderwidth 1
+    label $w.fconfig.l1 -text $::tr(ChooseTrainingBase)
+    pack $w.fconfig.l1 -pady 3
+
+    frame $w.fconfig.flist
+
+    listbox $w.fconfig.flist.lb -selectmode single -exportselection 0 \
+        -yscrollcommand "$w.fconfig.flist.ybar set" -height 10 -width 30
+    bind $w.fconfig.flist.lb <Double-Button-1> "::tactics::start $w"
+
+    scrollbar $w.fconfig.flist.ybar -command "$w.fconfig.flist.lb yview"
+    pack $w.fconfig.flist.lb $w.fconfig.flist.ybar -side left -fill y
+    for {set i 1} {$i<[llength $baseList]} {incr i 2} {
+      $w.fconfig.flist.lb insert end [lindex $baseList $i]
+    }
+    $w.fconfig.flist.lb selection set 0
+
+    frame $w.fconfig.reset
+    button $w.fconfig.reset.button -text $::tr(ResetScores) -command {
+      set current [.configTactics.fconfig.flist.lb curselection]
+      set name [lindex $::tactics::baseList [expr $current * 2 ] ]
+      set desc [lindex $::tactics::baseDesc $current]
+      if {[tk_messageBox -type yesno -parent .configTactics -icon question \
+	     -title {Confirm Reset} -message "Confirm resetting \"$desc\" database"] == {yes}} {
+	::tactics::resetScores $name .configTactics
+      }
+    }
+    pack $w.fconfig.reset.button
+
+    # in order to limit CPU usage, limit time for analysis (this prevents noise on laptops)
+    frame $w.fconfig.flimit
+    label $w.fconfig.flimit.blimit -text "$::tr(limitanalysis) ($::tr(seconds))" -relief flat
+    scale $w.fconfig.flimit.analysisTime -orient horizontal -from 1 -to 30 -length 120 \
+      -variable ::tactics::analysisTime -resolution 1
+    pack $w.fconfig.flimit.blimit -side top
+    pack $w.fconfig.flimit.analysisTime -side bottom
+
+    frame $w.fconfig.fbutton
+    dialogbutton $w.fconfig.fbutton.ok -text Ok -command "::tactics::start $w"
+    dialogbutton $w.fconfig.fbutton.cancel -text $::tr(Cancel) -command "focus .main ; destroy $w"
+    pack $w.fconfig.fbutton.ok $w.fconfig.fbutton.cancel -expand yes -side left -padx 20 -pady 2
+    pack $w.fconfig $w.fconfig.flist $w.fconfig.reset -side top
+
+    addHorizontalRule $w.fconfig
+
+    pack $w.fconfig.flimit -pady 5 -side top
+
+    addHorizontalRule $w.fconfig
+
+    pack $w.fconfig.fbutton -pady 5 -side bottom
+    bind $w <Configure> "recordWinSize $w"
+    bind $w <F1> { helpWindow TacticsTrainer }
+  }
+
+
+  proc start {parent} {
+    global ::tactics::analysisEngine ::askToReplaceMoves ::tactics::askToReplaceMoves_old
+
+    set current [.configTactics.fconfig.flist.lb curselection]
+    set base [lindex $::tactics::baseList [expr $current * 2]]
+    set desc [lindex $::tactics::baseDesc $current]
+
+    if {![::tactics::loadBase [file rootname $base] $parent]} {
+      return
+    }
+
+    destroy $parent
+
+    set ::gameInfo(hideNextMove) 1
+    if {[winfo exists .pgnWin]} {
+      destroy .pgnWin
+    }
+
+    set ::tactics::lastGameLoaded 0
+
+    if { ![::tactics::launchengine] } { return }
+
+    set askToReplaceMoves_old $askToReplaceMoves
+    set askToReplaceMoves 0
+
+    set w .tacticsWin
+    if {[winfo exists $w]} {
+      raiseWin $w
+      return
+    }
+
+    toplevel $w
+    wm title $w $desc
+    setWinLocation $w
+    # because sometimes the 2 buttons at the bottom are hidden
+    wm minsize $w 170 170
+    frame $w.f1 -relief groove -borderwidth 1
+    label $w.f1.labelInfo -textvariable ::tactics::infoEngineLabel -bg linen
+    checkbutton $w.f1.cbWinWonGame -text $::tr(WinWonGame) -variable ::tactics::winWonGame
+    pack $w.f1.labelInfo $w.f1.cbWinWonGame -expand yes -fill both -side top
+
+    frame $w.clock
+    ::gameclock::new $w.clock 1 80 0
+    ::gameclock::reset 1
+    ::gameclock::start 1
+
+    frame $w.f2 -relief groove
+    checkbutton $w.f2.solution -text $::tr(ShowSolution) -variable ::tactics::showSolution \
+      -command ::tactics::toggleSolution
+    label $w.f2.solved -textvariable ::tactics::labelSolution -wraplength 120
+    pack $w.f2.solution $w.f2.solved -expand yes -fill both -side top
+
+    frame $w.buttons -relief groove -borderwidth 1
+    pack $w.f1 -expand yes -fill both
+    pack $w.clock
+    pack $w.f2 $w.buttons -expand yes -fill both
+
+    setInfoEngine $::tr(LoadingBase)
+
+    button $w.buttons.next -text $::tr(Next) -command {
+      ::tactics::stopAnalyze
+      # mark game as solved if solution shown
+      if {$::tactics::showSolution} {
+	sc_game tags set -site $::tactics::solved
+	sc_game save [sc_game number]
+      }
+      ::tactics::loadNextGame
+    }
+    button $w.buttons.close -text Quit -command ::tactics::endTraining
+    pack $w.buttons.next $w.buttons.close -expand yes -fill both -padx 20 -pady 2
+    bind $w <Destroy> { ::tactics::endTraining }
+    bind $w <Configure> "recordWinSize $w"
+    bind $w <F1> { helpWindow TacticsTrainer }
+
+    setInfoEngine "---"
+    ::tactics::loadNextGame
+    ::tactics::mainLoop
+  }
+  ################################################################################
+  #
+  ################################################################################
+  proc endTraining {} {
+    set w .tacticsWin
+    bind $w <Destroy> {}
+    ::tactics::stopAnalyze
+    after cancel ::tactics::mainLoop
+    ::file::Close
+
+    set ::askToReplaceMoves $::tactics::askToReplaceMoves_old
+    focus .main
+    destroy $w
+
+    set ::gameInfo(hideNextMove) 0
+
+    catch { ::uci::closeUCIengine $::tactics::engineSlot }
+  }
+
+  proc toggleSolution {} {
+    global ::tactics::showSolution ::tactics::labelSolution ::tactics::analysisEngine
+
+    if {$showSolution} {
+      # pause main loop
+      after cancel ::tactics::mainLoop
+      if {![sc_pos isAt start]} {
+	# not sure why...but have to move back one
+	sc_move back
+      }
+
+      # add solution
+      sc_move addSan $analysisEngine(moves)
+
+      sc_move start
+
+      set labelSolution $analysisEngine(moves)
+      if {$analysisEngine(score) != {-327.0}} {
+	append labelSolution "\n(score $analysisEngine(score))"
+      }
+    } else  {
+      # restart this game
+      sc_game load $::tactics::lastGameLoaded
+      after 1000  ::tactics::mainLoop
+      set labelSolution {}
+    }
+    updateBoard -pgn
+    update
+  }
+
+  proc resetScores {name parent} {
+    global ::tactics::cancelScoreReset ::tactics::baseList
+
+    set base [file rootname $name]
+
+    set wasOpened 0
+
+    if {[sc_base count free] == 0} {
+      tk_messageBox -type ok -icon info -title Scid -message "Too many databases are opened\nClose one first" -parent $parent
+      return
+    }
+    # check if the base is already opened
+    if {[sc_base slot $name] != 0} {
+      sc_base switch [sc_base slot $name]
+      set wasOpened 1
+    } else  {
+      if { [catch { sc_base open $base }] } {
+        tk_messageBox -type ok -icon warning -title Scid -message "Unable to open base" -parent $parent
+        return
+      }
+    }
+    if {[sc_base isReadOnly]} {
+        tk_messageBox -type ok -icon warning -title Scid -message "Base $base is read-only" -parent $parent
+        return
+    }
+
+    # reset site tag for each game
+    progressWindow Scid $::tr(ResettingScore) $::tr(Cancel) "::tactics::sc_progressBar"
+    set numGames [sc_base numGames]
     set cancelScoreReset 0
-    set showSolution 0
-    set labelSolution ". . . . . . "
-    set prevFen ""
-    set engineSlot 5
-    # Don't try to find the exact best move but to win a won game (that is a mate in 5 is ok even if there was a pending mate in 2)
-    set winWonGame 0
-    
-    ################################################################################
-    # Tacticts training
-    ################################################################################
-    proc configBases {win} {
-        $win.d.search configure -state disabled
-        $win.fbutton.ok configure -state disabled -command {}
-        $win.fbutton.reset configure -state disabled -command {}
-        $win.fbutton.cancel configure -text [tr stop] -command {progressBarCancel}
-        $win.fbutton.help configure -state disabled
-        $win.s.bases delete [$win.s.bases children {}]
+    for {set g 1} { $g <= $numGames } { incr g} {
+      if { $cancelScoreReset } { break }
+      sc_game load $g
+      if { [sc_game tags get "Site"] != ""} {
+        sc_game tags set -site ""
+        sc_game save [sc_game number]
+      }
+      if { [expr $g % 100] == 0 } {
+        updateProgressWindow $g $numGames
+      }
+    }
+    closeProgressWindow
+    if { ! $wasOpened } {
+      sc_base close
+    }
+    # update listbox
+    set w .configTactics
+    set cs [$w.fconfig.flist.lb curselection]
+    set idx [expr $cs * 2 +1]
+    set tmp [lindex $baseList $idx]
+    regsub "\[(\]\[0-9\]+/" $tmp "(0/" tmp
+    lset baseList $idx $tmp
+    $w.fconfig.flist.lb delete 0 end
+    for {set i 1} {$i<[llength $baseList]} {incr i 2} {
+      $w.fconfig.flist.lb insert end [lindex $baseList $i]
+    }
+    $w.fconfig.flist.lb selection set $cs
+  }
+  ################################################################################
+  # cancel score reset loading
+  ################################################################################
+  proc sc_progressBar {} {
+    set ::tactics::cancelScoreReset 1
+  }
+  ################################################################################
+  #
+  ################################################################################
+  proc loadNextGame {} {
+    ::tactics::resetValues
+    setInfoEngine $::tr(LoadingGame)
+    set newGameFound 0
+    # find a game with site tag != problem solved
+    for {set g [ expr $::tactics::lastGameLoaded +1 ] } { $g <= [sc_base numGames]} { incr g} {
+      sc_game load $g
+      set tag [sc_game tags get "Site"]
+      if {$tag != $::tactics::solved} { set newGameFound 1 ; break }
+    }
+    # it seems we finished the serial
+    if {! $newGameFound } {
+      tk_messageBox -title Scid -icon info -type ok -message $::tr(AllExercisesDone)
+      return
+    }
+    set ::tactics::lastGameLoaded $g
 
-        set prevBase [sc_base current]
-        set valid {}
-        set fileList [lsort -dictionary [ glob -nocomplain -directory $::scidBasesDir *.si4 ] ]
-        set progress 0.0
-        set progressIncr 1.0
-        catch { set progressIncr [expr {602.0 / [llength $fileList]}] }
-        busyCursor .
-        foreach fname $fileList {
-            set fname [file rootname [file nativename $fname]]
-            set baseId [sc_base slot $fname]
-            if {$baseId == 0} {
-                progressBarSet $win.dummy 100 10
-                if { [catch { sc_base open $fname } baseId] } {
-                    if {$::errorCode == $::ERROR::UserCancel} { break }
-                    ERROR::MessageBox
-                    continue
-                }
-                set wasOpened 0
-            } else  {
-                set wasOpened 1
-            }
+    sideToMoveAtBottom
 
-            set filter [sc_filter new $baseId]
-            progressBarSet $win.dummy 100 10
-            set err [catch {
-                sc_filter search $baseId $filter header -filter RESET -flag S -flag| T
-                set nTactics [sc_filter count $baseId $filter]
-                sc_filter search $baseId $filter header -filter AND -site "\"$::tactics::solved\""
-                set solvedCount [sc_filter count $baseId $filter]
+    ::gameclock::reset 1
+    ::gameclock::start 1
 
-                set line [list [file tail $fname] [sc_base extra $baseId description] $solvedCount $nTactics]
+    updateBoard -pgn
+    set ::tactics::prevFen [sc_pos fen]
+    ::tree::refresh
+    ::windows::stats::Refresh
+    updateMenuStates
+    updateTitle
+    updateStatusBar
+    ::tactics::startAnalyze
+    ::tactics::mainLoop
+  }
+  ################################################################################
+  # flips the board if necessary so the side to move is at the bottom
+  ################################################################################
+  proc sideToMoveAtBottom {} {
+    if { [sc_pos side] == "white" && [::board::isFlipped .main.board] || [sc_pos side] == "black" &&  ![::board::isFlipped .main.board] } {
+      toggleRotateBoard
+    }
+  }
 
-                set pos "end"
-                if {[sc_base extra $baseId type] == 15} {
-                    if {![info exists nTactBases]} {
-                        set nTactBases -1
-                        set valid $fname
-                    }
-                    set pos [incr nTactBases]
-                }
-                $win.s.bases insert {} $pos -id $fname -values $line
-                $win.s.bases see $fname
-                if {$nTactics == 0} {
-                    $win.s.bases item $fname -tag empty
-                } else {
-                    if {$valid == ""} { set valid $fname }
-                }
+  ################################################################################
+  #
+  ################################################################################
 
-                set progress [expr {$progress + $progressIncr +1}]
-                $win.pbar coords bar 0 0 [expr {int($progress)}] 12
-            }]
-            sc_filter release $baseId $filter
-            if {$wasOpened == 0} {
-                sc_base close $baseId
-            }
+  # We should probably disable "flip board" button, as it breaks game
+  proc isPlayerTurn {} {
+    if { [sc_pos side] == "white" &&  ![::board::isFlipped .main.board] || \
+         [sc_pos side] == "black" &&  [::board::isFlipped .main.board] } {
+      return 1
+    } else {
+      return 0
+    }
+  }
 
-            if {$err} {
-                if {$::errorCode == $::ERROR::UserCancel} { break }
-                ERROR::MessageBox
-                continue
-            }
-        }
-        unbusyCursor .
-        sc_base switch $prevBase
-        $win.pbar coords bar 0 0 602 12
-        $win.fbutton.help configure -state normal
-        grid $win.fbutton.reset
-        set eager [$win.s.bases selection]
-        if {$eager != ""} {
-            set valid $eager
-            $win.s.bases selection set {}
-        }
-        bind $win.s.bases <<TreeviewSelect>> "::tactics::configValidBase $win"
-        $win.s.bases selection set [list $valid]
-        $win.s.bases see $valid
-        $win.d.search configure -state normal
+  ################################################################################
+  #
+  ################################################################################
+  proc exSolved {} {
+    ::tactics::stopAnalyze
+    ::gameclock::stop 1
+    sc_game tags set -site $::tactics::solved
+    sc_game save [sc_game number]
+    if {$::tactics::showSolution} {
+      return
+    }
+    tk_messageBox -title Scid -icon info -type ok -message $::tr(MateFound)
+    ::tactics::loadNextGame
+  }
+  ################################################################################
+  # Handle the case where position was changed not during normal play but certainly with
+  # move back / forward / rewind commands
+  ################################################################################
+  proc abnormalContinuation {} {
+    ::tactics::stopAnalyze
+    ::tactics::resetValues
+    ::tree::refresh
+    ::windows::stats::Refresh
+    updateMenuStates
+    updateTitle
+    updateStatusBar
+    if { [sc_pos side] == "white" && [::board::isFlipped .main.board] \
+      || [sc_pos side] == "black" &&  ![::board::isFlipped .main.board] } {
+      ::board::flip .main.board
+    }
+    updateBoard -pgn
+    set ::tactics::prevFen [sc_pos fen]
+    ::tactics::startAnalyze
+    ::tactics::mainLoop
+  }
+
+  ################################################################################
+  # waits for the user to play and check the move played
+  ################################################################################
+  proc mainLoop {} {
+    global ::tactics::prevScore ::tactics::prevLine ::tactics::analysisEngine ::tactics::nextEngineMove
+
+    after cancel ::tactics::mainLoop
+
+    if {[sc_pos fen] != $::tactics::prevFen && [sc_pos isAt start]} {
+      ::tactics::abnormalContinuation
+      return
     }
 
-    proc configValidDir {win} {
-        bind $win.s.bases <<TreeviewSelect>> {}
-        $win.fbutton.reset configure -state disabled -command {}
-        $win.fbutton.ok configure -state disabled -command {}
-        $win.d.search configure -text $::tr(Search)
-        $win.pbar coords bar 0 0 0 0
-        $win.fbutton.cancel configure -text [tr Cancel] -command "focus .; destroy $win"
-        if {[file isdirectory $::scidBasesDir]} {
-            $win.d.basedir configure -foreground black
-            $win.d.search configure -state normal \
-                -command "::tactics::configBases $win"
-            after idle "after 1 ::tactics::configBases $win"
-        } else {
-            $win.d.basedir configure -foreground red
-            $win.d.search configure -state disabled -command {}
-        }
+    # is this player's turn (which always plays from bottom of the board) 
+    if { [::tactics::isPlayerTurn] } {
+      after 1000  ::tactics::mainLoop
+      return
     }
 
-    proc configValidBase {win} {
-        set fname [$win.s.bases selection]
-        $win.fbutton.cancel configure -text [tr Cancel] -command "focus .; destroy $win"
-        if {$fname != "" && [$win.s.bases item {*}$fname -tags] != "empty"} {
-            $win.fbutton.ok configure -state normal \
-                -command "set e \[$win.e.engines selection\]; destroy $win; ::tactics::createWin $fname \$e"
-            $win.fbutton.reset configure -state normal \
-                -command "::tactics::resetScores $fname; ::tactics::configValidDir $win"
-        } else {
-            $win.fbutton.ok configure -state disabled -command {}
-            $win.fbutton.reset configure -state disabled -command {}
-        }
+    set ::tactics::prevFen [sc_pos fen]
+
+    # check if player's move is a direct mate : no need to wait for engine analysis in this case
+    set move_done [sc_game info previousMove]
+    if { [string index $move_done end] == "#"} { ::tactics::exSolved; return }
+
+    # if the engine is still analyzing, wait the end of it
+    if {$analysisEngine(analyzeMode)} { vwait ::tactics::analysisEngine(analyzeMode) }
+
+    if {[sc_pos fen] != $::tactics::prevFen  && [sc_pos isAt start]} {
+      ::tactics::abnormalContinuation
+      return
     }
 
-    proc config {} {
-        # check if tactics window is already opened. If so, abort serial.
-        set w .tacticsWin
-        if {[winfo exists $w]} {
-            destroy $w
-        }
-        
-        set w ".configTactics"
-        if {[winfo exists $w]} {
-            focus $w
-            return
-        }
-        toplevel $w
-        wm title $w $::tr(ConfigureTactics)
-        wm resizable $w 0 0
+    # the player moved and analysis is over : check if his move was as good as expected
+    set prevScore $analysisEngine(score)
+    set prevLine $analysisEngine(moves)
+    ::tactics::startAnalyze
 
-        #dummy progressbar
-        canvas $w.dummy
-        $w.dummy create rectangle 0 0 0 0
-
-        #Engine selection
-        grid [frame $w.sep1 -height 10] -sticky news -padx 10
-        label $w.engine -font font_Bold -text "[tr Engine]:"
-        grid $w.engine -sticky w -padx 10
-        grid [ttk::frame $w.e] -sticky news -padx 10
-        ttk::treeview $w.e.engines -columns {0 1} -selectmode browse -show {} -height 4
-        $w.e.engines column 0 -width 200
-        $w.e.engines column 1 -width 400
-
-        set i 0
-        set uci 0
-        foreach e $::engines(list) {
-            if {[lindex $e 7] != 0} {
-                $w.e.engines insert {} end -id $i -values [lrange $e 0 1]
-                if {$uci == 0} { $w.e.engines selection set [list $i] }
-                incr uci
-            }
-            incr i
-        }
-        if {$uci == 0} {
-            destroy $w
-            set msg "This feature require at least one UCI engine"
-            tk_messageBox -type ok -icon error -title "$::tr(ConfigureTactics)" -message $msg
-            return
-        }
-        autoscrollframe -bars both $w.e "" $w.e.engines
-
-        grid [ttk::frame $w.t] -sticky news -padx 10
-        grid columnconfigure $w.t 2 -weight 1
-        label $w.t.analabel -text "[tr SecondsPerMove]: "
-        scale $w.t.analysisTime -orient horizontal -from 1 -to 60 -length 120 -variable ::tactics::analysisTime \
-                -showvalue 0 -command { ::utils::validate::roundScale ::tactics::analysisTime 1 }
-        label $w.t.value -textvar ::tactics::analysisTime
-        grid $w.t.analabel  $w.t.value $w.t.analysisTime -sticky news
-        
-
-        #BaseDir selection
-        grid [frame $w.sep2 -height 20] -sticky news -padx 10 -pady 10
-        grid [frame $w.d] -sticky news -padx 10 -pady 10
-        label $w.d.lbl -font font_Bold -text "[tr ChooseTrainingBase]:"
-        grid $w.d.lbl -sticky w -columnspan 3
-        grid columnconfigure $w.d 1 -weight 1
-        button $w.d.selectDir -image tb_open -command "setTacticsBasesDir; ::tactics::configValidDir $w"
-        label $w.d.basedir -textvariable scidBasesDir
-        button $w.d.search -text [tr Search]
-        grid $w.d.selectDir $w.d.basedir $w.d.search -sticky w -padx 10
-
-
-        #Base selection
-        grid [ttk::frame $w.s] -sticky news -padx 10
-        ttk::treeview $w.s.bases -columns {0 1 2 3} -show headings -selectmode browse -height 8
-        $w.s.bases tag configure empty -foreground #a5a2ac
-        $w.s.bases heading 0 -text [tr DatabaseName]
-        $w.s.bases heading 1 -text [tr Description]
-        $w.s.bases heading 2 -text Solved
-        $w.s.bases heading 3 -text [tr Total]
-        $w.s.bases column 0 -width 140
-        $w.s.bases column 1 -width 300
-        $w.s.bases column 2 -width 80 -anchor c
-        $w.s.bases column 3 -width 80 -anchor c
-        autoscrollframe -bars both $w.s "" $w.s.bases
-
-        canvas $w.pbar -width 600 -height 10 -bg white -relief solid -border 1
-        $w.pbar create rectangle 0 0 0 0 -fill blue -outline blue -tags bar
-        grid $w.pbar
-
-
-        #Buttons
-        grid [ttk::frame $w.fbutton] -sticky news
-        grid columnconfigure $w.fbutton 1 -weight 1
-        ttk::button $w.fbutton.ok -text [tr Continue]
-        ttk::button $w.fbutton.cancel
-        ttk::button $w.fbutton.reset -text [tr ResetScores]
-        ttk::button $w.fbutton.help -text [tr Help] \
-            -command "destroy $w; helpWindow TacticsTrainer"
-        grid $w.fbutton.ok -row 0 -column 2
-        grid $w.fbutton.cancel -row 0 -column 3
-        grid $w.fbutton.reset -row 0 -column 1 -sticky w
-        grid $w.fbutton.help -row 0 -column 0 -sticky w
-
-        # Set up geometry for middle of screen:
-        set x [expr ([winfo screenwidth $w] - 600) / 2]
-        set y [expr ([winfo screenheight $w] - 600) / 2]
-        wm geometry $w +$x+$y
-        grab $w
-        configValidDir $w
-        focus $w
-    }
-    ################################################################################
-    #
-    ################################################################################
-    proc createWin { base engineIdx} {
-        global ::tactics::analysisEngine
-
-        ::uci::resetUciInfo $::tactics::engineSlot
-        set analysisEngine(analyzeMode) 0
-        progressWindow "Scid" [tr StartEngine]
-        set err [::uci::startEngine $engineIdx $::tactics::engineSlot]
-        closeProgressWindow
-        if {$err != 0} { return }
-
-        set err [::tactics::loadBase $base]
-        if {$err != 0} { return }
-
-        
-        set w .tacticsWin
-        if {[winfo exists $w]} { focus $w ; return }
-        
-        createToplevel $w .pgnWin
-        setTitle $w $::tr(Tactics)
-        setWinLocation $w
-        # because sometimes the 2 buttons at the bottom are hidden
-        wm minsize $w 170 170
-        ttk::frame $w.f1 -relief groove ;# -borderwidth 1
-        ttk::label $w.f1.labelInfo -textvariable ::tactics::infoEngineLabel -background linen
-        ttk::checkbutton $w.f1.cbWinWonGame -text $::tr(WinWonGame) -variable ::tactics::winWonGame
-        pack $w.f1.labelInfo $w.f1.cbWinWonGame -expand yes -fill both -side top
-        
-        ttk::frame $w.fclock
-        ::gameclock::new $w.fclock 1 80 0
-        ::gameclock::reset 1
-        ::gameclock::start 1
-        
-        ttk::frame $w.f2 -relief groove
-        ttk::checkbutton $w.f2.cbSolution -text $::tr(ShowSolution) -variable ::tactics::showSolution -command ::tactics::toggleSolution
-        ttk::label $w.f2.lSolution -textvariable ::tactics::labelSolution -wraplength 120
-        pack $w.f2.cbSolution $w.f2.lSolution -expand yes -fill both -side top
-        
-        ttk::frame $w.fbuttons -relief groove -borderwidth 1
-        pack $w.f1 $w.fclock $w.f2 $w.fbuttons -expand yes -fill both
-        
-        setInfoEngine $::tr(LoadingBase)
-        
-        ttk::button $w.fbuttons.next -text $::tr(Next) -command {
-            ::tactics::stopAnalyze
-            ::tactics::loadNextGame }
-        ttk::button $w.fbuttons.close -textvar ::tr(Abort) -command "destroy $w"
-        pack $w.fbuttons.next $w.fbuttons.close -expand yes -fill both -padx 20 -pady 2
-        bind $w <Destroy> "if {\[string equal $w %W\]} {::tactics::endTraining}"
-        bind $w <Configure> "recordWinSize $w"
-        bind $w <F1> { helpWindow TacticsTrainer }
-        createToplevelFinalize $w
-        
-        setInfoEngine "---"
-        set ::playMode "::tactics::callback"
-        ::tactics::loadNextGame
-    }
-    proc callback {cmd} {
-        switch $cmd {
-            stop { destroy .tacticsWin }
-        }
-        return 0
+    # now wait for the end of analyzis
+    if {$analysisEngine(analyzeMode)} { vwait ::tactics::analysisEngine(analyzeMode) }
+    if {[sc_pos fen] != $::tactics::prevFen  && [sc_pos isAt start]} {
+      ::tactics::abnormalContinuation
+      return
     }
 
-    proc endTraining {} {
-        after cancel ::tactics::mainLoop
-        after cancel ::tactics::loadNextGame
-        ::tactics::stopAnalyze
-
-        #TODO:
-        #sc_filter release $::tactics::baseId $::tactics::filter
-        sc_filter set $::tactics::baseId "dbfilter" 1
-        catch { ::uci::closeUCIengine $::tactics::engineSlot }
-
-        unset ::playMode
-        ::board::flipAuto .main.board
-        updateStatusBar
-        updateTitle
-    }
-    ################################################################################
-    #
-    ################################################################################
-    proc toggleSolution {} {
-        global ::tactics::showSolution ::tactics::labelSolution ::tactics::analysisEngine
-        if {$showSolution} {
-            set labelSolution "$analysisEngine(score) : [::trans $analysisEngine(moves)]"
-        } else  {
-            set labelSolution ". . . . . . "
-        }
-    }
-    ################################################################################
-    #
-    ################################################################################
-    proc resetScores {fname} {
-        global ::tactics::cancelScoreReset
-        
-        set prevBase [sc_base current]
-        set baseId [sc_base slot $fname]
-        if {$baseId == 0} {
-            if { [catch { sc_base open $fname } baseId] } {
-                ERROR::MessageBox
-                continue
-            }
-            set wasOpened 0
-        } else  {
-            sc_base switch $baseId
-            set curr_game [sc_game number]
-            sc_game push
-            set wasOpened 1
-        }
-        set filter [sc_filter new $baseId]
-        sc_filter search $baseId $filter header -filter RESET -site "\"$::tactics::solved\""
-        
-        #reset site tag for each game
-        set numGames [sc_filter count $baseId $filter]
-        set cancelScoreReset 0
-        progressWindow "Scid" $::tr(ResettingScore) $::tr(Cancel) "set ::tactics::cancelScoreReset 1"
-        for {set g 0} {$g < $numGames && $cancelScoreReset == 0} {incr g 100} {
-            updateProgressWindow $g $numGames
-
-            foreach {idx line deleted} [sc_base gameslist $baseId $g 100 $filter N+] {
-                foreach {n ply} [split $idx "_"] {
-                    sc_game load $n
-                    sc_game tags set -site ""
-                    sc_game save [sc_game number]
-                }
-            }
-        }
-        closeProgressWindow
-        sc_filter release $baseId $filter
-        if { ! $wasOpened } {
-            sc_base close $baseId
-        } else {
-            if {$curr_game == 0} {
-                sc_game new
-            } else {
-                sc_game load $curr_game
-            }
-            sc_game pop
-            ::notify::DatabaseModified $baseId
-            ::notify::GameChanged
-        }
-        sc_base switch $prevBase
-    }
-    ################################################################################
-    #
-    ################################################################################
-    proc loadNextGame {} {
-        ::tactics::resetValues
-        setInfoEngine $::tr(LoadingGame)
-
-        set nextTactic 0
-        while {![sc_pos isAt end]} {
-            sc_move forward
-            set cmt [sc_pos getComment]
-            if {[regexp {^\*\*\*\*D?[0-9]} $cmt]} {
-                set nextTactic 1
-                break
-            }
-        }
-        if {$nextTactic == 0} {
-            set g [sc_filter next]
-            if {$g == 0} {
-                tk_messageBox -title "Scid" -icon info -type ok -message $::tr(AllExercisesDone)
-                return
-            }
-            sc_game load $g
-            if {[sc_pos fen] == "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"} {
-                after idle ::tactics::loadNextGame
-                return
-            }
-        }
-        ::notify::GameChanged
-        ::board::flipAuto .main.board [expr {[sc_pos side] == "black"}]
-        focus .main
-        
-        ::gameclock::reset 1
-        ::gameclock::start 1
-        
-        set ::tactics::prevFen [sc_pos fen]
-        ::tactics::startAnalyze
-        ::tactics::mainLoop
-    }
-    ################################################################################
-    #
-    ################################################################################
-    proc isPlayerTurn {} {
-        if { [sc_pos side] == "white" &&  ![::board::isFlipped .main.board] || [sc_pos side] == "black" &&  [::board::isFlipped .main.board] } {
-            return 1
-        }
-        return 0
-    }
-    ################################################################################
-    #
-    ################################################################################
-    proc exSolved {} {
-        ::tactics::stopAnalyze
-        ::gameclock::stop 1
-        tk_messageBox -title "Scid" -icon info -type ok -message $::tr(MateFound)
+    # compare results
+    set res [::tactics::foundBestLine]
+    if {  $res != ""} {
+      tk_messageBox -title Scid -icon info -type ok -message "$::tr(BestSolutionNotFound)\n$res"
+      # take back last move so restore engine status
+      set analysisEngine(score) $prevScore
+      set analysisEngine(moves) $prevLine
+      sc_game tags set -site $::tactics::failed
+      sc_game save [sc_game number]
+      sc_move back
+      updateBoard -pgn
+      set ::tactics::prevFen [sc_pos fen]
+    } else  {
+      catch { sc_move addSan $nextEngineMove }
+      set ::tactics::prevFen [sc_pos fen]
+      updateBoard -pgn
+      if { $::tactics::matePending } {
+        # continue until end of game
+      } else  {
+        setInfoEngine $::tr(GoodMove)
         sc_game tags set -site $::tactics::solved
         sc_game save [sc_game number]
-        ::tactics::loadNextGame
+      }
     }
-    ################################################################################
-    # Handle the case where position was changed not during normal play but certainly with
-    # move back / forward / rewind commands
-    ################################################################################
-    proc abnormalContinuation {} {
-        ::tactics::stopAnalyze
-        ::tactics::resetValues
-        ::notify::GameChanged
-        ::notify::DatabaseChanged
-        if { [sc_pos side] == "white" && [::board::isFlipped .main.board] || [sc_pos side] == "black" &&  ![::board::isFlipped .main.board] } {
-            ::board::flip .main.board
-        }
-        set ::tactics::prevFen [sc_pos fen]
-        ::tactics::startAnalyze
-        ::tactics::mainLoop
-    }
-    ################################################################################
-    # waits for the user to play and check the move played
-    ################################################################################
-    proc mainLoop {} {
-        global ::tactics::prevScore ::tactics::prevLine ::tactics::analysisEngine ::tactics::nextEngineMove
-        
-        after cancel ::tactics::mainLoop
-        
-        if {[sc_pos fen] != $::tactics::prevFen && [sc_pos isAt start]} {
-            ::tactics::abnormalContinuation
-            return
-        }
-        
-        # is this player's turn (which always plays from bottom of the board) ?
-        if { [::tactics::isPlayerTurn] } {
-            after 1000  ::tactics::mainLoop
-            return
-        }
-        
-        set ::tactics::prevFen [sc_pos fen]
-        
-        # check if player's move is a direct mate : no need to wait for engine analysis in this case
-        set move_done [sc_game info previousMove]
-        if { [string index $move_done end] == "#"} { ::tactics::exSolved; return }
-        
-        # if the engine is still analyzing, wait the end of it
-        if {$analysisEngine(analyzeMode)} { vwait ::tactics::analysisEngine(analyzeMode) }
 
-        if {![winfo exists .tacticsWin]} { return }
-        
-        if {[sc_pos fen] != $::tactics::prevFen  && [sc_pos isAt start]} {
-            ::tactics::abnormalContinuation
-            return
-        }
-        
-        # the player moved and analysis is over : check if his move was as good as expected
-        set prevScore $analysisEngine(score)
-        set prevLine $analysisEngine(moves)
-        ::tactics::startAnalyze
-        
-        # now wait for the end of analyzis
-        if {$analysisEngine(analyzeMode)} { vwait ::tactics::analysisEngine(analyzeMode) }
-        if {[sc_pos fen] != $::tactics::prevFen  && [sc_pos isAt start]} {
-            ::tactics::abnormalContinuation
-            return
-        }
-        
-        # compare results
-        set res [::tactics::foundBestLine]
-        if {  $res != ""} {
-            tk_messageBox -title "Scid" -icon info -type ok -message "$::tr(BestSolutionNotFound)\n$res"
-            # take back last move so restore engine status
-            set analysisEngine(score) $prevScore
-            set analysisEngine(moves) $prevLine
-            sc_game tags set -site $::tactics::failed
-            sc_game save [sc_game number]
-            sc_move back
-            updateBoard -pgn
-            set ::tactics::prevFen [sc_pos fen]
-        } else  {
-            catch { sc_move addSan $nextEngineMove }
-            set ::tactics::prevFen [sc_pos fen]
-            updateBoard -pgn
-            if { $::tactics::matePending } {
-                # continue until end of game
-            } else  {
-                setInfoEngine $::tr(GoodMove)
-                sc_game tags set -site $::tactics::solved
-                sc_game save [sc_game number]
-            }
-        }
-        
-        after 1000 ::tactics::mainLoop
+    after 1000 ::tactics::mainLoop
+  }
+  ################################################################################
+  # Returns "" if the user played the best line, otherwise an explanation about the missed move :
+  # - guessed the same next move as engine
+  # - mate found in the minimal number of moves
+  # - combinaison's score is close enough (within 0.5 point)
+  ################################################################################
+  proc foundBestLine {} {
+    global ::tactics::analysisEngine ::tactics::prevScore ::tactics::prevLine ::tactics::nextEngineMove ::tactics::matePending
+    set score $analysisEngine(score)
+    set line $analysisEngine(moves)
+
+    set s [ regsub -all "\[\.\]{3} " $line "" ]
+    set s [ regsub -all "\[0-9\]+\[\.\] " $s "" ]
+    set nextEngineMove [ lindex [ split $s ] 0 ]
+    set ply [ llength [split $s] ]
+
+    # check if the player played the same move predicted by engine
+    set s [ regsub -all "\[\.\]{3} " $prevLine "" ]
+    set s [ regsub -all "\[0-9\]+\[\.\] " $s "" ]
+    set prevBestMove [ lindex [ split $s ] 1 ]
+    if { [sc_game info previousMoveNT] == $prevBestMove} {
+      return ""
     }
-    ################################################################################
-    # Returns "" if the user played the best line, otherwise an explanation about the missed move :
-    # - guessed the same next move as engine
-    # - mate found in the minimal number of moves
-    # - combination's score is close enough (within 0.5 point)
-    ################################################################################
-    proc foundBestLine {} {
-        global ::tactics::analysisEngine ::tactics::prevScore ::tactics::prevLine ::tactics::nextEngineMove ::tactics::matePending
-        set score $analysisEngine(score)
-        set line $analysisEngine(moves)
-        
-        set s [ regsub -all "\[\.\]{3} " $line "" ]
-        set s [ regsub -all "\[0-9\]+\[\.\] " $s "" ]
-        set nextEngineMove [ lindex [ split $s ] 0 ]
-        set ply [ llength [split $s] ]
-        
-        # check if the player played the same move predicted by engine
-        set s [ regsub -all "\[\.\]{3} " $prevLine "" ]
-        set s [ regsub -all "\[0-9\]+\[\.\] " $s "" ]
-        set prevBestMove [ lindex [ split $s ] 1 ]
-        if { [sc_game info previousMoveNT] == $prevBestMove} {
+
+    # Case of mate
+    if { [string index $prevLine end] == "#"} {
+      set matePending 1
+      #  Engine may find a mate then put a score != 300 but rather 10
+      if {[string index $line end] != "#"} {
+        if {! $::tactics::winWonGame } {
+          return $::tr(MateNotFound)
+        } else  {
+          # win won game but still have to find a mate
+          if {[sc_pos side] == "white" && $score < -300 || [sc_pos side] == "black" && $score > 300} {
             return ""
+          } else  {
+            return $::tr(MateNotFound)
+          }
         }
-        
-        # Case of mate
-        if { [string index $prevLine end] == "#"} {
-            set matePending 1
-            #  Engine may find a mate then put a score != 300 but rather 10
-            if {[string index $line end] != "#"} {
-                # Engine line does not end with a # but the score is a mate (we can't count plies here)
-                if {[sc_pos side] == "white" && $score < -300 || [sc_pos side] == "black" && $score > 300} {
-                    return ""
-                }
-                if {! $::tactics::winWonGame } {
-                    return $::tr(MateNotFound)
-                } else  {
-                    # win won game but still have to find a mate
-                    if {[sc_pos side] == "white" && $score < -300 || [sc_pos side] == "black" && $score > 300} {
-                        return ""
-                    } else  {
-                        return $::tr(MateNotFound)
-                    }
-                }
-            }
-            # Engine found a mate, search in how many plies
-            set s [ regsub -all "\[\.\]{3} " $prevLine "" ]
-            set s [ regsub -all "\[0-9\]+\[\.\] " $s "" ]
-            set prevPly [ llength [ split $s ] ]
-            if { $ply > [ expr $prevPly - 1 ] && ! $::tactics::winWonGame } {
-                return $::tr(ShorterMateExists)
-            } else  {
-                return ""
-            }
+      }
+      # Engine found a mate, search in how many plies
+      set s [ regsub -all "\[\.\]{3} " $prevLine "" ]
+      set s [ regsub -all "\[0-9\]+\[\.\] " $s "" ]
+      set prevPly [ llength [ split $s ] ]
+      if { $ply > [ expr $prevPly - 1 ] && ! $::tactics::winWonGame } {
+        return $::tr(ShorterMateExists)
+      } else  {
+        return ""
+      }
+    } else  {
+      # no mate case
+      set matePending 0
+      set threshold 0.5
+      if {$::tactics::winWonGame} {
+        # Only alert when the advantage clearly changes side
+        if {[sc_pos side] == "white" && $prevScore < 0 && $score >= $threshold  || \
+              [sc_pos side] == "black" &&  $prevScore >= 0 && $score < [expr 0 - $threshold]  } {
+          return "$::tr(ScorePlayed) $score\n$::tr(Expected) $prevScore"
         } else  {
-            # no mate case
-            set matePending 0
-            set threshold 0.5
-            if {$::tactics::winWonGame} {
-                # Only alert when the advantage clearly changes side
-                if {[sc_pos side] == "white" && $prevScore < 0 && $score >= $threshold  || \
-                            [sc_pos side] == "black" &&  $prevScore >= 0 && $score < [expr 0 - $threshold]  } {
-                    return "$::tr(ScorePlayed) $score\n$::tr(Expected) $prevScore"
-                } else  {
-                    return ""
-                }
-            }
-            if {[ expr abs($prevScore) ] > 3.0 } { set threshold 1.0 }
-            if {[ expr abs($prevScore) ] > 5.0 } { set threshold 1.5 }
-            # the player moved : score is from opponent side
-            if {[sc_pos side] == "white" && $score < [ expr $prevScore + $threshold ] || \
-                        [sc_pos side] == "black" && $score > [ expr $prevScore - $threshold ] } {
-                return ""
-            } else  {
-                return "$::tr(ScorePlayed) $score\n$::tr(Expected) $prevScore"
-            }
+          return ""
         }
+      }
+      if {[ expr abs($prevScore) ] > 3.0 } { set threshold 1.0 }
+      if {[ expr abs($prevScore) ] > 5.0 } { set threshold 1.5 }
+      # the player moved : score is from opponent side
+      if {[sc_pos side] == "white" && $score < [ expr $prevScore + $threshold ] || \
+            [sc_pos side] == "black" && $score > [ expr $prevScore - $threshold ] } {
+        return ""
+      } else  {
+        return "$::tr(ScorePlayed) $score\n$::tr(Expected) $prevScore"
+      }
     }
-    ################################################################################
-    # Loads a base bundled with Scid (in ./bases directory)
-    ################################################################################
-    proc loadBase { name } {
-        global ::tactics::baseId ::tactics::filter
-        set baseId [sc_base slot $name]
-        if {$baseId != 0} {
-            ::file::SwitchToBase $baseId 0
-        } else  {
-            progressWindow "Scid" "$::tr(OpeningTheDatabase): [file tail "$name"]..."
-            set err [catch {sc_base open "$name"} baseId]
-            closeProgressWindow
-            if {$err && $::errorCode != $::ERROR::NameDataLoss } {
-                ERROR::MessageBox "$fName\n"
-                return $err
-            }
-        }
-        #TODO:
-        #set filter [sc_filter new $baseId]
-        set filter dbfilter
-        sc_filter search $baseId $filter header -filter RESET -flag S -flag| T -site! "\"$::tactics::solved\""
+  }
 
-        ::notify::GameChanged
-        ::notify::DatabaseChanged
+  ################################################################################
+  # Loads a base bundled with Scid (in ./bases directory)
+  ################################################################################
+  proc loadBase {name parent} {
+
+    if {[sc_base count free] == 0} {
+      tk_messageBox -type ok -icon info -title Scid -message "Too many databases are open; close one first" -parent $parent
+      return 0
+    }
+    # check if the base is already opened
+    if {[sc_base slot $name] != 0} {
+      sc_base switch [sc_base slot $name]
+    } else  {
+      if { [catch { sc_base open $name }] } {
+        tk_messageBox -type ok -icon warning -title Scid -message "Unable to open base" -parent $parent
+        return 0
+      }
+    }
+    if {[sc_base isReadOnly]} {
+        tk_messageBox -type ok -icon warning -title Scid -message "Base $name is read-only" -parent $parent
         return 0
     }
-    ################################################################################
-    ## resetValues
-    #   Resets global data.
-    ################################################################################
-    proc resetValues {} {
-        set ::tactics::prevScore 0
-        set ::tactics::prevLine ""
-        set ::tactics::nextEngineMove ""
-        set ::tactics::matePending 0
-        set ::tactics::showSolution 0
-        set ::tactics::labelSolution ""
-        set ::tactics::prevFen ""
+
+    ::tree::refresh
+    ::windows::stats::Refresh
+    updateMenuStates
+    updateBoard -pgn
+    updateTitle
+    updateStatusBar
+    return 1
+  }
+
+  ################################################################################
+  ## resetValues
+  #   Resets global data.
+  ################################################################################
+  proc resetValues {} {
+    set ::tactics::prevScore 0
+    set ::tactics::prevLine ""
+    set ::tactics::nextEngineMove ""
+    set ::tactics::matePending 0
+    set ::tactics::showSolution 0
+    set ::tactics::labelSolution ""
+    set ::tactics::prevFen ""
+  }
+
+  ################################################################################
+  #
+  ################################################################################
+  proc  restoreAskToReplaceMoves {} {
+    set ::askToReplaceMoves $::tactics::askToReplaceMoves_old
+  }
+
+  ################################################################################
+  #
+  ################################################################################
+  proc setInfoEngine { s { color linen } } {
+    set ::tactics::infoEngineLabel $s
+    .tacticsWin.f1.labelInfo configure -background $color
+  }
+
+  ################################################################################
+  #  Will start engine
+  # in case of an error, return 0, or 1 if the engine is ok
+  ################################################################################
+  proc launchengine {} {
+    global ::tactics::analysisEngine
+
+    set analysisEngine(analyzeMode) 0
+
+    # Use Toga
+    set index 0
+    foreach e $::engines(list) {
+      if { [string equal -nocase -length 4 [lindex $e 0] "toga" ] } {
+	# Start engine in analysis mode
+        set ::tactics::engineSlot $index
+	::uci::startSilentEngine $index
+	return 1
+      }
+      incr index
     }
-    ################################################################################
-    #
-    ################################################################################
-    proc setInfoEngine { s { color linen } } {
-        set ::tactics::infoEngineLabel $s
-        .tacticsWin.f1.labelInfo configure -background $color
+
+    # failsafe only ???
+    set ::tactics::engineSlot 0
+
+    tk_messageBox -type ok -icon warning -parent . -title Scid \
+      -message "Unable to find engine.\nPlease configure engine with Toga as name"
+    return 0
+
+  }
+
+  # ======================================================================
+  # sendToEngine:
+  #   Send a command to a running analysis engine.
+  # ======================================================================
+  proc sendToEngine {text} {
+    ::uci::sendToEngine $::tactics::engineSlot $text
+  }
+
+  # ======================================================================
+  # startAnalyzeMode:
+  #   Put the engine in analyze mode
+  # ======================================================================
+  proc startAnalyze { } {
+    global ::tactics::analysisEngine ::tactics::analysisTime
+    setInfoEngine "$::tr(Thinking) ..." PaleVioletRed
+    .tacticsWin.f2.solution configure -state disabled
+
+    # Check that the engine has not already had analyze mode started:
+    if {$analysisEngine(analyzeMode)} {
+      ::tactics::sendToEngine  "exit"
     }
-    # ======================================================================
-    # sendToEngine:
-    #   Send a command to a running analysis engine.
-    # ======================================================================
-    proc sendToEngine {text} {
-        ::uci::sendToEngine $::tactics::engineSlot $text
-    }
-    
-    # ======================================================================
-    # startAnalyzeMode:
-    #   Put the engine in analyze mode
-    # ======================================================================
-    proc startAnalyze { } {
-        global ::tactics::analysisEngine ::tactics::analysisTime
-        setInfoEngine "$::tr(Thinking) ..." PaleVioletRed
-        
-        # Check that the engine has not already had analyze mode started:
-        if {$analysisEngine(analyzeMode)} {
-            ::tactics::sendToEngine  "exit"
-        }
-        
-        set analysisEngine(analyzeMode) 1
-        after cancel ::tactics::stopAnalyze
-        ::tactics::sendToEngine "position fen [sc_pos fen]"
-        ::tactics::sendToEngine "go infinite"
-        after [expr 1000 * $analysisTime] ::tactics::stopAnalyze
-    }
-    # ======================================================================
-    # stopAnalyzeMode:
-    #   Stop the engine analyze mode
-    # ======================================================================
-    proc stopAnalyze { } {
-        global ::tactics::analysisEngine ::tactics::analysisTime
-        # Check that the engine has already had analyze mode started:
-        if {!$analysisEngine(analyzeMode)} { return }
-        
-        set pv [lindex $::analysis(multiPV$::tactics::engineSlot) 0]
-        set analysisEngine(score) [lindex $pv 1]
-        set analysisEngine(moves) [lindex $pv 2]
-        
-        set analysisEngine(analyzeMode) 0
-        ::tactics::sendToEngine  "stop"
-        if {[winfo exists .tacticsWin]} {
-            setInfoEngine $::tr(AnalyzeDone) PaleGreen3
-        }
-    }
-    
+
+    set analysisEngine(analyzeMode) 1
+    after cancel ::tactics::stopAnalyze
+    ::tactics::sendToEngine "position fen [sc_pos fen]"
+    ::tactics::sendToEngine "go infinite"
+    after [expr 1000 * $analysisTime] ::tactics::stopAnalyze
+  }
+
+  # ======================================================================
+  # stopAnalyzeMode:
+  #   Stop the engine analyze mode
+  # ======================================================================
+  proc stopAnalyze { } {
+    global ::tactics::analysisEngine ::tactics::analysisTime
+    # Check that the engine has already had analyze mode started:
+    if {!$analysisEngine(analyzeMode)} { return }
+
+    set pv [lindex $::analysis(multiPV$::tactics::engineSlot) 0]
+    set analysisEngine(score) [lindex $pv 1]
+    set analysisEngine(moves) [lindex $pv 2]
+
+    set analysisEngine(analyzeMode) 0
+    ::tactics::sendToEngine  "stop"
+    setInfoEngine $::tr(AnalyzeDone) PaleGreen3
+    .tacticsWin.f2.solution configure -state normal
+  }
+
 }
 
 ###

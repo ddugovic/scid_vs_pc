@@ -1,91 +1,114 @@
-/*
-* Copyright (C) 2014  Fulvio Benini
-
-* This file is part of Scid (Shane's Chess Information Database).
-*
-* Scid is free software: you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation.
-*
-* Scid is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU General Public License for more details.
-*
-* You should have received a copy of the GNU General Public License
-* along with Scid.  If not, see <http://www.gnu.org/licenses/>.
-*/
+//////////////////////////////////////////////////////////////////////
+//
+//  FILE:       timer.h
+//              Millisecond resolution timer class
+//
+//  Part of:    Scid (Shane's Chess Information Database)
+//  Version:    1.7
+//
+//  Notice:     Copyright (c) 1999  Shane Hudson.  All rights reserved.
+//
+//  Author:     Shane Hudson (sgh@users.sourceforge.net)
+//
+//////////////////////////////////////////////////////////////////////
 
 #ifndef SCID_TIMER_H
 #define SCID_TIMER_H
 
-#if CPP11_SUPPORT
+//////////////////////////////////////////////////////////////////////
+// Timer::MilliSecs() returns the number of milliseconds since the
+// timer was constructed or its Reset() method was last called.
+// It uses gettimeofday() in Unix, or ftime() in Windows.
 
-#include <chrono>
-class Timer {
-   decltype(std::chrono::system_clock::now()) start_;
-public:
-   Timer() { Reset(); }
-   void Reset() { start_ = std::chrono::system_clock::now(); }
-   long long MilliSecs (void) const {
-		auto t = std::chrono::system_clock::now();
-		return std::chrono::duration_cast<std::chrono::milliseconds>(t - start_).count();
-   }
-   long long CentiSecs () const { return MilliSecs() / 10; }
+
+#ifdef WIN32
+#  include <sys/timeb.h>
+#else
+#  ifndef NO_GETTIMEOFDAY
+#    include <sys/time.h>
+#  endif
+#endif
+
+
+struct msecTimerT {
+    long seconds;
+    long milliseconds;
 };
 
-template <class S>
-auto operator<<(S& os, const Timer& timer) -> decltype(os) {
-   return os << timer.MilliSecs() << " milliseconds\n";
-}
 
-/* Usage:
-Timer t;
-//do some stuff
-std::cout << "Elapsed: " << t;
-*/
-
-
-#else //no CPP11_SUPPORT
-
-class Timer {
-	long seconds_;
-	long milliseconds_;
-	static void set(long* sec, long* millisec);
-
-public:
-    Timer() { Reset (); }
-    void Reset() { set(&seconds_, &milliseconds_); }
-    int CentiSecs () { return MilliSecs() / 10; }
-    int MilliSecs () {
-		long sec, millisec;
-        set(&sec, &millisec);
-        return 1000 * (sec - seconds_) + (millisec - milliseconds_);
-    }
-};
-
-    
-#ifndef _MSC_VER // Use gettimeofday() system call in Unix:
-
-#include <sys/time.h>
-inline void Timer::set(long* sec, long* millisec) {
+inline static void 
+setTimer (msecTimerT *t)
+{
+#ifdef WIN32
+    // Use ftime() call in Windows:
+    struct timeb tb;
+    ftime (&tb);
+    t->seconds = tb.time;
+    t->milliseconds = tb.millitm;
+#else
+#  ifdef NO_GETTIMEOFDAY
+    // No gettimeofday() call, so timing is disabled.
+    t->seconds = 0;
+    t->milliseconds = 0;
+#  else
+    // Use gettimeofday() system call in Unix:
     struct timeval timeOfDay;
     gettimeofday (&timeOfDay, NULL);
-    *sec = timeOfDay.tv_sec;
-    *millisec = timeOfDay.tv_usec / 1000;
+    t->seconds = timeOfDay.tv_sec;
+    t->milliseconds = timeOfDay.tv_usec / 1000;
+#  endif  // NO_GETTIMEOFDAY
+#endif  // WIN32
 }
 
-#else // Use ftime() call in Windows:
 
-#include <sys/timeb.h>
-inline void Timer::set(long* sec, long* millisec) {
-	struct timeb tb;
-    ftime (&tb);
-    *sec = tb.time;
-    *millisec = tb.millitm;
-}
-#endif //_MSC_VER
+class Timer {
 
-#endif //CPP11_SUPPORT
+  private:
 
-#endif //SCID_TIMER_H
+    msecTimerT StartTime;
+
+  public:
+#ifdef WINCE
+  void* operator new(size_t sz) {
+    void* m = my_Tcl_Alloc(sz);
+    return m;
+  }
+  void operator delete(void* m) {
+    my_Tcl_Free((char*)m);
+  }
+  void* operator new [] (size_t sz) {
+    void* m = my_Tcl_AttemptAlloc(sz);
+    return m;
+  }
+
+  void operator delete [] (void* m) {
+    my_Tcl_Free((char*)m);
+  }
+
+#endif  
+  
+    Timer() { Reset (); }
+    ~Timer() {}
+    void Reset() { setTimer (&StartTime); }
+
+    int MilliSecs (void) {
+        msecTimerT nowTime;
+        setTimer (&nowTime);
+        return 1000 * (nowTime.seconds - StartTime.seconds) +
+                    (nowTime.milliseconds - StartTime.milliseconds);
+    }
+
+    int CentiSecs (void) {
+        msecTimerT nowTime;
+        setTimer (&nowTime);
+        return 100 * (nowTime.seconds - StartTime.seconds) +
+                    (nowTime.milliseconds - StartTime.milliseconds) / 10;
+    }
+
+};
+
+#endif
+
+//////////////////////////////////////////////////////////////////////
+//  EOF: timer.h
+//////////////////////////////////////////////////////////////////////

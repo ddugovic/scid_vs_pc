@@ -16,80 +16,74 @@
 #ifndef SCID_COMMON_H
 #define SCID_COMMON_H
 
-#if __cplusplus >= 201103L || defined(__GXX_EXPERIMENTAL_CXX0X__) || _MSC_VER > 1600
-	#define CPP11_SUPPORT 1
-#else
-	#define CPP11_SUPPORT 0
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// HEADER FILES:
+
+#include <stdio.h>
+#include <stdlib.h>
+#ifdef WINCE
+#include <tcl.h>
 #endif
-
-#if defined(_MSC_VER) && _MSC_VER <= 1600
-typedef unsigned __int8   uint8_t;
-typedef unsigned __int16  uint16_t;
-typedef unsigned __int32  uint32_t;
-typedef unsigned __int64  uint64_t;
-#else
-#include <stdint.h>
-#endif // _MSC_VER <= 1600
-
+#include "tclmy.h"
+#include "myassert.h"
 #include "error.h"
 
-#ifdef ZLIB
-	#include <zlib.h>
-	inline bool gzable() { return true; }
-#else
-	// If the zlib compression library is NOT used, create dummy inline
-	// functions to replace those used in zlib, which saves wrapping every
-	// zlib function call with #ifndef conditions.
-	inline bool gzable() { return false; }
-	typedef void * gzFile;
-	inline gzFile gzopen (const char * name, const char * mode) { return 0; }
-	inline int gzputc (gzFile fp, int c) { return c; }
-	inline int gzgetc (gzFile fp) { return -1; }
-	inline int gzread (gzFile fp, unsigned char* buffer, int length) { return 0; }
-	inline int gzeof (gzFile fp) { return 1; }
-	inline int gzseek (gzFile fp, int offset, int where) { return 0; }
-	inline int gzclose (gzFile fp) { return 0; }
+#ifdef _MSC_VER
+#define snprintf _snprintf
 #endif
 
+// Include the zlib header file if it is being compiled with Scid:
+#ifndef NO_ZLIB
+#  ifdef ZLIB
+#    include "zlib/zlib.h"
+#   else
+#    include <zlib.h>
+#  endif
+#endif
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // CONSTANTS:
 
 // Buffer sizes
+#ifdef WINCE
+#define BBUF_SIZE 30000
+#define TBUF_SIZE 100000
+#else
 #define BBUF_SIZE 256000 //120000
+#define TBUF_SIZE 1280000 //160000
+#endif
 
 typedef unsigned short versionT;
 
 // Version: div by 100 for major number, modulo 100 for minor number
 // so 109 = 1.9, 110 = 1.10, etc.
 
-const versionT SCID_VERSION = 400;     // Current file format version = 4.0
-const versionT SCID_OLDEST_VERSION = 300; // Oldest readable file format: 3.0
+const versionT SCID_VERSION = 400;     // Current file format version = 3.0
+const versionT SCID_OLDEST_VERSION = 400; // Oldest compatible format: 3.0
 
-const char SCID_VERSION_STRING[] = "4.6.3";     // Current Scid version
-const char SCID_WEBSITE[] = "http://scid.sourceforge.net/";
+const char SCID_VERSION_STRING[] = "4.20";     // Current version
+const char SCID_VERSION_DATE[] = "Apr 7, 2019";
+const char SCID_WEBSITE[] = "http://scidvspc.sourceforge.net/";
 
+const char TREEFILE_SUFFIX[] = ".stc";
 const char GZIP_SUFFIX[] = ".gz";
 const char ZIP_SUFFIX[] = ".zip";
 const char PGN_SUFFIX[] = ".pgn";
 
 
-//////////////////////////////////////////////////////////////////////
-// ASSERT macro: asserts an expression. Differs from the standard
-//    assert in that it does NOT print the expression (this is a waste,
-//    if an assert fails you can go to the code to see why) and that
-//    it MUST be a statement, not part of a larger expression.
-//    Adapted from the book "Writing Solid Code".
+// If the zlib compression library is NOT used, create dummy inline
+// functions to replace those used in zlib, which saves wrapping every
+// zlib function call with #ifndef conditions.
 
-
-#ifdef ASSERTIONS
-#include <assert.h>
-    #define ASSERT(f) assert(f)
-
-#else   // #ifndef ASSERTIONS
-
-    #define ASSERT(f) 
-
-#endif  // #ifdef ASSERTIONS
+#ifdef NO_ZLIB
+typedef void * gzFile;
+inline gzFile gzopen (const char * name, const char * mode) { return NULL; }
+inline int gzputc (gzFile fp, int c) { return c; }
+inline int gzgetc (gzFile fp) { return -1; }
+inline int gzread (gzFile fp, char * buffer, int length) { return 0; }
+inline int gzeof (gzFile fp) { return 1; }
+inline int gzseek (gzFile fp, int offset, int where) { return 0; }
+inline int gzclose (gzFile fp) { return 0; }
+#endif
 
 
 // Bit Manipulations
@@ -119,10 +113,11 @@ const char PGN_SUFFIX[] = ".pgn";
 
 //  General types
 
-typedef uint8_t  byte;           //  8 bit unsigned
-typedef uint16_t ushort;         // 16 bit unsigned
-typedef uint32_t uint;           // 32 bit unsigned
-typedef int32_t  sint;           // 32 bit signed
+typedef unsigned char           byte;           //  8 bit unsigned
+typedef unsigned short          ushort;         // 16 bit unsigned
+typedef unsigned int            uint;           // 32 bit unsigned
+typedef signed   int            sint;           // 32 bit signed
+typedef unsigned long           ulong;
 
 
 //  compareT: comparison type
@@ -170,9 +165,7 @@ enum fileModeT {
     FMODE_None = 0,
     FMODE_ReadOnly,
     FMODE_WriteOnly,
-    FMODE_Both,
-    FMODE_Create,
-    FMODE_Memory
+    FMODE_Both
 };
 
 //  Date type: see date.h and date.cpp
@@ -181,7 +174,7 @@ typedef uint    dateT;
 
 //  Game Information types
 
-typedef uint            gamenumT;
+typedef uint            gameNumberT;      // Used in Index class
 typedef ushort          eloT;
 typedef ushort          ecoT;
 typedef char            ecoStringT [6];   /* "A00j1" */
@@ -217,7 +210,7 @@ const resultT
     RESULT_Draw  = 3;
 
 const uint RESULT_SCORE[4] = { 1, 2, 0, 1 };
-const uint RESULT_SORT[4] = { 1, 3, 0, 2 };
+
 const char RESULT_CHAR [4]       = { '*',  '1',    '0',    '='       };
 const char RESULT_STR [4][4]     = { "*",  "1-0",  "0-1",  "=-="     };
 const char RESULT_LONGSTR [4][8] = { "*",  "1-0",  "0-1",  "1/2-1/2" };
@@ -653,8 +646,35 @@ direction_Delta (directionT dir)
 
 // sqDir[][]: Array listing the direction between any two squares.
 //    For example, sqDir[A1][B2] == UP_RIGHT, and sqDir[A1][C2] == NULL_DIR.
-//    It is initialised with the function scid_Init() in misc.cpp
+//    It is initialised with the function sqDir_Init() in misc.cpp
 extern directionT  sqDir[66][66];
+
+// sqMove[66][11]: a table of the square resulting from a move in a
+//    certain direction from a square.
+//    For example, sqMove[A1][UP] == A2; sqMove[A1][DOWN] == NULL_SQUARE.
+#include "sqmove.h"
+
+// square_Move(): Return the new square resulting from moving in
+//      direction d from x.
+  inline squareT
+square_Move(squareT sq, directionT dir)
+{
+    return sqMove[sq][dir];
+}
+
+// square_Last():
+//   Return the last square reached by moving as far as possible in
+//   the direction d from the square sq. If sq is a valid on-board
+//   square and d is a valid direction, the result will always be
+//   a valid on-board square; the result will be the same as the
+//   input square if moving in the specified direction would end
+//   up off the board.
+  inline squareT
+square_Last (squareT sq, directionT dir)
+{
+    return sqLast[sq][dir];
+}
+
 
 // The starting Board
 //
@@ -716,6 +736,35 @@ square_Adjacent (squareT from, squareT to)
     int fdist = (int)fromFyle - (int)toFyle;
     if (fdist < -1  ||  fdist > 1) { return false; }
     return true;
+}
+
+// Random values:
+//   To ensure good bit distributions, we take three random values
+//   and mix the bits around.
+
+inline void srandom32(uint seed) {
+#ifdef WINCE
+    srand (seed);
+#else
+#ifdef WIN32
+    srand (seed);
+#else
+    srandom (seed);
+#endif
+#endif
+}
+
+inline uint random32()
+{
+#ifdef WINCE
+    return rand() ^ (rand() << 16) ^ (rand() >> 16);
+#else
+#ifdef WIN32
+    return rand() ^ (rand() << 16) ^ (rand() >> 16);
+#else
+    return random() ^ (random() << 16) ^ (random() >> 16);
+#endif
+#endif
 }
 
 #endif  // #ifdef SCID_COMMON_H

@@ -24,7 +24,7 @@
                             /* hopefully it should never happen         */
 
 /* Almost all  functions listed further return one as  its result on of */
-/* codes given  above: if no error occurred then COMP_ERR_NONE (i.e. 0) */
+/* codes given  above: if no  error occured then COMP_ERR_NONE (i.e. 0) */
 /* is returned, otherwise functions return  error  code  plus number of */
 /* line in "comp.c"  where the error  was detected multiplied  by  256; */
 /* line number may  be  used for exact specification  of  a place where */
@@ -825,12 +825,14 @@ static int comp_open_file (decode_info **res, FILE *fd, int check_crc)
   return (COMP_ERR_NONE);
 }
 
+/* Unused by probe
 static int comp_tell_blocks (decode_info *info)
 {
   if (info == 0 || info->magic != DECODE_MAGIC)
     return (-1);
   return (info->n_blk);
 }
+*/
 
 static int comp_init_block (decode_block *block, int block_size, uchar *orig)
 {

@@ -16,7 +16,6 @@
 #define SCID_PROBE_H
 
 #include "position.h"
-#include "matsig.h"
 
 bool scid_TB_compiled (void);
 

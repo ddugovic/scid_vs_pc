@@ -4,68 +4,117 @@
 
 namespace eval ::search {}
 
-# searchType: set to Header or Material in a SearchOptions file
+# 'Header' or 'Material' in a SearchOptions file (.sso)
+# (Can't save a Board search)
 set searchType 0
 
+# How search affects the filter
+# Can be   0 (And)   1 (Or)   2 (Ignore/Reset) which is the default
 set ::search::filter::operation 2
 
+# TODO: Rename to ::search::filter::text
+# filterText: returns text describing state of filter for specified
+#   database, e.g. "no games" or "all / 400" or "1,043 / 2,057"
 
-# search::filter::reset
-# TODO: remove this function
-proc ::search::filter::reset {} {
-  ::windows::gamelist::FilterReset "" [sc_base current]
-}
-
-# ::search::filter::negate
-#
-#   Negates the filter, to include only excluded games.
-#
-proc ::search::filter::negate {} {
-  ::windows::gamelist::FilterNegate "" [sc_base current]
-}
-
-
-
-# ::search::addFilterOpFrame
-#
-#   Adds a search filter operation selection frame to the window.
-#   Adds a frame of radiobuttons allowing the filter operation
-#   (AND with current filter, OR with current filter, or RESET filter)
-#   to be chosen.
-#   The default value for the first search is RESET:
-proc ::search::addFilterOpFrame {w {small 0}} {
-  ttk::frame $w.filterop
-  set f $w.filterop
-  pack $f -side top -fill x
-  
-  set regular Regular.TRadiobutton
-  set bold Bold.TRadiobutton
-  if {$small} {
-    set regular Small.TRadiobutton
-    set bold SmallBold.TRadiobutton
+proc filterText {{base 0} {kilo 0}} {
+  # Default to current base if no base specified:
+  if {$base == 0} { set base [sc_base current] }
+  set filterCount [sc_filter count $base]
+  set gameCount [sc_base numGames $base]
+  if {$gameCount == 0} { return $::tr(noGames) }
+  if {$gameCount == $filterCount} {
+    return "$::tr(all) / [::utils::thousands $gameCount $kilo]"
   }
-  
-  ttk::label $f.title -font $bold -textvar ::tr(FilterOperation) -anchor center
-  ttk::frame $f.b
-  ttk::radiobutton $f.b.and -textvar ::tr(FilterAnd) -variable ::search::filter::operation -value 0 -style $regular 
-  ttk::radiobutton $f.b.or -textvar ::tr(FilterOr) -variable ::search::filter::operation -value 1 -style $regular
-  ttk::radiobutton $f.b.ignore -textvar ::tr(FilterIgnore) -variable ::search::filter::operation -value 2 -style $regular
-  ## ttk::radiobutton $f.b.search -textvar ::tr(FilterIgnore) -variable ::search::filter::operation -value 3 -style $regular
-  pack $f.title -side top
-  pack $f.b -anchor center -side top
-  pack $f.b.and $f.b.or $f.b.ignore -side left -pady 5 -padx 5
-  ### pack $f.b.and $f.b.or $f.b.ignore $f.b.search -side left -pady 5 -padx 5
+  return "[::utils::thousands $filterCount $kilo] / [::utils::thousands $gameCount $kilo]"
 }
 
 
-# ::search::Config
+proc ::search::filter::reset {{base {}}} {
+  if {$base == {}} {set base [sc_base current]}
+
+  sc_filter reset $base
+
+  if {$base == [sc_base current]} { 
+    set ::glstart 1
+  } else {
+    set ::glistStart($base) 1
+  }
+  ::windows::stats::Refresh
+  updateMenuStates
+}
+
+### Negate filter
+
+proc ::search::filter::negate {{base {}}} {
+  set currentBaseNum [sc_base current]
+  if {$base == {} || $base == $currentBaseNum} {
+    sc_filter negate
+    set glstart 1
+  } else {
+    sc_base switch $base
+    sc_filter negate
+    set ::glistStart($base) 1
+    sc_base switch $currentBaseNum
+  }
+
+  ::windows::stats::Refresh
+  updateMenuStates
+}
+
+#  Sets all filter games to end (move 255)
+#  and move current game to end
+
+proc ::search::filter::end {} {
+  global glstart
+  sc_filter end
+  ::move::End
+  ::windows::stats::Refresh
+  updateMenuStates
+}
+
+
+
+# Add a frame of radiobuttons to specify which filter operation to perform with search
 #
-#   Sets state of Search button in Header, Board and Material windows
-#
+# The variable ::search::filter::operation is shared between the three search widgets
+# (but there should be different variables, to avoid interaction)
+# and can be  0 (And), 1 (Or), 2 (Ignore/Reset) which is the default
+
+proc ::search::addFilterOpFrame {w {small 0} {side top}} {
+  set f $w.filterop
+
+  frame $f
+  pack  $f -side $side
+  if {$small} {
+    set regular font_Small
+    set bold    font_SmallBold
+  } else {
+    set regular font_Regular
+    set bold    font_Bold
+  }
+
+  label $f.title -font $bold -textvar ::tr(FilterOperation)
+  radiobutton $f.and -textvar ::tr(FilterAnd) -variable ::search::filter::operation \
+    -value 0 -pady 5 -padx 5 -font $regular
+  radiobutton $f.or -textvar ::tr(FilterOr) -variable ::search::filter::operation \
+    -value 1 -pady 5 -padx 5 -font $regular
+  radiobutton $f.ignore -textvar ::tr(FilterIgnore) -variable ::search::filter::operation \
+    -value 2 -pady 5 -padx 5 -font $regular
+
+  pack $f.title -side top
+  pack $f.ignore $f.and $f.or -side left
+}
+
+
+###  Sets state of Search button in Header, Board and Material windows
+
 proc ::search::Config {{state ""}} {
   if {$state == ""} {
-    set state disabled
-    if {[sc_base inUse]} { set state normal }
+    if {[sc_base inUse]} {
+      set state normal
+    } else {
+      set state disabled
+    }
   }
   catch {.sh.b.search configure -state $state }
   catch {.sb.b.search configure -state $state }
@@ -73,15 +122,27 @@ proc ::search::Config {{state ""}} {
 }
 
 
-proc ::search::usefile {} {
-  set ftype { { "Scid SearchOption files" {".sso"} } }
-  set ::fName [tk_getOpenFile -initialdir $::initialDir(base) \
-      -filetypes $ftype -title "Select a SearchOptions file"]
-  if {$::fName == ""} { return }
-  
-  if {[catch {uplevel "#0" {source $::fName} } ]} {
+proc ::search::usefile {{file {}}} {
+  global fName initialDir env
+
+  if {$file != {}} {
+    set fName $file
+  } else {
+    set ftype { { "Scid SearchOption files" {".sso"} } }
+    if {! [file isdirectory $initialDir(sso)] } {
+      set initialDir(sso) $env(HOME)
+    } 
+    set fName [tk_getOpenFile -initialdir $initialDir(sso) \
+		   -filetypes $ftype -title "Select a SearchOptions file"]
+  }
+  if {$fName == ""} {
+    return
+  }
+  set initialDir(sso) [file dirname $fName]
+
+  if {[catch {uplevel "#0" {source $fName} } ]} {
     tk_messageBox -title "Scid: Error reading file" -type ok -icon warning \
-        -message "Unable to open or read SearchOptions file: $fName"
+                -message "Unable to open or read SearchOptions file: $fName"
   } else {
     switch -- $::searchType {
       "Material" { ::search::material }
@@ -91,9 +152,8 @@ proc ::search::usefile {} {
   }
 }
 
-# will go to the first game found, except if the Tree of current base is opened (of there will be filter collision)
 proc ::search::loadFirstGame {} {
-  set w ".treeWin[sc_base current]"
-  if {[winfo exists $w]} { return }
-  ::game::Load [sc_filter first]
+    set ::glstart 1
+    set ::glistStart([sc_base current]) 1
+    ::game::Load [sc_filter first]
 }

@@ -20,10 +20,12 @@
 #include "common.h"
 #include "date.h"
 #include "dstring.h"
+#include "error.h"
+#include "namebase.h"
 #include "spellchk.h"
 
-const uint CROSSTABLE_MaxPlayers = 500;  // Max. number of players.
-const uint CROSSTABLE_MaxRounds =   60;  // Max. number of Swiss event rounds.
+const uint CROSSTABLE_MaxPlayers = 1000;  // Max. number of players.
+const uint CROSSTABLE_MaxRounds =    60;  // Max. number of Swiss event rounds.
 
 struct clashT
 {
@@ -60,6 +62,7 @@ struct playerDataT
     uint        gameCount;
     uint        tiebreak; // Sonneborn-Berger tiebreak for all-play-all,
                           // or Bucholz tiebreak for Swiss.
+    uint        won, loss, draw, tb_head;
     uint        oppEloCount;
     uint        oppEloTotal;
     uint        oppEloScore;  // score against Elo opponents
@@ -84,6 +87,7 @@ class Crosstable
     uint         MaxClashes;  // Maximum games between any two players
     uint         MaxRound;
     uint         ResultCount [NUM_RESULT_TYPES];
+    SpellChecker * SpellCheck;
     dateT        FirstDate;
 
     bool         ShowTitles;
@@ -101,6 +105,8 @@ class Crosstable
     crosstableOutputT OutputFormat;
     crosstableSortT SortOption;
     bool         ThreeWin;
+    bool         TieWin;
+    bool         TieHead;
 
     playerDataT * PlayerData [CROSSTABLE_MaxPlayers];
 
@@ -144,6 +150,24 @@ class Crosstable
     void   Destroy();
 
   public:
+#ifdef WINCE
+  void* operator new(size_t sz) {
+    void* m = my_Tcl_Alloc(sz);
+    return m;
+  }
+  void operator delete(void* m) {
+    my_Tcl_Free((char*)m);
+  }
+  void* operator new [] (size_t sz) {
+    void* m = my_Tcl_AttemptAlloc(sz);
+    return m;
+  }
+
+  void operator delete [] (void* m) {
+    my_Tcl_Free((char*)m);
+  }
+
+#endif
     Crosstable() { Init(); }
     ~Crosstable() { Destroy(); }
 
@@ -155,6 +179,8 @@ class Crosstable
 
     void   SetSortOption (crosstableSortT option) { SortOption = option; }
     void   SetThreeWin   (bool threewin) { ThreeWin = threewin; }
+    void   SetTieWin     (bool tiewin) { TieWin = tiewin; }
+    void   SetTieHead    (bool tiehead) { TieHead = tiehead; }
 
     void   SortByName()  { SortOption = CROSSTABLE_SortName; }
     void   SortByElo()   { SortOption = CROSSTABLE_SortElo; }
@@ -172,8 +198,10 @@ class Crosstable
     void   SetDecimalPointChar (char ch) { DecimalPointChar = ch; }
     void   SetNumberedColumns (bool b) { APAColumnNums = b; }
 
+    void   UseSpellChecker (SpellChecker * nc) { SpellCheck = nc; }
+
     uint   NumPlayers() { return PlayerCount; }
-    errorT AddPlayer (idNumberT id, const char * name, eloT elo, const SpellChecker*);
+    errorT AddPlayer (idNumberT id, const char * name, eloT elo);
     errorT AddResult (uint gameNumber, idNumberT white, idNumberT black,
                       resultT result, uint round, dateT date);
 
@@ -184,6 +212,7 @@ class Crosstable
     static uint Performance (uint oppAvg, uint percentage);
     static uint FideCategory (eloT rating);
     static eloT OpponentElo (eloT player, eloT opponent);
+           int comparePlayerData (playerDataT * p1, playerDataT * p2);
     static int RatingChange (eloT player, uint oppAvg, uint percentage, 
                              uint count);
 };

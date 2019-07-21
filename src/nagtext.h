@@ -3,13 +3,10 @@
 //  FILE:       nagtext.h
 //              Translationtable for NAG values to text
 //
-//  Part of:    Scid (Shane's Chess Information Database)
-//  Version:    3.6
+//  Copyright (c) 2000-2013 Shane Hudson and others
 //
-//  Notice:     Copyright (c) 2000-2003 Shane Hudson.  All rights reserved.
-//
-//  Author:     A. Wagner
-//
+//  Updated:     W. van den Akker
+//  Updated:     A. Wagner
 //
 //////////////////////////////////////////////////////////////////////
 
@@ -210,7 +207,7 @@ const char * evalNagsRegular [] =
    "$189",            // $189
    "ǁ",               // $190 etc.
    "⡁",               // $191 doubled pawn
-   "⚯",               // $192 separated pawn
+   "⚯",               // $192 spearated pawn
    "⚮",               // $193 connected pawn
    "$194",            // $194
    "$195",            // $195
@@ -234,15 +231,6 @@ const char * evalNagsRegular [] =
    "$213",            // $213 more pawns
    "⌊",               // $214 with
    "⌋",               // $215 without
-   "$216",            // $216
-   "$217",            // $217
-   "$218",            // $218
-   "$219",            // $219
-   "$220",            // $220
-   "$221",            // $221
-   "$222",            // $222
-   "$223",            // $223
-   "$224"             // $224
 };
 
 

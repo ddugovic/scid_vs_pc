@@ -17,7 +17,9 @@
 #define SCID_TEXTBUF_H
 
 #include "common.h"
-#include <stdio.h>
+#include "error.h"
+#include <string>
+
 
 class TextBuffer
 {
@@ -36,21 +38,18 @@ private:
     char * Buffer;
     char * Current;
 
+    std::string CurrentWord;
+
     bool   PausedTranslations;
     bool   HasTranslations;
     const char * Translation [256];
 
     inline void   AddChar (char ch);
-    TextBuffer(const TextBuffer&);
-    TextBuffer& operator=(const TextBuffer&);
 
     //----------------------------------
     //  TextBuffer:  Public Functions
 public:
-    TextBuffer() {
-        Init();
-        SetBufferSize(1280000);
-    }
+    TextBuffer()    { Init(); }
     ~TextBuffer()   { Free(); }
     
     void     Init ();
@@ -76,6 +75,7 @@ public:
     void     ClearTranslations () { HasTranslations = false; }
     void     PauseTranslations () { PausedTranslations = true; }
     void     ResumeTranslations () { PausedTranslations = false; }
+    errorT   ReplaceContent(const char * newContent, uint size);
 
     errorT   NewLine();
     errorT   Indent();
@@ -84,6 +84,7 @@ public:
     errorT   PrintString (const char * str);
     errorT   PrintSpace ();
     errorT   PrintChar (char b);
+    errorT   DumpToFile (FILE * fp);
 
     errorT   PrintInt (uint i, const char * str);
     inline errorT PrintInt (uint i) { return PrintInt (i, ""); }

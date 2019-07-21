@@ -1,70 +1,104 @@
 ###################
-# htext.tcl: Online help/hypertext display module for Scid
+# htext.tcl
 #
-# The htext module implements html-like display in a text widget.
-# It is used in Scid for the help and crosstable windows, and for
-# the game information area.
+# Hypertext display module for Scid
+#
+# Implements html-like display in a text widget.
+# It is used in Scid for the help, crosstable, game information area and 
+# *importantly*, the PGN window. Slowdown occurs with large PGN files,
+# and is probably due to the rendering of Tk::text widget with 4000+ char lines.
 
 namespace eval ::htext {}
 
 set helpWin(Stack) {}
 set helpWin(yStack) {}
+set helpWin(index) -1
+set helpWin(len) 0
+
 set helpWin(Indent) 0
 
 # help_PushStack and help_PopStack:
-#   Implements the stack of help windows for the "Back" button.
-#
-proc help_PushStack {name {heading ""}} {
+#   Implements a stack (list) of help windows for the Back and Forward buttons
+
+proc help_PushStack {name {heading {}}} {
   global helpWin
+
+  # truncate in case we've been moving forward
+  set helpWin(Stack)  [lrange $helpWin(Stack)  0 $helpWin(index)]
+  set helpWin(yStack) [lrange $helpWin(yStack) 0 $helpWin(index)]
+
   lappend helpWin(Stack) $name
-  if {[llength $helpWin(Stack)] > 10} {
-    set helpWin(Stack) [lrange $helpWin(Stack) 1 end]
-  }
-  if {[winfo exists .helpWin]} {
-    set helpWin(yStack) [linsert $helpWin(yStack) 0 \
-        [lindex [.helpWin.text yview] 0]]
-    if {[llength $helpWin(yStack)] > 10} {
-      set helpWin(yStack) [lrange $helpWin(yStack) 0 9]
+
+    if {[winfo exists .helpWin]} {
+      # Before adding a new 0.0, we can set posi of the previous window
+      lset helpWin(yStack) end [lindex [.helpWin.text yview] 0]
     }
-  }
+
+  # new windows won't have a posi yet
+  lappend helpWin(yStack) 0.0
+
+  set helpWin(len) [llength $helpWin(Stack)]
+  set helpWin(index) [expr $helpWin(len) - 1]
 }
 
-set ::htext::headingColor "\#990000"
+# set ::htext::headingColor "\#990000"
+set ::htext::headingColor darkslateblue
 array set ::htext:updates {}
 
-proc help_PopStack {} {
-  global helpWin helpText
-  set len [llength $helpWin(Stack)]
-  if {$len < 1} { return }
-  incr len -2
-  set name [lindex $helpWin(Stack) $len]
-  set helpWin(Stack) [lrange $helpWin(Stack) 0 $len]
-  
-  set ylen [llength $helpWin(yStack)]
-  set yview 0.0
-  if {$ylen >= 1} {
-    set yview [lindex $helpWin(yStack) 0]
-    set helpWin(yStack) [lrange $helpWin(yStack) 1 end]
-  }
+proc help_MoveForward {} {
+  global helpWin helpText helpName
+  incr helpWin(index)
+  set name  [lindex $helpWin(Stack)  $helpWin(index)]
+  set yview [lindex $helpWin(yStack) $helpWin(index)]
   updateHelpWindow $name
   .helpWin.text yview moveto $yview
 }
 
-proc helpWindow {name {heading ""}} {
-  help_PushStack $name
-  updateHelpWindow $name $heading
+proc help_PopStack {} {
+  global helpWin helpText helpName
+
+  if {$helpWin(index) < 1} { return }
+
+    if {[winfo exists .helpWin]} {
+      # Just set posi of this window first
+      # bug: there's some window creep upwards as we keep reading/setting yview
+
+      lset helpWin(yStack) $helpWin(index) [lindex [.helpWin.text yview] 0]
+    }
+
+  incr helpWin(index) -1
+  set name  [lindex $helpWin(Stack)  $helpWin(index)]
+  set yview [lindex $helpWin(yStack) $helpWin(index)]
+  updateHelpWindow $name
+  .helpWin.text yview moveto $yview
 }
 
-proc updateHelpWindow {name {heading ""}} {
-  global helpWin helpText helpTitle windowsOS language
+
+proc toggleHelp {} {
+  if {[winfo exists .helpWin]} {
+    destroy .helpWin
+  } else {
+    helpWindow Contents
+  }
+}
+
+proc helpWindow {name {heading {}}} {
+  help_PushStack $name
+  updateHelpWindow $name $heading
+  update
+}
+
+proc updateHelpWindow {name {heading {}}} {
+  global helpWin helpText helpTitle windowsOS language helpName
   set w .helpWin
-  
+
+  set helpName $name ; # used by forward stack
   set slist [split $name " "]
   if {[llength $slist] > 1} {
     set name [lindex $slist 0]
     set heading [lindex $slist 1]
   }
-  
+
   if {[info exists helpText($language,$name)] && [info exists helpTitle($language,$name)]} {
     set title $helpTitle($language,$name)
     set helptext $helpText($language,$name)
@@ -74,54 +108,75 @@ proc updateHelpWindow {name {heading ""}} {
   } else {
     return
   }
-  
+
   if {![winfo exists $w]} {
     toplevel $w
     # wm geometry $w -10+0
+    # wm minsize $w 40 5
     setWinLocation $w
     setWinSize $w
-    
-    wm minsize $w 20 5
-    text $w.text -setgrid yes -wrap word -width $::winWidth($w) -height $::winHeight($w) -relief sunken -border 0 -yscroll "$w.scroll set"
-    ttk::scrollbar $w.scroll -command "$w.text yview"
-    
-    ttk::frame $w.b -relief raised -border 2
+    text $w.text -setgrid yes -wrap word -width $::winWidth($w) \
+        -height $::winHeight($w) -relief sunken -yscroll "$w.scroll set"
+    scrollbar $w.scroll -relief sunken -command "$w.text yview" -width 12
+
+    frame $w.b -relief raised 
     pack $w.b -side bottom -fill x
-    ttk::button $w.b.contents -textvar ::tr(Contents) -command { helpWindow Contents }
-    ttk::button $w.b.index -textvar ::tr(Index) -command { helpWindow Index }
-    ttk::button $w.b.back -textvar ::tr(Back) -command { help_PopStack }
-    ttk::button $w.b.close -textvar ::tr(Close) -command {
+    button $w.b.contents -textvar ::tr(Contents) -width 6 -command { helpWindow Contents }
+    button $w.b.index -textvar ::tr(Index) -width 6 -command { helpWindow Index }
+    button $w.b.back -text "  << " -command { help_PopStack }
+    button $w.b.forward -text "  >> " -command { help_MoveForward }
+    # button $w.b.font -text Font -width 6 -command "FontDialogRegular $w"
+
+    ### Help Widget Find
+    entry $w.b.find -width 10 -textvariable ::helpWin(find) -highlightthickness 0
+    configFindEntryBox $w.b.find helpWin .helpWin.text
+
+    button $w.b.close -textvar ::tr(Close) -width 6 -command {
       set ::helpWin(Stack) {}
       set ::helpWin(yStack) {}
+      set ::helpWin(index) -1
+      set ::helpWin(len) 0
       destroy .helpWin
     }
-    
-    pack $w.b.contents $w.b.index $w.b.back -side left -padx 1 -pady 2
-    pack $w.b.close -side right -padx 5 -pady 2
-    pack $w.scroll -side right -fill y -padx 2 -pady 2
+
+    pack $w.b.back $w.b.contents $w.b.index $w.b.forward -side left -padx 3 -pady 2
+    pack $w.b.close -side right -padx 3 -pady 2
+    pack $w.b.find -side right -padx 3 -pady 2 -ipady 2
+    pack $w.scroll -side right -fill y -pady 2
     pack $w.text -fill both -expand 1 -padx 1
-    
-    $w.text configure -font font_Regular -foreground black -background white
+
+    $w.text configure -font font_Regular
     ::htext::init $w.text
     bind $w <Configure> "recordWinSize $w"
+    bind $w <F1> toggleHelp
+  } else {
+    raiseWin $w
   }
-  
+
   $w.text configure -cursor top_left_arrow
   $w.text configure -state normal
   $w.text delete 0.0 end
-  
+
   $w.b.index configure -state normal
   if {$name == "Index"} { $w.b.index configure -state disabled }
   $w.b.contents configure -state normal
   if {$name == "Contents"} { $w.b.contents configure -state disabled }
-  $w.b.back configure -state disabled
-  if {[llength $helpWin(Stack)] >= 2} {
+
+  if {$helpWin(index) < 1} {
+    $w.b.back configure -state disabled
+  } else {
     $w.b.back configure -state normal
   }
-  
-  wm title $w "Scid Help: $title"
+
+  if {$helpWin(len) == [expr $helpWin(index) + 1]} {
+    $w.b.forward configure -state disabled
+  } else {
+    $w.b.forward configure -state normal
+  }
+
+  wm title $w "[tr HelpContents]: $title"
   wm iconname $w "Scid help"
-  
+
   $w.text delete 0.0 end
   bind $w <Up> "$w.text yview scroll -1 units"
   bind $w <Down> "$w.text yview scroll 1 units"
@@ -130,48 +185,58 @@ proc updateHelpWindow {name {heading ""}} {
   bind $w <Key-Home> "$w.text yview moveto 0"
   bind $w <Key-End> "$w.text yview moveto 0.99"
   bind $w <Escape> "$w.b.close invoke"
-  bind $w <Key-b> "$w.b.back invoke"
-  bind $w <Left> "$w.b.back invoke"
-  bind $w <Key-i> "$w.b.index invoke"
-  
+  # bind $w <Key-b> "$w.b.back invoke"
+  bind $w <Alt-Left> "$w.b.back invoke"
+  bind $w <Alt-Right> "$w.b.forward invoke"
+  # bind $w <Key-i> "$w.b.index invoke"
+
+  bindWheeltoFont $w
   ::htext::display $w.text $helptext $heading 0
   focus $w
 }
 
+### Now unused... big slowdown for what purpose ?
 proc ::htext::updateRate {w rate} {
   set ::htext::updates($w) $rate
 }
 
 proc ::htext::init {w} {
-  set cyan "\#007000"
-  set maroon "\#990000"
-  set green "darkgreen"
-  
-  set ::htext::updates($w) 100
-  $w tag configure black -foreground black
-  $w tag configure white -foreground white
-  $w tag configure red -foreground red
-  $w tag configure blue -foreground blue
-  $w tag configure darkblue -foreground darkBlue
-  $w tag configure green -foreground $green
-  $w tag configure cyan -foreground $cyan
-  $w tag configure yellow -foreground yellow
-  $w tag configure maroon -foreground $maroon
-  $w tag configure gray -foreground gray20
-  
-  $w tag configure bgBlack -background black
-  $w tag configure bgWhite -background white
-  $w tag configure bgRed -background red
-  $w tag configure bgBlue -background blue
-  $w tag configure bgLightBlue -background lightBlue
-  $w tag configure bgGreen -background $green
-  $w tag configure bgCyan -background $cyan
-  $w tag configure bgYellow -background yellow
-  
+  global graphFigurineAvailable
+
+  set cyan {#007000}
+  set maroon {#990000}
+  set green {#008b00}
+
+  # set ::htext::updates($w) 100
+  $w tag configure black -fore black
+  $w tag configure white -fore white
+  $w tag configure red -fore red
+  $w tag configure blue -fore blue
+  $w tag configure darkblue -fore darkBlue
+  $w tag configure green -fore $green
+  $w tag configure cyan -fore $cyan
+  $w tag configure yellow -fore yellow
+  $w tag configure maroon -fore $maroon
+  $w tag configure gray -fore gray50
+
+  $w tag configure gbold -font font_Bold
+  # hmmm... salmon4 rosybrown4 royalblue royalblue2 chartreuse4 springgreen4
+
+  $w tag configure bgBlack -back black
+  $w tag configure bgWhite -back white
+  $w tag configure bgRed -back red
+  $w tag configure bgBlue -back blue
+  $w tag configure bgLightBlue -back lightBlue
+  $w tag configure bgGreen -back $green
+  $w tag configure bgCyan -back $cyan
+  $w tag configure bgYellow -back yellow
+
   $w tag configure tab -lmargin2 50
   $w tag configure li -lmargin2 50
   $w tag configure center -justify center
-  
+  $w tag configure left -justify left
+  $w tag configure right -justify right
+
   if {[$w cget -font] == "font_Small"} {
     $w tag configure b -font font_SmallBold
     $w tag configure i -font font_SmallItalic
@@ -182,395 +247,374 @@ proc ::htext::init {w} {
   $w tag configure bi -font font_BoldItalic
   $w tag configure tt -font font_Fixed
   $w tag configure u -underline 1
-  $w tag configure h1 -font font_H1 -foreground $::htext::headingColor \
-      -justify center
-  $w tag configure h2 -font font_H2 -foreground $::htext::headingColor
-  $w tag configure h3 -font font_H3 -foreground $::htext::headingColor
-  $w tag configure h4 -font font_H4 -foreground $::htext::headingColor
-  $w tag configure h5 -font font_H5 -foreground $::htext::headingColor
+  $w tag configure h1 -font {Arial 24 normal} -fore $::htext::headingColor -justify center
+  $w tag configure h2 -font font_H2 -fore $::htext::headingColor
+  $w tag configure h3 -font font_H3 -fore $::htext::headingColor
+  $w tag configure h4 -font font_H4 -fore $::htext::headingColor
+  $w tag configure ht -font font_Bold -fore $::htext::headingColor -justify center
   $w tag configure footer -font font_Small -justify center
-  
-  $w tag configure term -font font_BoldItalic -foreground $::htext::headingColor
-  $w tag configure menu -font font_Bold -foreground $cyan
-  
+
+  $w tag configure term -font font_BoldItalic -fore $::htext::headingColor
+  $w tag configure menu -font font_Bold -fore $cyan
+
   # PGN-window-specific tags:
-  $w tag configure tag -foreground $::pgnColor(Header)
+  $w tag configure tag -fore $::pgnColor(Header)
   if { $::pgn::boldMainLine } {
-    $w tag configure nag -foreground $::pgnColor(Nag) -font font_Regular
-    $w tag configure var -foreground $::pgnColor(Var) -font font_Regular
+    $w tag configure nag -fore $::pgnColor(Nag) -font font_Regular
+    $w tag configure var -fore $::pgnColor(Var) -font font_Regular
   } else {
-    $w tag configure nag -foreground $::pgnColor(Nag)
-    $w tag configure var -foreground $::pgnColor(Var)
-	 ### TODO
-    ### $w tag configure var -foreground $::pgnColor(Var) -font font_Figurine_Var
-
+    $w tag configure nag -fore $::pgnColor(Nag)
+    $w tag configure var -fore $::pgnColor(Var)
   }
-  $w tag configure ip1 -lmargin1 25 -lmargin2 25
-  $w tag configure ip2 -lmargin1 50 -lmargin2 50
-  $w tag configure ip3 -lmargin1 75 -lmargin2 75
-  $w tag configure ip4 -lmargin1 100 -lmargin2 100
-}
 
-proc ::htext::isStartTag {tagName} {
-  return [expr {![strIsPrefix "/" $tagName]} ]
-}
-
-proc ::htext::isEndTag {tagName} {
-  return [strIsPrefix "/" $tagName]
+  if {$graphFigurineAvailable} {
+    $w tag configure f -font font_Figurine(normal)
+    $w tag configure fb -font font_Figurine(bold)
+  }
 }
 
 proc ::htext::isLinkTag {tagName} {
-  return [strIsPrefix "a " $tagName]
+  return [strIsPrefix {a } $tagName]
 }
 
 proc ::htext::extractLinkName {tagName} {
   if {[::htext::isLinkTag $tagName]} {
-    return [lindex [split [string range $tagName 2 end] " "] 0]
+    return [lindex [split [string range $tagName 2 end] { }] 0]
   }
-  return ""
+  return {}
 }
 
 proc ::htext::extractSectionName {tagName} {
   if {[::htext::isLinkTag $tagName]} {
-    return [lindex [split [string range $tagName 2 end] " "] 1]
+    return [lindex [split [string range $tagName 2 end] { }] 1]
   }
-  return ""
+  return {}
 }
 
 set ::htext::interrupt 0
 
-proc ::htext::display {w helptext {section ""} {fixed 1}} {
+### Some tcl string optimisations by S.A. 5/12/2009, 06/09/2010
+
+proc ::htext::display {w helptext {section {}} {fixed 1}} {
   global helpWin
   # set start [clock clicks -milli]
   set helpWin(Indent) 0
   set ::htext::interrupt 0
   $w mark set insert 0.0
   $w configure -state normal
-  set linkName ""
-  
+  set linkName {}
+
   set count 0
   set str $helptext
-  if {$fixed} {
-    regsub -all "\n\n" $str "<p>" str
-    regsub -all "\n" $str " " str
-  } else {
-    regsub -all "\[ \n\]+" $str " " str
-    regsub -all ">\[ \n\]+" $str "> " str
-    regsub -all "\[ \n\]+<" $str " <" str
-  }
-  set tagType ""
-  set seePoint ""
-  
-  if {! [info exists ::htext::updates($w)]} {
-    set ::htext::updates($w) 100
-  }
-  
-  # Loop through the text finding the next formatting tag:
-  
+  # Conflict here between pgn and help markup.
+  # In pgn we don't want to do this regsub
+  if {$fixed == 1} {
+    regsub -all \n\n $str <p> str
+    regsub -all \n $str { } str
+  } elseif {$fixed == 0} {
+    regsub -all "\[ \n\]+" $str { } str
+    regsub -all ">\[ \n\]+" $str {> } str
+    regsub -all "\[ \n\]+<" $str { <} str
+  } ; # else fixed == 2 (pgn.tcl), don't convert newlines in comments
+
+  set tagType {}
+  set seePoint {}
+
+  # Loop through the text finding the next formatting tag
+
   while {1} {
-    set startPos [string first "<" $str]
+    set startPos [string first < $str]
     if {$startPos < 0} { break }
-    set endPos [string first ">" $str]
+    set endPos [string first > $str]
     if {$endPos < 1} { break }
-    
+
     set tagName [string range $str [expr {$startPos + 1}] [expr {$endPos - 1}]]
-    
-    # Check if it is a starting tag (no "/" at the start):
-    
-    if {![strIsPrefix "/" $tagName]} {
+
+    # starting tag (no "/" at the start)
+
+    if {![strIsPrefix {/} $tagName]} {
       
-      # Check if it is a link tag:
-      if {[strIsPrefix "a " $tagName]} {
+      if {[strIsPrefix m_ $tagName]} {
+        # Move tag &&&
+        set moveTag $tagName
+        set tagName m
+        # Too many bindings! 
+        $w tag bind $moveTag <ButtonPress-1> [list ::pgn::move $moveTag]
+        $w tag bind $moveTag <ButtonPress-3> [list ::pgn::move $moveTag]
+        $w tag bind $moveTag <Any-Enter> [list u1 $w $moveTag]
+        $w tag bind $moveTag <Any-Leave> [list u0 $w $moveTag]
+      } elseif {[strIsPrefix {a } $tagName]} {
+	# link tag
         set linkName [::htext::extractLinkName $tagName]
         set sectionName [::htext::extractSectionName $tagName]
         set linkTag "link ${linkName} ${sectionName}"
-        set tagName "a"
-        $w tag configure "$linkTag" -foreground blue -underline 1
-        $w tag bind "$linkTag" <ButtonRelease-1> \
-            "helpWindow $linkName $sectionName"
-        $w tag bind $linkTag <Any-Enter> \
-            "$w tag configure \"$linkTag\" -background yellow
-        $w configure -cursor hand2"
-        $w tag bind $linkTag <Any-Leave> \
-            "$w tag configure \"$linkTag\" -background {}
-        $w configure -cursor {}"
-      } elseif {[strIsPrefix "url " $tagName]} {
-        # Check if it is a URL tag:
+        set tagName a
+        $w tag configure $linkTag -fore dodgerblue3
+        $w tag bind $linkTag <ButtonRelease-1> "helpWindow $linkName $sectionName"
+        $w tag bind $linkTag <Any-Enter> [list uh1 $w $linkTag]
+        $w tag bind $linkTag <Any-Leave> [list uh0 $w $linkTag]
+      } elseif {[strIsPrefix {url } $tagName]} {
+        # URL tag
         set urlName [string range $tagName 4 end]
         set urlTag "url $urlName"
-        set tagName "url"
-        $w tag configure "$urlTag" -foreground red -underline 1
-        $w tag bind "$urlTag" <ButtonRelease-1> "openURL {$urlName}"
-        $w tag bind $urlTag <Any-Enter> \
-            "$w tag configure \"$urlTag\" -background yellow
-        $w configure -cursor hand2"
-        $w tag bind $urlTag <Any-Leave> \
-            "$w tag configure \"$urlTag\" -background {}
-        $w configure -cursor {}"
-      } elseif {[strIsPrefix "run " $tagName]} {
-        # Check if it is a Tcl command tag:
+        set tagName url
+        $w tag configure $urlTag -fore darkred
+        $w tag bind $urlTag <ButtonRelease-1> "openURL {$urlName}"
+        $w tag bind $urlTag <Any-Enter> [list uh1 $w $urlTag]
+        $w tag bind $urlTag <Any-Leave> [list uh0 $w $urlTag]
+      } elseif {[strIsPrefix {run } $tagName]} {
+        # Tcl command tag, also used extensively in statistics windows
         set runName [string range $tagName 4 end]
         set runTag "run $runName"
-        set tagName "run"
-        $w tag bind "$runTag" <ButtonRelease-1> "catch {$runName}"
-        $w tag bind $runTag <Any-Enter> \
-            "$w tag configure \"$runTag\" -foreground yellow
-        $w tag configure \"$runTag\" -background darkBlue
-        $w configure -cursor hand2"
-        $w tag bind $runTag <Any-Leave> \
-            "$w tag configure \"$runTag\" -foreground {}
-        $w tag configure \"$runTag\" -background {}
-        $w configure -cursor {}"
-      } elseif {[strIsPrefix "go " $tagName]} {
-        # Check if it is a goto tag:
+        set tagName run
+        $w tag bind $runTag <ButtonRelease-1> "catch {$runName}"
+        $w tag bind $runTag <Any-Enter> [list bh1 $w $runTag]
+        $w tag bind $runTag <Any-Leave> [list bh0 $w $runTag]
+      } elseif {[strIsPrefix {go } $tagName]} {
+        # Goto tag
+        # (is this used ??)
         set goName [string range $tagName 3 end]
         set goTag "go $goName"
-        set tagName "go"
-        $w tag bind "$goTag" <ButtonRelease-1> \
+        set tagName go
+        $w tag bind $goTag <ButtonRelease-1> \
             "catch {$w see \[lindex \[$w tag nextrange $goName 1.0\] 0\]}"
         $w tag bind $goTag <Any-Enter> \
-            "$w tag configure \"$goTag\" -foreground yellow
-        $w tag configure \"$goTag\" -background maroon
-        $w configure -cursor hand2"
+            "$w tag configure \"$goTag\" -fore gray
+             $w tag configure \"$goTag\" -back maroon
+             $w configure -cursor hand2"
         $w tag bind $goTag <Any-Leave> \
-            "$w tag configure \"$goTag\" -foreground {}
-        $w tag configure \"$goTag\" -background {}
-        $w configure -cursor {}"
-      } elseif {[strIsPrefix "pi " $tagName]} {
-        # Check if it is a player info tag:
+            "$w tag configure \"$goTag\" -fore {}
+             $w tag configure \"$goTag\" -back {}
+             $w configure -cursor {}"
+      } elseif {[strIsPrefix {pi } $tagName]} {
+        # Player info tag
         set playerTag $tagName
         set playerName [string range $playerTag 3 end]
-        set tagName "pi"
-        $w tag configure "$playerTag" -foreground darkBlue
-        $w tag bind "$playerTag" <ButtonRelease-1> "::pinfo::playerInfo \"$playerName\""
+        set tagName pi
+        # $w tag configure "$playerTag" -fore Blue
+        $w tag bind $playerTag <ButtonRelease-1> [list playerInfo $playerName raise]
+        ### Hmmm - seen pgn that have the ELO in the playername like "surname [1234] christian"
         $w tag bind $playerTag <Any-Enter> \
-            "$w tag configure \"$playerTag\" -foreground yellow
-        $w tag configure \"$playerTag\" -background darkBlue
-        $w configure -cursor hand2"
+            "catch {$w tag configure \"$playerTag\" -back gray85}
+             $w configure -cursor hand2"
         $w tag bind $playerTag <Any-Leave> \
-            "$w tag configure \"$playerTag\" -foreground darkBlue
-        $w tag configure \"$playerTag\" -background {}
-        $w configure -cursor {}"
-      } elseif {[strIsPrefix "g_" $tagName]} {
-        # Check if it is a game-load tag:
+            "catch {$w tag configure \"$playerTag\" -back {}}
+             $w configure -cursor {}"
+      } elseif {[strIsPrefix g_ $tagName]} {
+        # Game-load tag
         set gameTag $tagName
-        set tagName "g"
+        set tagName g
         set gnum [string range $gameTag 2 end]
         set glCommand "::game::LoadMenu $w [sc_base current] $gnum %X %Y"
         $w tag bind $gameTag <ButtonPress-1> $glCommand
-        $w tag bind $gameTag <ButtonPress-$::MB3> \
-            "::gbrowser::new [sc_base current] $gnum"
+        # right-click browses game, but too annoying in crosstable
+        # $w tag bind $gameTag <ButtonPress-3>  "::gbrowser::new [sc_base current] $gnum"
         $w tag bind $gameTag <Any-Enter> \
-            "$w tag configure $gameTag -foreground yellow
-        $w tag configure $gameTag -background darkBlue
-        $w configure -cursor hand2"
+            "$w tag configure $gameTag
+             $w tag configure $gameTag -back gray85
+             $w configure -cursor hand2"
         $w tag bind $gameTag <Any-Leave> \
-            "$w tag configure $gameTag -foreground {}
-        $w tag configure $gameTag -background {}
-        $w configure -cursor {}"
-      } elseif {[strIsPrefix "m_" $tagName]} {
-        # Check if it is a move tag:
-        set moveTag $tagName
-        set tagName "m"
-		  ### TODO
-		  ### Does not work for variations as the var-Tag appears before
-		  ### the <m_ tags, therefore this overwrites font sizes
-        ### $w tag configure $moveTag -font font_Figurine_ML
-        $w tag bind $moveTag <ButtonRelease-1> "sc_move pgn [string range $moveTag 2 end]; updateBoard"
-        # Bind middle button to popup a PGN board:
-        $w tag bind $moveTag <ButtonPress-$::MB2> "::pgn::ShowBoard .pgnWin.text $moveTag %X %Y"
-        # invoking contextual menu in PGN window
-        $w tag bind $moveTag <ButtonPress-$::MB3> "sc_move pgn [string range $moveTag 2 end]; updateBoard"
-        $w tag bind $moveTag <Any-Enter> "$w tag configure $moveTag -underline 1
-        $w configure -cursor hand2"
-        $w tag bind $moveTag <Any-Leave> "$w tag configure $moveTag -underline 0
-        $w configure -cursor {}"
-      } elseif {[strIsPrefix "c_" $tagName]} {
-        # Check if it is a comment tag:
+            "$w tag configure $gameTag -fore {}
+             $w tag configure $gameTag -back {}
+             $w configure -cursor {}"
+      } elseif {[strIsPrefix c_ $tagName]} {
+        # Comment tag
         set commentTag $tagName
-        set tagName "c"
+        set tagName c
         if { $::pgn::boldMainLine } {
-          $w tag configure $commentTag -foreground $::pgnColor(Comment) -font font_Regular
+          $w tag configure $commentTag -fore $::pgnColor(Comment) -font font_Regular
         } else {
-          $w tag configure $commentTag -foreground $::pgnColor(Comment)
+          $w tag configure $commentTag -fore $::pgnColor(Comment)
         }
-        $w tag bind $commentTag <ButtonRelease-1> "sc_move pgn [string range $commentTag 2 end]; updateBoard; ::commenteditor::Open"
-        $w tag bind $commentTag <Any-Enter> "$w tag configure $commentTag -underline 1
-        $w configure -cursor hand2"
-        $w tag bind $commentTag <Any-Leave> "$w tag configure $commentTag -underline 0
-        $w configure -cursor {}"
+        $w tag bind $commentTag <ButtonRelease-1> [list ::pgn::comment $commentTag]
+        $w tag bind $commentTag <Any-Enter> [list u1 $w $commentTag]
+        $w tag bind $commentTag <Any-Leave> [list u0 $w $commentTag]
+      } elseif {[string match ip* $tagName] && [string is integer [set margin [string range $tagName 2 end]]]} {
+        set margin [expr {25 * $margin}]
+        $w tag configure $tagName -lmargin1 $margin -lmargin2 $margin
       }
       
-      if {$tagName == "h1"} {$w insert end "\n"}
-      
+      if {$tagName == {h1}} {$w insert end \n}
     }
-    
-    # Now insert the text up to the formatting tag:
+
+    # Now insert the text up to the formatting tag
     $w insert end [string range $str 0 [expr {$startPos - 1}]]
-    
-    # Check if it is a name tag matching the section we want:
-    if {$section != ""  &&  [strIsPrefix "name " $tagName]} {
+
+    # Check if it is a name tag matching the section we want
+    if {$section != {}  &&  [strIsPrefix {name } $tagName]} {
       set sect [string range $tagName 5 end]
       if {$section == $sect} { set seePoint [$w index insert] }
     }
-    
-    if {[string index $tagName 0] == "/"} {
-      # Get rid of initial "/" character:
+
+    if {[string index $tagName 0] == {/}} {
+      ### process tag close, e.g. </menu>
+      # Get rid of initial "/" character
       set tagName [string range $tagName 1 end]
       switch -- $tagName {
-        h1 - h2 - h3 - h4 - h5  {$w insert end "\n"}
-      }
-      if {$tagName == "p"} {$w insert end "\n"}
-      #if {$tagName == "h1"} {$w insert end "\n"}
-      if {$tagName == "menu"} {$w insert end "\]"}
-      if {$tagName == "ul"} {
-        incr helpWin(Indent) -4
-        $w insert end "\n"
+        m {}
+        h1 - h2 - h3 - h4 - ht - p  { $w insert end \n }
+        menu { $w insert end \] }
+        ul   {
+	      incr helpWin(Indent) -4
+	      $w insert end \n
+             }
       }
       if {[info exists startIndex($tagName)]} {
         switch -- $tagName {
-          a {$w tag add $linkTag $startIndex($tagName) [$w index insert]}
-          g  {$w tag add $gameTag $startIndex($tagName) [$w index insert]}
-          c  {$w tag add $commentTag $startIndex($tagName) [$w index insert]}
-          m  {$w tag add $moveTag $startIndex($tagName) [$w index insert]}
-          pi {$w tag add $playerTag $startIndex($tagName) [$w index insert]}
-          url {$w tag add $urlTag $startIndex($tagName) [$w index insert]}
-          run {$w tag add $runTag $startIndex($tagName) [$w index insert]}
-          go {$w tag add $goTag $startIndex($tagName) [$w index insert]}
-          default {$w tag add $tagName $startIndex($tagName) [$w index insert]}
+          m  {$w tag add $moveTag startm insert}
+          a  {$w tag add $linkTag starta insert}
+          g  {$w tag add $gameTag startg insert}
+          c  {$w tag add $commentTag startc insert}
+          pi {$w tag add $playerTag startpi insert}
+          url {$w tag add $urlTag starturl insert}
+          run {$w tag add $runTag startrun insert}
+          go {$w tag add $goTag startgo insert}
+          default {$w tag add $tagName start$tagName insert}
         }
         unset startIndex($tagName)
       }
     } else {
       switch -- $tagName {
+        m {}
         ul {incr helpWin(Indent) 4}
         li {
-          $w insert end "\n"
+          $w insert end \n
           for {set space 0} {$space < $helpWin(Indent)} {incr space} {
-            $w insert end " "
+            $w insert end { }
           }
         }
-        p  {$w insert end "\n"}
-        br {$w insert end "\n"}
-        q  {$w insert end "\""}
-        lt {$w insert end "<"}
-        gt {$w insert end ">"}
-        h2 - h3 - h4 - h5  {$w insert end "\n"}
+        q  {$w insert end \"}
+        lt {$w insert end <}
+        gt {$w insert end >}
+        h2 - h3 - h4 - ht - p - br  {$w insert end \n}
       }
-      #Set the start index for this type of tag:
-      set startIndex($tagName) [$w index insert]
-      if {$tagName == "menu"} {$w insert end "\["}
+      # Set the start index for this type of tag
+      set startIndex($tagName) 1
+      $w mark set start$tagName insert
+      $w mark gravity start$tagName left
+      # menu is now unused i think - S.A.
+      if {$tagName == {menu}} {$w insert end \[}
     }
-    
-    # Check if it is an image or button tag:
-    if {[strIsPrefix "img " $tagName]} {
-      set imgName [string range $tagName 4 end]
-      set winName $w.$imgName
-      while {[winfo exists $winName]} { append winName a }
-      label $winName -image $imgName -relief flat -borderwidth 0 -background white
-      $w window create end -window $winName
-    }
-    if {[strIsPrefix "button " $tagName]} {
-      set idx [ string first "-command" $tagName]
-      set cmd ""
-      if {$idx == -1} {
-        set imgName [string range $tagName 7 end]
-      } else  {
-        set imgName [string trim [string range $tagName 7 [expr $idx -1]]]
-        set cmd [ string range $tagName [expr $idx +9] end ]
+
+    if {$tagName != {m}} {
+      if {[strIsPrefix {img } $tagName]} {
+	set imgName [string range $tagName 4 end]
+	set winName $w.$imgName
+	while {[winfo exists $winName]} { append winName a }
+	label $winName -image $imgName -relief flat -borderwidth 0
+	$w window create end -window $winName
+	bindMouseWheel $winName $w
       }
-      set winName $w.$imgName
-      while {[winfo exists $winName]} { append winName a }
-      button $winName -image $imgName -command $cmd
-      $w window create end -window $winName
+
+      if {[strIsPrefix {button } $tagName]} {
+	set imgName [lindex $tagName 1]
+	set imgSize [lindex $tagName 2]
+	set winName $w.$imgName
+	while {[winfo exists $winName]} { append winName a }
+	button $winName -image $imgName
+	if {[string is integer -strict $imgSize]} {
+	  $winName configure -width $imgSize -height $imgSize
+	}
+	$w window create end -window $winName
+	bindMouseWheel $winName $w
+      }
+
+      if {[strIsPrefix {window } $tagName]} {
+	set winName [string range $tagName 7 end]
+	$w window create end -window $winName
+	bindMouseWheel $winName $w
+      }
     }
-    if {[strIsPrefix "window " $tagName]} {
-      set winName [string range $tagName 7 end]
-      $w window create end -window $winName
-    }
-    
-    # Now eliminate the processed text from the string:
-    set str [string range $str [expr {$endPos + 1}] end]
+
+    # Eliminate the processed text from the string
+
+    # Used to cause unicode bug in eco string, but scid.eco is now utf8
+    # and this is faster for the crosstable (some tcl bug i think S.A)
+    set str [string range $str $endPos+1 end] 
+    # set str [string replace $str 0 $endPos]
     incr count
-    if {$count == $::htext::updates($w)} { update idletasks; set count 1 }
-    if {$::htext::interrupt} {
-      $w configure -state disabled
-      return
-    }
+
+    ### This is meant to allow interrupts, but doesnt work
+    ### but is very bad for performance with big pgn files
+    # if {$count == $::htext::updates($w)} {
+    #   update idletasks
+    #   set count 1
+    # }
+    # if {$::htext::interrupt} {
+    #   $w configure -state disabled
+    #   return
+    # }
   }
-  
-  # Now add any remaining text:
+
+  # Add any remaining text
   if {! $::htext::interrupt} { $w insert end $str }
-  
-  if {$seePoint != ""} { $w yview $seePoint }
+
+  if {$seePoint != {}} { $w yview $seePoint }
   $w configure -state disabled
   # set elapsed [expr {[clock clicks -milli] - $start}]
 }
 
+# Get some speed from optimising these into procs (?) S.A
+# u - underline
+# uh - underline+hand
+# bh - background+hand
 
-# openURL:
-#    Sends a command to the user's web browser to view a webpage given
-#    its URL.
-#
+proc u1 {w tag} {
+  $w tag configure $tag -background gray80
+}
+proc u0 {w tag} {
+  $w tag configure $tag -background {}
+}
+proc uh1 {w tag} {
+  $w tag configure $tag -underline 1
+  $w configure -cursor hand2
+}
+proc uh0 {w tag} {
+  $w tag configure $tag -underline 0
+  $w configure -cursor {}
+}
+proc bh1 {w tag} {
+  $w tag configure $tag -back gray85
+  $w configure -cursor hand2
+}
+proc bh0 {w tag} {
+  $w tag configure $tag -back {}
+  $w configure -cursor {}
+}
+
+### Open a webpage in the user's (configured?) web browser
+
 proc openURL {url} {
-  global windowsOS
+  global windowsOS macOS
   busyCursor .
+
   if {$windowsOS} {
     # On Windows, use the "start" command:
-    regsub -all " " $url "%20" url
     if {[string match $::tcl_platform(os) "Windows NT"]} {
-      catch {exec $::env(COMSPEC) /c start $url &}
+      catch {exec $::env(COMSPEC) /c start "$url" &}
     } else {
       catch {exec start $url &}
     }
-  } elseif {$::macOS} {
-    # On Mac OS X use the "open" command:
-    catch {exec open $url &}
-  } else {
-    # On Unix systems, there is no standard for invoking favorite
-    # web browser, so just try starting Mozilla or Netscape.
-    
-    # First, check if Mozilla seems to be available:
-    if {[file executable [auto_execok firefox]]} {
-      # First, try -remote mode:
-      if {[catch {exec /bin/sh -c "$::auto_execs(firefox) -remote 'openURL($url)'"}]} {
-        # Now try a new Mozilla process:
-        catch {exec /bin/sh -c "$::auto_execs(firefox) '$url'" &}
-      }
-    } elseif {[file executable [auto_execok iceweasel]]} {
-      # First, try -remote mode:
-      if {[catch {exec /bin/sh -c "$::auto_execs(iceweasel) -remote 'openURL($url)'"}]} {
-        # Now try a new Mozilla process:
-        catch {exec /bin/sh -c "$::auto_execs(iceweasel) '$url'" &}
-      }
-    } elseif {[file executable [auto_execok mozilla]]} {
-      # First, try -remote mode:
-      if {[catch {exec /bin/sh -c "$::auto_execs(mozilla) -remote 'openURL($url)'"}]} {
-        # Now try a new Mozilla process:
-        catch {exec /bin/sh -c "$::auto_execs(mozilla) '$url'" &}
-      }
-    } elseif {[file executable [auto_execok www-browser]]} {
-      # Now try a new Mozilla process:
-      catch {exec /bin/sh -c "$::auto_execs(www-browser) '$url'" &}
-    } elseif {[file executable [auto_execok netscape]]} {
-      # OK, no Mozilla (poor user) so try Netscape (yuck):
-      # First, try -remote mode to avoid starting a new netscape process:
-      if {[catch {exec /bin/sh -c "$::auto_execs(netscape) -raise -remote 'openURL($url)'"}]} {
-        # Now just try starting a new netscape process:
-        catch {exec /bin/sh -c "$::auto_execs(netscape) '$url'" &}
-      }
-    } else {
-      foreach executable {iexplorer opera lynx w3m links epiphan galeon
-        konqueror mosaic amaya browsex elinks} {
-        set executable [auto_execok $executable]
-        if [string length $executable] {
-          # Is there any need to give options to these browsers? how?
-          set command [list $executable $url &]
-          catch {exec /bin/sh -c "$executable '$url'" &}
-          break
-        }
-      }
+  } elseif {$macOS} {
+    if {[catch {exec /bin/sh -c "open -a Firefox \"$url\""}]} {
+      catch {exec /bin/sh -c "open -a Safari \"$url\"" &}
     }
+  } else {
+    # The problem with the code commented out is it will leave two tabs  
+    # open as the first will start firefox but fail the tab because of
+    # the invalid switch and string. 
+    # then the second call will open a second tab in the already 
+    # running firefox. - R.A.
+
+    #if {[catch {exec /bin/sh -c "firefox -remote 'openURL($url)'"}]} {
+    #  # Now try a new firefox process
+    #  catch {exec /bin/sh -c "firefox '$url'" &}
+    #}
+    
+    # This implementation ... seems broke to me :( S.A.
+    # if {[catch {exec /bin/sh -c "xdg-open '$url'" &}]} 
+
+    catch {exec /bin/sh -c "firefox '$url'" &}
   }
   unbusyCursor .
 }

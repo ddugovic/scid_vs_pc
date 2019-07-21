@@ -29,28 +29,44 @@ MFile::Init ()
     Type = MFILE_MEMORY;
     Capacity = 0;
     Location = 0;
-    SeqReadLocation = 0;
     Data = NULL;
     CurrentPtr = NULL;
+    FileBuffer = NULL;
     FileName = NULL;
+#ifdef WIN32
+    MappedFile = NULL;
+#endif
 }
 
 void
 MFile::Extend ()
 {
     ASSERT (Type == MFILE_MEMORY);
+
     // Double Capacity, starting with at least 8 Kb:
     uint oldCapacity = Capacity;
     Capacity += Capacity;
     if (Capacity < 8192) { Capacity = 8192; }
     byte * oldData = Data;
     Data = new byte [Capacity];
-    CurrentPtr = &(Data[Location]);
     if (oldData != NULL) {
-        // Copy data to new array:
-        for (uint i=0; i < oldCapacity; i++) { Data[i] = oldData[i]; }
-        delete[] oldData;
+      // Copy data to new array:
+      for (uint i=0; i < oldCapacity; i++) {
+        Data[i] = oldData[i];
+      }
+      delete[] oldData;
     }
+    CurrentPtr = &(Data[Location]);
+}
+
+void
+MFile::SetBufferSize (uint bufsize)
+{
+    if (Type != MFILE_REGULAR) { return; }
+    if (FileBuffer != NULL) { return; }
+    FileBuffer = new char [bufsize];
+
+    setvbuf (Handle, FileBuffer, _IOFBF, bufsize);
 }
 
 errorT
@@ -63,19 +79,18 @@ MFile::Seek (uint position)
         return OK;
     }
 
-    if (Type == MFILE_SEQREAD) {
-        Type = MFILE_REGULAR;
-        if (Data != NULL) delete[] Data;
-        Data = CurrentPtr = NULL;
-        Capacity = 0;
-    } else {
-        if (FileMode != FMODE_Both  &&  Location == position) { return OK; }
-    }
+    // We do not need to seek if FileMode is not FMODE_Both and we are
+    // already at the position:
+    if (FileMode != FMODE_Both  &&  Location == position) { return OK; }
 
     int result;
     if (Type == MFILE_GZIP) {
         result = gzseek (GzHandle, position, 0);
         GzBuffer_Avail = 0;
+#ifdef WIN32
+    } else if (Type == MFILE_MMAP) {
+        result = 0; // always succeeding
+#endif
     } else {
         result = fseek (Handle, position, 0);
     }
@@ -110,21 +125,17 @@ MFile::Open (const char * name, fileModeT fmode)
             return ERROR_FileOpen;
         }
         GzHandle = gzopen (name, "rb");
+
         if (GzHandle == NULL) { return ERROR_FileOpen; }
         Type = MFILE_GZIP;
         GzBuffer = new byte [GZ_BUFFER_SIZE];
+
         GzBuffer_Current = GzBuffer;
         GzBuffer_Avail = 0;
     } else {
         Handle = fopen (name, modeStr);
         if (Handle == NULL) { return ERROR_FileOpen; }
-        Type = MFILE_SEQREAD;
-        Data = new byte [SEQREADBUFSIZE];
-        CurrentPtr = Data;
-        SeqReadLocation = 0;
-        fseek(Handle, 0L, SEEK_END);
-        Capacity = ftell(Handle);
-        fseek(Handle, 0L, SEEK_SET);
+        Type = MFILE_REGULAR;
     }
 
     FileMode = fmode;
@@ -132,6 +143,23 @@ MFile::Open (const char * name, fileModeT fmode)
     Location = 0;
     return OK;
 }
+
+#ifdef WIN32
+errorT
+MFile::OpenMappedFile (const char * name, fileModeT fmode)
+{
+    ASSERT(Handle == NULL && GzHandle == NULL);
+    ASSERT(fmode == FMODE_ReadOnly);
+
+    Type = MFILE_MMAP;
+    FileName = strDuplicate(name);
+    MappedFile = new WinMMap(name);
+    FileMode = fmode;
+    Location = 0;
+
+    return MappedFile->isOpen() ? OK : ERROR_FileOpen;
+}
+#endif
 
 errorT
 MFile::Create (const char * name, fileModeT fmode)
@@ -143,6 +171,7 @@ MFile::Create (const char * name, fileModeT fmode)
         case FMODE_Both:      modeStr = "w+b"; break;
         default:              return ERROR_FileMode;
     }
+
     if ((Handle = fopen (name, modeStr)) == NULL) { return ERROR_FileOpen; }
     FileMode = fmode;
     FileName = strDuplicate (name);
@@ -150,6 +179,44 @@ MFile::Create (const char * name, fileModeT fmode)
     Type = MFILE_REGULAR;
     return OK;
 }
+
+errorT
+MFile::Close ()
+{
+    if (Type == MFILE_MEMORY) {
+        if (Data != NULL) { delete[] Data; }
+        Init();
+        return OK;
+    }
+    int result;
+    if (Type == MFILE_GZIP) {
+        if (GzBuffer != NULL) {
+        delete[] GzBuffer;
+            GzBuffer = GzBuffer_Current = NULL;
+            GzBuffer_Avail = 0;
+        }
+        result = gzclose (GzHandle);
+#ifdef WIN32
+    } else if (Type == MFILE_MMAP) {
+        delete MappedFile;
+        MappedFile = NULL;
+#endif
+    } else {
+        result = fclose (Handle);
+    }
+
+    if (FileBuffer != NULL) {
+        delete[] FileBuffer;
+        FileBuffer = NULL;
+    }
+    if (FileName != NULL) {
+        delete[] FileName;
+        FileName = NULL;
+    }
+    Init();
+    return (result == 0 ? OK : ERROR);
+}
+
 
 errorT
 MFile::WriteNBytes (const char * str, uint length)
@@ -172,7 +239,7 @@ MFile::WriteNBytes (const char * str, uint length)
       }
       return OK;
     }
-    if (Type == MFILE_SEQREAD) Seek(Location);
+
     Location += length;
     
     if (Type == MFILE_GZIP) {
@@ -183,6 +250,7 @@ MFile::WriteNBytes (const char * str, uint length)
       }
       return err;
     }
+
     return (fwrite( str, length, 1, Handle) != 1) ? ERROR_FileWrite : OK;
 }
 
@@ -195,7 +263,53 @@ MFile::ReadNBytes (char * str, uint length)
             *str++ = ReadOneByte ();
         }
     } else {
+        // Optimization: if FREAD_OPTIMIZE is set,
+        // We read the bytes with fread instead of a getc() loop.
+        // This makes tree/material/etc searches go faster.
+
+
+#define FREAD_OPTIMIZE
+#ifdef FREAD_OPTIMIZE
         Location += fread (str, 1, length, Handle);
+#else
+        while (length-- > 0) {
+            *str++ = getc(Handle);
+        }
+        Location++;
+#endif
+    }
+    return OK;
+}
+
+errorT
+MFile::ReadLine (char * str, uint maxLength)
+{
+    ASSERT (FileMode != FMODE_WriteOnly);
+    if (Type != MFILE_REGULAR) {
+        while (1) {
+            if (maxLength == 0) { break; }
+            maxLength--;
+            char ch = ReadOneByte ();
+            *str++ = ch;
+            if (ch == '\n') { break; }
+        }
+        *str = 0;
+    } else {
+        fgets (str, (int) maxLength, Handle);
+        Location = ftell (Handle);
+    }
+    return OK;
+}
+
+errorT
+MFile::ReadLine (DString * dstr)
+{
+    int ch = ReadOneByte();
+    while (ch != '\n'  &&  ch != EOF) {
+        if (ch != '\r') {
+            dstr->AddChar (ch);
+        }
+        ch = ReadOneByte();
     }
     return OK;
 }

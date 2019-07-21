@@ -17,15 +17,12 @@
 #define SCID_POSITION_H
 
 #include "common.h"
+#include "dstring.h"
 #include "misc.h"
 #include "movelist.h"
+#include "sqlist.h"
+#include "sqset.h"
 #include "tokens.h"
-#include <stdio.h>
-
-class DString;
-class SquareSet;
-class SquareList;
-
 
 //////////////////////////////////////////////////////////////////////
 //  Position:  Constants
@@ -142,11 +139,12 @@ private:
     //  Position:  Public Functions
 public:
     Position()   { Init(); }
-    static const Position& getStdStart();
+    Position(const Position& p);
+    ~Position()  {}
 
     void        Init();
     void        Clear();        // No pieces on board
-    void        StdStart() { *this = getStdStart(); }
+    void        StdStart();     // Standard chess starting position
     bool        IsStdStart();
     errorT      AddPiece (pieceT p, squareT sq);
 
@@ -161,6 +159,8 @@ public:
     void        SetPlyCounter (ushort x) { PlyCounter = x; }
     ushort      GetPlyCounter ()         { return PlyCounter; }
     ushort      GetFullMoveCount ()      { return PlyCounter / 2 + 1; }
+    MoveList *  GetLegalMoves ()         { return &LegalMoves; }
+
 
     // Methods to get the Board or piece lists -- used in game.cpp to
     // decode moves:
@@ -222,9 +222,10 @@ public:
                                SquareSet * sqset, bool capturesOnly);
 
     // Generate all legal moves:
-    void  GenerateMoves (MoveList* mlistRes, pieceT mask, genMovesT genType, bool maybeInCheck);
+    void  GenerateMoves (MoveList * mlist, pieceT mask, genMovesT genType, bool maybeInCheck);
     void  GenerateMoves () { GenerateMoves (NULL, EMPTY, GEN_ALL_MOVES, true); }
     void  GenerateMoves (MoveList * mlist) { GenerateMoves (mlist, EMPTY, GEN_ALL_MOVES, true); }
+    void  GenerateMoves (MoveList * mlist, pieceT mask) { GenerateMoves (mlist, mask, GEN_ALL_MOVES, true); }
     void  GenerateMoves (MoveList * mlist, genMovesT genType) { GenerateMoves (mlist, EMPTY, genType, true); }
     void  GenerateCaptures (MoveList * mlist) { GenerateMoves (mlist, EMPTY, GEN_CAPTURES, true); }
     bool  IsLegalMove (simpleMoveT * sm);
@@ -235,7 +236,6 @@ public:
     errorT      MatchKingMove (MoveList * mlist, squareT target);
 
     uint        CalcAttacks (colorT toMove, squareT kingSq, SquareList * squares);
-    int         TreeCalcAttacks (colorT toMove, squareT target);
     uint        CalcNumChecks () {
                     return CalcAttacks (1-ToMove, GetKingSquare(), NULL);
                 }
@@ -251,6 +251,7 @@ public:
     bool        IsKingInCheckDir (directionT dir);
     bool        IsKingInCheck (simpleMoveT * sm);
     bool        IsKingInMate ();
+    bool        IsStaleMate ();
     bool        IsLegal ();
 
     bool        IsPromoMove (squareT from, squareT to);
@@ -262,7 +263,8 @@ public:
 
     void        MakeSANString (simpleMoveT * sm, char * s, sanFlagT flag);
     void        MakeUCIString (simpleMoveT * sm, char * s);
-	void        CalcSANStrings (sanListT *sanList, sanFlagT flag);
+    void        CalcSANStrings (sanListT *sanList, sanFlagT flag);
+    void        CalcUCIStrings (sanListT *sanList);
 
     errorT      ReadCoordMove (simpleMoveT * m, const char * s, bool reverse);
     errorT      ReadMove (simpleMoveT * m, const char * s, tokenT t);
@@ -294,7 +296,7 @@ public:
 
     // Copy, compare positions
     int         Compare (Position * p);
-    void        CopyFrom (Position * src) { *this = *src; }
+    void        CopyFrom (Position * src);
 
     // Set up a random position:
     errorT      Random (const char * material);

@@ -4,60 +4,33 @@
 
 namespace eval ::search::header {}
 
-set sTitleList [list gm im fm none wgm wim wfm w]
+set sWhite "";  set sBlack "";  set sEvent ""; set sSite "";  set sRound ""
+set sWhiteEloMin 0; set sWhiteEloMax [sc_info limit elo]
+set sBlackEloMin 0; set sBlackEloMax [sc_info limit elo]
+set sEloDiffMin "-[sc_info limit elo]"; set sEloDiffMax "+[sc_info limit elo]"
+set sTitleList "gm im fm cm wgm wim wfm none"
 foreach i $sTitleList {
   set sTitles(w:$i) 1
   set sTitles(b:$i) 1
 }
-set sHeaderFlagList {StdStart Promotions Comments Variations Annotations \
+set sGlMin 0; set sGlMax 999
+set sEcoMin "A00";  set sEcoMax "E99"; set sEco Yes
+set sDateMin "0000.00.00"; set sDateMax "[sc_info limit year].12.31"
+set sResWin 1; set sResLoss 1; set sResDraw 1; set sResOther 1
+set sGnumMin 1; set sGnumMax -1
+set sIgnoreCol No
+set sSideToMove wb
+set sHeaderFlagList {StdStart Promotions UnderPromo Comments Variations Annotations \
       DeleteFlag WhiteOpFlag BlackOpFlag MiddlegameFlag EndgameFlag \
       NoveltyFlag PawnFlag TacticsFlag KsideFlag QsideFlag \
       BrilliancyFlag BlunderFlag UserFlag }
-
 set sHeaderCustomFlagList {  CustomFlag1 CustomFlag2 CustomFlag3 CustomFlag4 CustomFlag5 CustomFlag6 }
-
-set sHeaderFlagChars {S X _ _ _ D W B M E N P T K Q ! ? U 1 2 3 4 5 6}
-
+foreach i [ concat $sHeaderFlagList $sHeaderCustomFlagList ] {
+  set sHeaderFlags($i) both
+}
 set sPgntext(1) ""
 set sPgntext(2) ""
 set sPgntext(3) ""
-
-# checkDates:
-#    Checks minimum/maximum search dates in header search window and
-#    extends them if necessary.
-proc checkDates {} {
-  global sDateMin sDateMax
-  if {[string length $sDateMin] == 0} { set sDateMin "0000" }
-  if {[string length $sDateMax] == 0} { set sDateMax [sc_info limit year]}
-  if {[string length $sDateMin] == 4} { append sDateMin ".??.??" }
-  if {[string length $sDateMax] == 4} { append sDateMax ".12.31" }
-  if {[string length $sDateMin] == 7} { append sDateMin ".??" }
-  if {[string length $sDateMax] == 7} { append sDateMax ".31" }
-}
-
-proc ::search::header::defaults {} {
-  set ::sWhite "";  set ::sBlack ""
-  set ::sEvent ""; set ::sSite "";  set ::sRound ""; set ::sAnnotator ""; set ::sAnnotated 0
-  set ::sWhiteEloMin 0; set ::sWhiteEloMax [sc_info limit elo]
-  set ::sBlackEloMin 0; set ::sBlackEloMax [sc_info limit elo]
-  set ::sEloDiffMin "-[sc_info limit elo]"
-  set ::sEloDiffMax "+[sc_info limit elo]"
-  set ::sGlMin 0; set ::sGlMax 999
-  set ::sEcoMin "A00";  set ::sEcoMax "E99"; set ::sEco Yes
-  set ::sGnumMin 1; set ::sGnumMax -1
-  set ::sDateMin "0000.00.00"; set ::sDateMax "[sc_info limit year].12.31"
-  set ::sResWin ""; set ::sResLoss ""; set ::sResDraw ""; set ::sResOther ""
-  set ::sIgnoreCol No
-  set ::sSideToMove wb
-  foreach flag  [ concat $::sHeaderFlagList $::sHeaderCustomFlagList ] { set ::sHeaderFlags($flag) both }
-  foreach i [array names ::sPgntext] { set ::sPgntext($i) "" }
-  foreach i $::sTitleList {
-    set ::sTitles(w:$i) 1
-    set ::sTitles(b:$i) 1
-  }
-}
-
-::search::header::defaults
 
 trace variable sDateMin w ::utils::validate::Date
 trace variable sDateMax w ::utils::validate::Date
@@ -71,6 +44,7 @@ trace variable sEloDiffMax w [list ::utils::validate::Integer "-[sc_info limit e
 trace variable sGlMin w {::utils::validate::Integer 9999 0}
 trace variable sGlMax w {::utils::validate::Integer 9999 0}
 
+# wtf &&&
 trace variable sGnumMin w {::utils::validate::Integer -9999999 0}
 trace variable sGnumMax w {::utils::validate::Integer -9999999 0}
 
@@ -79,64 +53,104 @@ foreach i {sEcoMin sEcoMax} {
   trace variable $i w {::utils::validate::Regexp {^$|^[A-Ea-e]$|^[A-Ea-e][0-9]$|^[A-Ea-e][0-9][0-9]$|^[A-Ea-e][0-9][0-9][a-z]$|^[A-Ea-e][0-9][0-9][a-z][1-4]$}}
 }
 
+# checkDates:
+#    Checks minimum/maximum search dates in header search window and
+#    extends them if necessary.
+proc checkDates {} {
+  global sDateMin sDateMax
+  if {[string length $sDateMin] == 0} { set sDateMin "0000" }
+  if {[string length $sDateMax] == 0} { set sDateMax [sc_info limit year]}
+  if {[string length $sDateMin] == 4} { append sDateMin ".??.??" }
+  if {[string length $sDateMax] == 4} { append sDateMax ".12.31" }
+  if {[string length $sDateMin] == 7} { append sDateMin ".??" }
+  if {[string length $sDateMax] == 7} { append sDateMax ".31" }
+  if {[string match {*.01.01} $sDateMin]} { set sDateMin "[string range $sDateMin 0 end-6].??.??"}
+}
+
+proc ::search::header::defaults {} {
+  global sWhite sBlack sEvent sSite sRound sDateMin sDateMax sIgnoreCol sSideToMove
+  global sWhiteEloMin sWhiteEloMax sBlackEloMin sBlackEloMax
+  global sEloDiffMin sEloDiffMax
+  global sEco sEcoMin sEcoMax sHeaderFlags sGlMin sGlMax
+  global sGnumMin sGnumMax
+  global sResWin sResLoss sResDraw sResOther glstart
+  global sPgntext sTitles sPgncase sGameEnd
+
+  set sWhite "";  set sBlack ""
+  set sEvent ""; set sSite "";  set sRound ""
+  set sWhiteEloMin 0; set sWhiteEloMax [sc_info limit elo]
+  set sBlackEloMin 0; set sBlackEloMax [sc_info limit elo]
+  set sEloDiffMin "-[sc_info limit elo]"
+  set sEloDiffMax "+[sc_info limit elo]"
+  set sGlMin 0; set sGlMax 999
+  set sEcoMin "A00";  set sEcoMax "E99"; set sEco Yes
+  set sGnumMin 1; set sGnumMax -1
+  set sDateMin "0000.00.00"; set sDateMax "[sc_info limit year].12.31"
+  set sResWin 1; set sResLoss 1; set sResDraw 1; set sResOther 1
+  set sIgnoreCol No
+  set sSideToMove wb
+  set sPgncase 0
+  set sGameEnd Any
+  set preComment 0
+  set postComment 0
+  foreach flag  [ concat $::sHeaderFlagList $::sHeaderCustomFlagList ] { set sHeaderFlags($flag) both }
+  foreach i [array names sPgntext] { set sPgntext($i) "" }
+  foreach i $::sTitleList {
+    set sTitles(w:$i) 1
+    set sTitles(b:$i) 1
+  }
+}
+
+::search::header::defaults
+
 set sHeaderFlagFrame 0
 
-# ::search::header
-#
-#   Opens the window for searching by header information.
-#
-proc search::header {{ref_base ""} {ref_filter ""}} {
-  global sWhite sBlack sEvent sSite sRound sAnnotator sAnnotated sDateMin sDateMax sIgnoreCol
+#   Search by header information.
+#   (General Search)
+
+proc search::header {} {
+  global sWhite sBlack sEvent sSite sRound sDateMin sDateMax sIgnoreCol
   global sWhiteEloMin sWhiteEloMax sBlackEloMin sBlackEloMax
   global sEloDiffMin sEloDiffMax sSideToMove
   global sEco sEcoMin sEcoMax sHeaderFlags sGlMin sGlMax sTitleList sTitles
-  global sResWin sResLoss sResDraw sResOther sPgntext
+  global sResWin sResLoss sResDraw sResOther glstart sPgncase sPgntext sGameEnd preComment postComment
 
   set w .sh
   if {[winfo exists $w]} {
-    wm deiconify $w
     raiseWin $w
     return
   }
-  
+
   toplevel $w
-  wm title $w "Scid: $::tr(HeaderSearch)"
-  foreach frame {cWhite cBlack ignore tw tb eventsite dateround res ano gl ends eco} {
-    ttk::frame $w.$frame
+  wm withdraw $w
+  wm title $w "$::tr(HeaderSearch)"
+  foreach frame {cWhite cBlack ignore tw tb eventsite dateround res gl ends eco} {
+    frame $w.$frame
   }
-  
-  raise $w
-  
+
   bind $w <F1> { helpWindow Searches Header }
   bind $w <Escape> "$w.b.cancel invoke"
   bind $w <Return> "$w.b.search invoke"
-  
-  if {$ref_base != ""} {
-    set ::refDatabaseH $ref_base
-    set ::refFilterH $ref_filter
-  } else {
-    pack [ttk::frame $w.refdb] -side top -fill x
-    CreateSelectDBWidget "$w.refdb" "refDatabaseH" "$ref_base"
-    addHorizontalRule $w
-    set ::refFilterH ""
-  }
 
   set regular font_Small
   set bold font_SmallBold
-  
+
   foreach color {White Black} {
-    pack $w.c$color -side top -fill x
-    ttk::label $w.c$color.lab -textvar ::tr($color:) -font $bold -width 9 -anchor w
+    pack $w.c$color -side top -fill x -pady 3
+    label $w.c$color.lab -textvar ::tr($color) -font $bold -width 9 -anchor w
+
+    set tmp [set s[set color]]
     ttk::combobox $w.c$color.e -textvariable "s$color" -width 40
     ::utils::history::SetCombobox HeaderSearch$color $w.c$color.e
+    set s$color $tmp
+
     bind $w.c$color.e <Return> { .sh.b.search invoke; break }
-    
-    ttk::label $w.c$color.space
-    ttk::label $w.c$color.elo1 -textvar ::tr(Rating:) -font $bold
-    ttk::entry $w.c$color.elomin -textvar s${color}EloMin -width 6 -justify right \
+    label $w.c$color.space
+    label $w.c$color.elo1 -textvar ::tr(Rating) -font $bold
+    entry $w.c$color.elomin -textvar s${color}EloMin -width 6 -justify right \
         -font $regular
-    ttk::label $w.c$color.elo2 -text "-" -font $regular
-    ttk::entry $w.c$color.elomax -textvar s${color}EloMax -width 6 -justify right \
+    label $w.c$color.elo2 -text "-" -font $regular
+    entry $w.c$color.elomax -textvar s${color}EloMax -width 6 -justify right \
         -font $regular
     bindFocusColors $w.c$color.e
     bindFocusColors $w.c$color.elomin
@@ -145,66 +159,81 @@ proc search::header {{ref_base ""} {ref_filter ""}} {
     pack $w.c$color.elomax $w.c$color.elo2 $w.c$color.elomin $w.c$color.elo1 \
         -side right
   }
-  
-  pack $w.ignore -side top -fill x
-  ttk::label $w.ignore.l -textvar ::tr(IgnoreColors:) -font $bold
-  ttk::radiobutton $w.ignore.yes -variable sIgnoreCol -value Yes -textvar ::tr(Yes) -style Small.TRadiobutton
-  ttk::radiobutton $w.ignore.no  -variable sIgnoreCol -value No -textvar ::tr(No) -style Small.TRadiobutton
+
+  pack $w.ignore -side top -fill x  -pady 2
+  label $w.ignore.l -textvar ::tr(IgnoreColors) -font $bold
+  radiobutton $w.ignore.yes -variable sIgnoreCol -value Yes -textvar ::tr(Yes) -font $regular
+  radiobutton $w.ignore.no  -variable sIgnoreCol -value No -textvar ::tr(No) -font $regular
   pack $w.ignore.l $w.ignore.yes $w.ignore.no -side left
-  ttk::label $w.ignore.rdiff -textvar ::tr(RatingDiff:) -font $bold
-  ttk::entry $w.ignore.rdmin -width 6 -textvar sEloDiffMin -justify right -font $regular
-  ttk::label $w.ignore.rdto -text "-" -font $regular
-  ttk::entry $w.ignore.rdmax -width 6 -textvar sEloDiffMax -justify right -font $regular
+
+  # RatingDiff shortened for english only S.A.
+  label $w.ignore.rdiff -textvar ::tr(RatingDiff) -font $bold
+  entry $w.ignore.rdmin -width 6 -textvar sEloDiffMin -justify right -font $regular
+  label $w.ignore.rdto -text "-" -font $regular
+  entry $w.ignore.rdmax -width 6 -textvar sEloDiffMax -justify right -font $regular
   bindFocusColors $w.ignore.rdmin
   bindFocusColors $w.ignore.rdmax
   pack $w.ignore.rdmax $w.ignore.rdto $w.ignore.rdmin $w.ignore.rdiff \
       -side right
-  
+
   set spellstate normal
   if {[lindex [sc_name read] 0] == 0} { set spellstate disabled }
   foreach c {w b} name {White Black} {
     pack $w.t$c -side top -fill x
-    ttk::label $w.t$c.label -text "$::tr($name) FIDE:" -font $bold -width 14 -anchor w
+    label $w.t$c.label -text "$::tr($name) FIDE title" -font $bold -width 18 -anchor w
     pack $w.t$c.label -side left
     foreach i $sTitleList {
       set name [string toupper $i]
-      if {$i == "none"} { set name "-" }
-      ttk::checkbutton $w.t$c.b$i -text $name -width 5 -variable sTitles($c:$i) -offvalue 0 -onvalue 1 -state $spellstate
+      if {$i == "none"} { set name [tr None] }
+      checkbutton $w.t$c.b$i -text $name -width 5 -font $regular \
+          -variable sTitles($c:$i) -offvalue 0 -onvalue 1 -indicatoron 0 \
+          -state $spellstate -pady 0
+      if {$::macOS} {
+         $w.t$c.b$i configure -height 2
+      }
       pack $w.t$c.b$i -side left -padx 1
     }
   }
-  
+
   addHorizontalRule $w
-  
+
+  ### Event and Site
+
   set f $w.eventsite
   pack $f -side top -fill x
   foreach i {Event Site} {
-    ttk::label $f.l$i -textvar ::tr(${i}:) -font $bold
-    ttk::combobox $f.e$i -textvariable s$i -width 30
-    bind $f.e$i <Return> { .sh.b.search invoke ; break }
+    label $f.l$i -textvar ::tr(${i}) -font $bold
+
+    set tmp [set s[set i]]
+    ttk::combobox $f.e$i -textvariable s$i -width 25
     ::utils::history::SetCombobox HeaderSearch$i $f.e$i
+    set s$i $tmp
+
+    bind $f.e$i <Return> { .sh.b.search invoke ; break }
     bindFocusColors $f.e$i
   }
-  pack $f.lEvent $f.eEvent -side left
-  pack $f.eSite $f.lSite -side right
-  
+  pack $f.lEvent $f.eEvent -side left -padx 3
+  pack $f.eSite $f.lSite -side right -padx 3
+
+  ### Date
+
   set f $w.dateround
   pack $f -side top -fill x
-  ttk::label $f.l1 -textvar ::tr(Date:) -font $bold
-  ttk::label $f.l2 -text "-" -font $regular
-  ttk::label $f.l3 -text " " -font $regular
-  ttk::entry $f.emin -textvariable sDateMin -width 10 -font $regular
-  button $f.eminCal -image tb_calendar -padx 0 -pady 0 -command {
+  label $f.l1 -text "$::tr(Date)  " -font $bold
+  label $f.l2 -text "-" -font $regular
+  label $f.l3 -text " " -font $regular
+  entry $f.emin -textvariable sDateMin -width 10 -font $regular
+  button $f.eminCal -image ::utils::date::calendar -padx 0 -pady 0 -command {
     regsub -all {[.]} $sDateMin "-" newdate
-    set ndate [::utils::date::chooser $newdate]
+    set ndate [::utils::date::chooser $newdate .sh]
     if {[llength $ndate] == 3} {
       set sDateMin "[lindex $ndate 0].[lindex $ndate 1].[lindex $ndate 2]"
     }
   }
-  ttk::entry $f.emax -textvariable sDateMax -width 10 -font $regular
-  button $f.emaxCal -image tb_calendar -padx 0 -pady 0 -command {
+  entry $f.emax -textvariable sDateMax -width 10 -font $regular
+  button $f.emaxCal -image ::utils::date::calendar -padx 0 -pady 0 -command {
     regsub -all {[.]} $sDateMax "-" newdate
-    set ndate [::utils::date::chooser $newdate]
+    set ndate [::utils::date::chooser $newdate .sh]
     if {[llength $ndate] == 3} {
       set sDateMax "[lindex $ndate 0].[lindex $ndate 1].[lindex $ndate 2]"
     }
@@ -213,69 +242,55 @@ proc search::header {{ref_base ""} {ref_filter ""}} {
   bindFocusColors $f.emax
   bind $f.emin <FocusOut> +checkDates
   bind $f.emax <FocusOut> +checkDates
-  ttk::button $f.lyear -textvar ::tr(YearToToday) -style Pad0.Small.TButton -command {
+  button $f.lyear -textvar ::tr(YearToToday) -font $regular -pady 2 -command {
     set sDateMin "[expr [::utils::date::today year]-1].[::utils::date::today month].[::utils::date::today day]"
     set sDateMax [::utils::date::today]
   }
-  
-  pack $f.l1 $f.emin $f.eminCal $f.l2 $f.emax $f.emaxCal $f.l3 $f.lyear -side left
-  
-  ttk::label $f.lRound -textvar ::tr(Round:) -font $bold
-  ttk::entry $f.eRound -textvariable sRound -width 10 -font $regular
+  pack $f.l1 $f.emin $f.eminCal $f.l2 $f.emax $f.emaxCal $f.l3 $f.lyear \
+    -side left -padx 3 -pady 3
+
+  label $f.lRound -textvar ::tr(Round) -font $bold
+  spinbox $f.eRound -from 1 -to 20 -increment 1 -textvariable sRound -width 10 -font $regular
+  # entry $f.eRound -textvariable sRound -width 10 -font $regular
+  set sRound {}
   bindFocusColors $f.eRound
-  pack $f.eRound $f.lRound -side right
-  
+  pack $f.eRound $f.lRound -side right -padx 3
+
   addHorizontalRule $w
-  
+
+  ### Result
+
   pack .sh.res -side top -fill x
-  ttk::label $w.res.l1 -textvar ::tr(Result:) -font $bold
-  pack $w.res.l1 -side left
-  ttk::checkbutton $w.res.ewin -text "1-0 " -variable sResWin -offvalue "1" -onvalue ""
-  ttk::checkbutton $w.res.edraw -text "1/2-1/2 " -variable sResDraw -offvalue "=" -onvalue ""
-  ttk::checkbutton $w.res.eloss -text "0-1 " -variable sResLoss -offvalue "0" -onvalue ""
-  ttk::checkbutton $w.res.eother -text "* " -variable sResOther -offvalue "*" -onvalue ""
-  pack $w.res.ewin $w.res.edraw $w.res.eloss $w.res.eother -side left
-  
-  ttk::label $w.gl.l1 -textvar ::tr(GameLength:) -font $bold
-  ttk::label $w.gl.l2 -text "-" -font $regular
-  ttk::label $w.gl.l3 -textvar ::tr(HalfMoves) -font $regular
-  ttk::entry $w.gl.emin -textvariable sGlMin -justify right -width 4 -font $regular
-  ttk::entry $w.gl.emax -textvariable sGlMax -justify right -width 4 -font $regular
+  label $w.res.l1 -textvar ::tr(Result) -font $bold
+  pack $w.res.l1 -side left -padx 3
+  foreach i { win     loss     draw     other    } \
+          v { sResWin sResLoss sResDraw sResOther} \
+       text { {1-0 }  {0-1 }   {Draw }     {No Result }     } {
+    checkbutton $w.res.e$i -text $text -variable $v -font $regular 
+    pack $w.res.e$i -side left -padx 3
+  }
+
+  label $w.gl.l1 -textvar ::tr(GameLength) -font $bold
+  label $w.gl.l2 -text {-} -font $regular
+  label $w.gl.l3 -text "($::tr(HalfMoves))" -font $regular
+  entry $w.gl.emin -textvariable sGlMin -justify right -width 6 -font $regular
+  entry $w.gl.emax -textvariable sGlMax -justify right -width 6 -font $regular
   bindFocusColors $w.gl.emin
   bindFocusColors $w.gl.emax
   pack $w.gl -in $w.res -side right -fill x
-  pack $w.gl.l1 $w.gl.emin $w.gl.l2 $w.gl.emax $w.gl.l3 -side left
-  
-  ttk::label $w.ends.label -textvar ::tr(EndSideToMove:) -font $bold
-  ttk::frame $w.ends.sep1 -width 5
-  ttk::frame $w.ends.sep2 -width 5
-  ttk::radiobutton $w.ends.white -textvar ::tr(White) -variable sSideToMove -value w
-  ttk::radiobutton $w.ends.black -textvar ::tr(Black) -variable sSideToMove -value b
-  ttk::radiobutton $w.ends.both -textvar ::tr(Both) -variable sSideToMove -value wb
-  pack $w.ends.label $w.ends.white $w.ends.sep1 $w.ends.black $w.ends.sep2 $w.ends.both -side left
-  pack $w.ends -side top -fill x
-  
-  addHorizontalRule $w
-  
-  pack .sh.ano -side top -fill x
-  ttk::label $w.ano.a1 -textvar ::tr(Annotations:) -font $bold
-  ttk::label $w.ano.a2 -textvar ::tr(Annotator:) -font $bold
-  ttk::checkbutton $w.ano.an -textvar ::tr(Cmnts:) -variable sAnnotated -offvalue 0 -onvalue 1
-  ttk::entry $w.ano.aname -textvariable sAnnotator -width 20 -font $regular
-  pack $w.ano.a1 $w.ano.an -side left
-  pack $w.ano.aname $w.ano.a2 -side right
+  pack $w.gl.l1 $w.gl.l3 $w.gl.emin $w.gl.l2 $w.gl.emax -side left
 
-  addHorizontalRule $w
-  
-  ttk::label $w.eco.l1 -textvar ::tr(ECOCode:) -font $bold
-  ttk::label $w.eco.l2 -text "-" -font $regular
-  ttk::label $w.eco.l3 -text " " -font $regular
-  ttk::label $w.eco.l4 -textvar ::tr(GamesWithNoECO:) -font $bold
-  ttk::entry $w.eco.emin -textvariable sEcoMin -width 5 -font $regular
-  ttk::entry $w.eco.emax -textvariable sEcoMax -width 5 -font $regular
+  ### ECO
+
+  label $w.eco.l1 -textvar ::tr(ECOCode) -font $bold
+  label $w.eco.l2 -text "-" -font $regular
+  label $w.eco.l3 -text " " -font $regular
+  label $w.eco.l4 -textvar ::tr(GamesWithNoECO) -font $bold
+  entry $w.eco.emin -textvariable sEcoMin -width 5 -font $regular
+  entry $w.eco.emax -textvariable sEcoMax -width 5 -font $regular
   bindFocusColors $w.eco.emin
   bindFocusColors $w.eco.emax
-  ttk::button $w.eco.range -text "..." -style  Pad0.Small.TButton -width 0 -command {
+  button $w.eco.range -text Choose -font $regular -pady 2 -padx 6 -width 7 -command {
     set tempResult [chooseEcoRange]
     if {[scan $tempResult "%\[A-E0-9a-z\]-%\[A-E0-9a-z\]" sEcoMin_tmp sEcoMax_tmp] == 2} {
       set sEcoMin $sEcoMin_tmp
@@ -283,24 +298,50 @@ proc search::header {{ref_base ""} {ref_filter ""}} {
     }
     unset tempResult
   }
-  ttk::radiobutton $w.eco.yes -variable sEco -value Yes -textvar ::tr(Yes) -style Small.TRadiobutton
-  ttk::radiobutton $w.eco.no -variable sEco -value No -textvar ::tr(No) -style Small.TRadiobutton
+  radiobutton $w.eco.yes -variable sEco -value Yes -textvar ::tr(Yes) \
+      -font $regular
+  radiobutton $w.eco.no -variable sEco -value No -textvar ::tr(No) \
+      -font $regular
   pack $w.eco -side top -fill x
-  pack $w.eco.l1 $w.eco.emin $w.eco.l2 $w.eco.emax $w.eco.range $w.eco.l3 $w.eco.l4 $w.eco.yes $w.eco.no -side left
-  
-  set f [ttk::frame $w.gnum]
+  pack $w.eco.l1 $w.eco.emin $w.eco.l2 $w.eco.emax $w.eco.range -side left -padx 3
+  pack $w.eco.no $w.eco.yes $w.eco.l4 $w.eco.l3 -side right -padx 3
+
+  ### Side to move
+
+  label $w.ends.label -textvar ::tr(EndSideToMove) -font $bold
+  frame $w.ends.sep1 -width 5
+  frame $w.ends.sep2 -width 5
+  radiobutton $w.ends.white -textvar ::tr(White) -variable sSideToMove -value w -font $regular
+  radiobutton $w.ends.black -textvar ::tr(Black) -variable sSideToMove -value b -font $regular
+  radiobutton $w.ends.both -textvar ::tr(Both) -variable sSideToMove -value wb -font $regular
+  pack $w.ends.label $w.ends.white $w.ends.sep1 \
+      $w.ends.black $w.ends.sep2 $w.ends.both -side left
+  pack $w.ends -side top -fill x
+
+  # Checkmate ?
+
+  label $w.ends.endslabel -textvar ::tr(GameEnd) -font $bold
+  ttk::combobox $w.ends.ending -font $regular -width 12 -values {Any Checkmate Stalemate} -textvariable sGameEnd -state readonly
+  pack $w.ends.ending -side right
+  pack $w.ends.endslabel -side right -padx 3
+
+  ## Game Number
+
+  set f [frame $w.gnum]
   pack $f -side top -fill x
-  ttk::label $f.l1 -textvar ::tr(GlistGameNumber:) -font $bold
-  ttk::entry $f.emin -textvariable sGnumMin -width 8 -justify right -font $regular
-  ttk::label $f.l2 -text "-" -font $regular
-  ttk::entry $f.emax -textvariable sGnumMax -width 8 -justify right -font $regular
-  pack $f.l1 $f.emin $f.l2 $f.emax -side left
+  label $f.l1 -text "$::tr(GlistGameNumber)    " -font $bold
+  entry $f.emin -textvariable sGnumMin -width 8 -justify right -font $regular
+  label $f.l2 -text {-} -font $regular
+  entry $f.emax -textvariable sGnumMax -width 8 -justify right -font $regular
+  pack $f.l1 $f.emin $f.l2 $f.emax -side left -padx 3
   bindFocusColors $f.emin
   bindFocusColors $f.emax
-  ttk::label $f.l3 -text " " -font $regular
-  ttk::button $f.all -text [::utils::string::Capital $::tr(all)] -style Pad0.Small.TButton -command {set sGnumMin 1; set sGnumMax -1}
-  ttk::menubutton $f.first -style pad0.TMenubutton -textvar ::tr(First...) -menu $f.first.m
-  ttk::menubutton $f.last -style pad0.TMenubutton -textvar ::tr(Last...) -menu $f.last.m
+  button $f.all -text [::utils::string::Capital $::tr(all)] -pady 2 -font $regular \
+      -command {set sGnumMin 1; set sGnumMax -1} -width 7
+  menubutton $f.first -textvar ::tr(First) -pady 2 -font $regular \
+      -menu $f.first.m -indicatoron 1 -relief flat
+  menubutton $f.last -textvar ::tr(Last) -pady 2 -font $regular \
+      -menu $f.last.m -indicatoron 1 -relief flat
   menu $f.first.m -font $regular
   menu $f.last.m -font $regular
   foreach x {10 50 100 500 1000 5000 10000} {
@@ -309,24 +350,30 @@ proc search::header {{ref_base ""} {ref_filter ""}} {
     $f.last.m add command -label $x \
         -command "set sGnumMin -$x; set sGnumMax -1"
   }
-  pack $f.l3 $f.all $f.first $f.last -side left -padx 2
-  
-  set f [ttk::frame $w.pgntext]
+  pack $f.first $f.last $f.all -side left -padx 5
+
+  # Pre game comment
+  checkbutton $f.preComment -textvar ::tr(PreComment) -variable preComment -font $bold 
+  checkbutton $f.postComment -textvar ::tr(PostComment) -variable postComment -font $bold 
+  pack $f.postComment $f.preComment -side right
+
+  set f [frame $w.pgntext]
   pack $f -side top -fill x
-  ttk::label $f.l1 -textvar ::tr(PgnContains:) -font $bold
-  ttk::entry $f.e1 -textvariable sPgntext(1) -width 15 -font $regular
-  ttk::label $f.l2 -text "+" -font $regular
-  ttk::entry $f.e2 -textvariable sPgntext(2) -width 15 -font $regular
-  ttk::label $f.l3 -text "+" -font $regular
-  ttk::entry $f.e3 -textvariable sPgntext(3) -width 15 -font $regular
+  label $f.l1 -textvar ::tr(PgnContains) -font $bold
+  entry $f.e1 -textvariable sPgntext(1) -width 15 -font $regular
+  label $f.l2 -text { and } -font $regular
+  entry $f.e2 -textvariable sPgntext(2) -width 15 -font $regular
+  label $f.l3 -text { and } -font $regular
+  entry $f.e3 -textvariable sPgntext(3) -width 15 -font $regular
+  checkbutton $f.case -textvar ::tr(IgnoreCase) -variable sPgncase -font $regular 
   bindFocusColors $f.e1
   bindFocusColors $f.e2
   bindFocusColors $f.e3
-  pack $f.l1 $f.e1 $f.l2 $f.e2 $f.l3 $f.e3 -side left
-  
+  pack $f.l1 $f.e1 $f.l2 $f.e2 $f.l3 $f.e3 $f.case -side left
+
   addHorizontalRule $w
-  
-  ttk::button $w.flagslabel -textvar ::tr(FindGamesWith:) -style Pad0.Small.TButton -image tb_menu -compound left -command {
+
+  button $w.flagslabel -textvar ::tr(FindGamesWith) -font $bold -command {
     if {$sHeaderFlagFrame} {
       set sHeaderFlagFrame 0
       pack forget .sh.flags
@@ -335,270 +382,232 @@ proc search::header {{ref_base ""} {ref_filter ""}} {
       pack .sh.flags -side top -after .sh.flagslabel
     }
   }
-  pack $w.flagslabel -side top -fill x
-  
-  ttk::frame $w.flags
+  pack $w.flagslabel -side top
+
+  frame $w.flags
   if {$::sHeaderFlagFrame} {
     pack $w.flags -side top
   }
-  
+
   set count 0
   set row 0
   set col 0
-  foreach var $::sHeaderFlagList {   
-    set lab [ttk::label $w.flags.l$var -text  [ ::tr $var ] -font font_Small]
+  foreach var $::sHeaderFlagList {
+    set lab [label $w.flags.l$var -textvar ::tr($var) -font font_Small]
     grid $lab -row $row -column $col -sticky e
     incr col
-    grid [ttk::radiobutton $w.flags.yes$var -variable sHeaderFlags($var) -value yes -text $::tr(Yes)] -row $row -column $col
+    grid [radiobutton $w.flags.yes$var -variable sHeaderFlags($var) \
+        -ind 0 -value yes -text $::tr(Yes) -padx 2 -pady 0 \
+        -font font_Small] \
+        -row $row -column $col
     incr col
-    grid [ttk::radiobutton $w.flags.no$var -variable sHeaderFlags($var) -value no -text $::tr(No)] -row $row -column $col
+    grid [radiobutton $w.flags.no$var -variable sHeaderFlags($var) \
+        -ind 0 -value no -text $::tr(No) -padx 2 -pady 0 \
+        -font font_Small] \
+        -row $row -column $col
     incr col
-    grid [ttk::radiobutton $w.flags.both$var -variable sHeaderFlags($var) -value both -text $::tr(Both)] -row $row -column $col
+    grid [radiobutton $w.flags.both$var -variable sHeaderFlags($var) \
+        -ind 0 -value both -text $::tr(Both) -padx 2 -pady 0 \
+        -font font_Small] \
+        -row $row -column $col
+    if {$::macOS} {
+       $w.flags.yes$var  configure -height 2 -width 4
+       $w.flags.no$var   configure -height 2 -width 4
+       $w.flags.both$var configure -height 2 -width 4
+    }
     incr count
     incr col -3
     incr row
     if {$count == 6} { set col 5; set row 0 }
     if {$count == 12} { set col 10; set row 0 }
   }
-  
-  set ::curr_db [sc_base current]
   set count 1
   set col 0
   set row 7
   foreach var $::sHeaderCustomFlagList {
     
-    set lb [sc_base extra $::curr_db flag$count]
-    if { $lb == ""  } {  set lb $var  }
+    set lb [sc_game flag $count description]
+    if { $lb == ""  } {
+      set lb "Custom $count"
+    } else {
+      set lb "$lb ($count)"
+    }
     
-    set lab [ttk::label $w.flags.l$var -text $lb -font font_Small]
+    set lab [label $w.flags.l$var -text $lb -font font_Small]
     grid $lab -row $row -column $col -sticky e
     incr col
-    grid [ttk::radiobutton $w.flags.yes$var -variable sHeaderFlags($var) -value yes -text $::tr(Yes)] -row $row -column $col
+    grid [radiobutton $w.flags.yes$var -variable sHeaderFlags($var) -value yes -text $::tr(Yes) -ind 0 -padx 2 -pady 0 -font font_Small] -row $row -column $col
     incr col
-    grid [ttk::radiobutton $w.flags.no$var -variable sHeaderFlags($var) -value no -text $::tr(No)] -row $row -column $col
+    grid [radiobutton $w.flags.no$var -variable sHeaderFlags($var) -value no -text $::tr(No) -ind 0 -padx 2 -pady 0 -font font_Small] -row $row -column $col
     incr col
-    grid [ttk::radiobutton $w.flags.both$var -variable sHeaderFlags($var) -value both -text $::tr(Both)] -row $row -column $col
+    grid [radiobutton $w.flags.both$var -variable sHeaderFlags($var) -value both -text $::tr(Both) -ind 0 -padx 2 -pady 0 -font font_Small] -row $row -column $col
     incr col 2
     incr count
     if {$count == 4} { set col 0; set row 8 }
+    if {$::macOS} {
+       $w.flags.yes$var  configure -height 2 -width 4
+       $w.flags.no$var   configure -height 2 -width 4
+       $w.flags.both$var configure -height 2 -width 4
+    }
   }
-  
-  grid [ttk::label $w.flags.space -text "" -font $regular] -row 0 -column 4
-  grid [ttk::label $w.flags.space2 -text "" -font $regular] -row 0 -column 9
-  
+
+  grid [label $w.flags.space -text "" -font $regular] -row 0 -column 4
+  grid [label $w.flags.space2 -text "" -font $regular] -row 0 -column 9
+
   addHorizontalRule $w
   ::search::addFilterOpFrame $w 1
   addHorizontalRule $w
-  
-  ### Header search: search/cancel buttons
-  
-  ttk::frame $w.b
-  pack $w.b -side top -fill both
-  ttk::button $w.b.defaults -textvar ::tr(Defaults) -command ::search::header::defaults ;# -padx 20
-  ttk::button $w.b.save -textvar ::tr(Save...) -command ::search::header::save ;# -padx 20
-  ttk::button $w.b.stop -textvar ::tr(Stop) -command progressBarCancel
-  ttk::button $w.b.search -textvar ::tr(Search) -command {
+
+  ### Search and Cancel buttons
+
+  frame $w.b
+  button $w.b.defaults -textvar ::tr(Defaults) -padx 20 \
+      -command ::search::header::defaults
+  button $w.b.save -textvar ::tr(Save) -padx 20 -command ::search::header::save
+  button $w.b.stop -textvar ::tr(Stop) -command sc_progressBar
+  button $w.b.help -textvar ::tr(Help) -command {helpWindow Searches Header}
+
+  button $w.b.search -textvar ::tr(Search) -padx 20 -command {
+    checkDates
     ::utils::history::AddEntry HeaderSearchWhite $sWhite
     ::utils::history::AddEntry HeaderSearchBlack $sBlack
     ::utils::history::AddEntry HeaderSearchEvent $sEvent
     ::utils::history::AddEntry HeaderSearchSite $sSite
-    
+
     set sPgnlist {}
     foreach i {1 2 3} {
-      set temp [string trim $sPgntext($i)]
+      # dont trim string fields as searching for whitespace can be useful
+      set temp $sPgntext($i)
       if {$temp != ""} { lappend sPgnlist $temp }
     }
+    busyCursor .
     pack .sh.b.stop -side right -padx 5
     grab .sh.b.stop
+    sc_progressBar .sh.progress bar 301 21 time
     set wtitles {}
     set btitles {}
     foreach i $sTitleList {
       if $sTitles(w:$i) { lappend wtitles $i }
       if $sTitles(b:$i) { lappend btitles $i }
     }
-    
-    set dbase [string index $::refDatabaseH 0]
-    if {$::refFilterH == ""} {
-        set filter "dbfilter"
-    } else {
-        set filter [sc_filter link $dbase $::refFilterH]
-    }
 
-    if {$sEco == "Yes"} {
-        set noEco "-eco|"
-    } else {
-        set noEco "-eco!"
-    }
+    ### (todo) SCID has some extra stuff here about
+    # if {($sWhite == "!me") || ($sBlack == "!me")}
+    # elseif {($sWhite == "!mymove") || ($sBlack == "!mymove")}
 
-    if {$::search::filter::operation != "2" } {
-        set fOrig [sc_filter new $dbase]
-        sc_filter copy $dbase $fOrig $filter
-    }
+    set str [sc_search header -white $sWhite -black $sBlack \
+        -event $sEvent -site $sSite -round $sRound \
+        -date [list $sDateMin $sDateMax] \
+        -results [list $sResWin $sResDraw $sResLoss $sResOther] \
+        -welo [list $sWhiteEloMin $sWhiteEloMax] \
+        -belo [list $sBlackEloMin $sBlackEloMax] \
+        -delo [list $sEloDiffMin $sEloDiffMax] \
+        -eco [list $sEcoMin $sEcoMax $sEco] \
+        -length [list $sGlMin $sGlMax] \
+        -toMove $sSideToMove \
+        -gameNumber [list $sGnumMin $sGnumMax] \
+        -preComment $preComment -postComment $postComment \
+        -flip $sIgnoreCol -filter $::search::filter::operation \
+        -fStdStart $sHeaderFlags(StdStart) \
+        -fPromotions $sHeaderFlags(Promotions) \
+        -fUnderPromo $sHeaderFlags(UnderPromo) \
+        -fComments $sHeaderFlags(Comments) \
+        -fVariations $sHeaderFlags(Variations) \
+        -fAnnotations $sHeaderFlags(Annotations) \
+        -fDelete $sHeaderFlags(DeleteFlag) \
+        -fWhiteOp $sHeaderFlags(WhiteOpFlag) \
+        -fBlackOp $sHeaderFlags(BlackOpFlag) \
+        -fMiddlegame $sHeaderFlags(MiddlegameFlag) \
+        -fEndgame $sHeaderFlags(EndgameFlag) \
+        -fNovelty $sHeaderFlags(NoveltyFlag) \
+        -fPawnStruct $sHeaderFlags(PawnFlag) \
+        -fTactics $sHeaderFlags(TacticsFlag) \
+        -fKingside $sHeaderFlags(KsideFlag) \
+        -fQueenside $sHeaderFlags(QsideFlag) \
+        -fBrilliancy $sHeaderFlags(BrilliancyFlag) \
+        -fBlunder $sHeaderFlags(BlunderFlag) \
+        -fUser $sHeaderFlags(UserFlag) \
+	-fCustom1 $sHeaderFlags(CustomFlag1) \
+	-fCustom2 $sHeaderFlags(CustomFlag2) \
+	-fCustom3 $sHeaderFlags(CustomFlag3) \
+	-fCustom4 $sHeaderFlags(CustomFlag4) \
+	-fCustom5 $sHeaderFlags(CustomFlag5) \
+	-fCustom6 $sHeaderFlags(CustomFlag6) \
+        -pgn $sPgnlist -wtitles $wtitles -btitles $btitles \
+        -ignoreCase $sPgncase -gameend $sGameEnd \
+        ]
 
-    set flagsYes ""
-    set flagsNo ""
-    set idx -1
-    foreach i [ concat $::sHeaderFlagList $::sHeaderCustomFlagList ] {
-        incr idx
-        if {$i == "Comments"} { continue }
-        if {$i == "Variations"} { continue }
-        if {$i == "Annotations"} { continue }
-
-        if  { $sHeaderFlags($i) == "yes" } {
-            append flagsYes [lindex $::sHeaderFlagChars $idx]
-        } elseif  { $sHeaderFlags($i) == "no" } {
-            append flagsNo [lindex $::sHeaderFlagChars $idx]
-        }
-    }
-
-    set fCounts(Variations) "-n_variations"
-    set fCountsV(Variations) ""
-    set fCounts(Comments) "-n_comments"
-    set fCountsV(Comments) ""
-    set fCounts(Annotations) "-n_nags"
-    set fCountsV(Annotations) ""
-    foreach i {"Variations" "Comments" "Annotations"} {
-        if  { $sHeaderFlags($i) == "yes" } {
-             append fCounts($i) "!"
-             set fCountsV($i) "0"
-        } elseif  { $sHeaderFlags($i) == "no" } {
-             set fCountsV($i) "0"
-        }
-    }
-
-    set results ""
-    append results $sResWin
-    append results $sResDraw
-    append results $sResLoss
-    append results $sResOther
-
-    progressBarSet .sh.fprogress.progress 301 21
-    set err [catch { sc_filter search $dbase $filter header \
-          -filter RESET \
-          -white $sWhite -black $sBlack \
-          -event $sEvent -site $sSite -round $sRound \
-          -date [list $sDateMin $sDateMax] \
-          -result! $results \
-          -welo [list $sWhiteEloMin $sWhiteEloMax] \
-          -belo [list $sBlackEloMin $sBlackEloMax] \
-          -delo [list $sEloDiffMin $sEloDiffMax] \
-          -eco [list $sEcoMin $sEcoMax] $noEco [list 0 0] \
-          -length [list $sGlMin $sGlMax] \
-          -toMove $sSideToMove \
-          -gnum [list $sGnumMin $sGnumMax] \
-          -annotated $sAnnotated \
-          -annotator $sAnnotator \
-          -flag $flagsYes -flag! $flagsNo \
-          $fCounts(Variations) $fCountsV(Variations) \
-          $fCounts(Comments) $fCountsV(Comments) \
-          $fCounts(Annotations) $fCountsV(Annotations) \
-          -pgn $sPgnlist -wtitles $wtitles -btitles $btitles \
-    }]
-
-    if {!$err && $sIgnoreCol == "Yes"} {
-        set fIgnore [sc_filter new $dbase]
-        set deloMin [ expr { $sEloDiffMax * -1 }]
-        set deloMax [ expr { $sEloDiffMin * -1 }]
-        progressBarSet .sh.fprogress.progress 301 21
-        catch { sc_filter search $dbase $fIgnore header \
-          -filter RESET \
-          -white $sBlack -black $sWhite \
-          -event $sEvent -site $sSite -round $sRound \
-          -date [list $sDateMin $sDateMax] \
-          -result! $results \
-          -welo [list $sBlackEloMin $sBlackEloMax] \
-          -belo [list $sWhiteEloMin $sWhiteEloMax] \
-          -delo [list $deloMin $deloMax] \
-          -eco [list $sEcoMin $sEcoMax] $noEco [list 0 0] \
-          -length [list $sGlMin $sGlMax] \
-          -toMove $sSideToMove \
-          -gnum [list $sGnumMin $sGnumMax] \
-          -annotated $sAnnotated \
-          -annotator $sAnnotator \
-          -flag $flagsYes -flag! $flagsNo \
-          $fCounts(Variations) $fCountsV(Variations) \
-          $fCounts(Comments) $fCountsV(Comments) \
-          $fCounts(Annotations) $fCountsV(Annotations) \
-          -pgn $sPgnlist -wtitles $wtitles -btitles $btitles \
-        }
-
-        sc_filter or $dbase $filter $fIgnore
-        sc_filter release $dbase $fIgnore
-    }
-
-    if {[info exists fOrig]} {
-        if {$::search::filter::operation == "0" } {
-            sc_filter and $dbase $filter $fOrig
-        } else {
-            sc_filter or $dbase $filter $fOrig
-        }
-        sc_filter release $dbase $fOrig
-        unset fOrig
-    }
-
-    set str "[sc_filter count $dbase $filter] / [sc_base numGames $dbase]"
-
-    after idle "::notify::DatabaseModified $dbase dbfilter"
-    
     grab release .sh.b.stop
     pack forget .sh.b.stop
-    .sh.status configure -text $str
+    unbusyCursor .
 
+    .sh.status configure -text "Result: $str"
+    set glstart 1
+
+    ::search::loadFirstGame
+
+    ::windows::stats::Refresh
   }
-  
-  ttk::button $w.b.cancel -textvar ::tr(Close) -command {focus .; destroy .sh} ;# -padx 20
-  
-  foreach i {defaults save cancel search stop} {
-    $w.b.$i configure -style Small.TButton
-    
-    pack $w.b.defaults $w.b.save -side left -padx 5
-    pack $w.b.cancel $w.b.search -side right -padx 5
+
+  button $w.b.cancel -textvar ::tr(Close) -padx 20 \
+      -command {focus .main ; destroy .sh}
+
+  foreach i {defaults save help cancel search stop} {
+    $w.b.$i configure -font $regular
   }
-  
-  pack [ ttk::frame $w.fprogress ] -fill both
-  canvas $w.fprogress.progress -height 20 -width 300 -bg white -relief solid -border 1
-  $w.fprogress.progress create rectangle 0 0 0 0 -fill blue -outline blue -tags bar
-  $w.fprogress.progress create text 295 10 -anchor e -font font_Regular -tags time \
+
+  pack $w.b.defaults $w.b.save $w.b.help -side left -padx 5
+  pack $w.b.cancel $w.b.search -side right -padx 5
+
+  canvas $w.progress -height 20 -width 300  -relief solid -border 1
+  $w.progress create rectangle 0 0 0 0 -fill $::progcolor -outline $::progcolor -tags bar
+  $w.progress create text 295 10 -anchor e -font font_Regular -tags time \
       -fill black -text "0:00 / 0:00"
-  pack $w.fprogress.progress -side top -pady 2
-  ttk::label $w.status -text "" -width 1 -font font_Small -relief sunken -anchor w
+  label $w.status -text "" -width 1 -font font_Small -relief sunken -anchor w
   pack $w.status -side bottom -fill x
+  pack $w.b -side bottom -pady 2 -fill x
+  pack $w.progress -side bottom -pady 2
   # update
   wm resizable $w 0 0
   ::search::Config
-  focus $w.cWhite.e
+
+  placeWinOverParent $w .
+  wm state $w normal
+  # focus $w.cWhite.e
 }
 
 proc ::search::header::save {} {
-  global sWhite sBlack sEvent sSite sRound sAnnotator sAnnotated sDateMin sDateMax sIgnoreCol
+  global sWhite sBlack sEvent sSite sRound sDateMin sDateMax sIgnoreCol
   global sWhiteEloMin sWhiteEloMax sBlackEloMin sBlackEloMax
   global sEloDiffMin sEloDiffMax sGlMin sGlMax
   global sEco sEcoMin sEcoMax sHeaderFlags sSideToMove
-  global sResWin sResLoss sResDraw sResOther sPgntext
-  
+  global sResWin sResLoss sResDraw sResOther glstart sPgntext sPgncase sGameEnd
+
   set ftype { { "Scid SearchOptions files" {".sso"} } }
-  set fName [tk_getSaveFile -initialdir [pwd] -filetypes $ftype -title "Create a SearchOptions file"]
+  set fName [tk_getSaveFile -initialdir $::initialDir(sso) -filetypes $ftype -title "Create a SearchOptions file" -parent .sh]
   if {$fName == ""} { return }
-  
+  set ::initialDir(sso) [file dirname $fName]
+
   if {[string compare [file extension $fName] ".sso"] != 0} {
     append fName ".sso"
   }
-  
+
   if {[catch {set searchF [open [file nativename $fName] w]} ]} {
     tk_messageBox -title "Error: Unable to open file" -type ok -icon error \
         -message "Unable to create SearchOptions file: $fName"
     return
   }
-  puts $searchF "\# SearchOptions File created by Scid $::scidVersion"
+  puts $searchF "# $::scidName search options file"
   puts $searchF "set searchType Header"
-  
+
   # First write the regular variables:
-  foreach i {sWhite sBlack sEvent sSite sRound sAnnotator sAnnotated sDateMin sDateMax sResWin
+  foreach i {sWhite sBlack sEvent sSite sRound sDateMin sDateMax sResWin
     sResLoss sResDraw sResOther sWhiteEloMin sWhiteEloMax sBlackEloMin
-    sBlackEloMax sEcoMin sEcoMax sEloDiffMin sEloDiffMax
+    sBlackEloMax sEcoMin sEcoMax sEloDiffMin sEloDiffMax sPgncase sGameEnd
     sIgnoreCol sSideToMove sGlMin sGlMax ::search::filter::operation} {
     puts $searchF "set $i [list [set $i]]"
   }
+
   # Now write the array values:
   foreach i [array names sHeaderFlags] {
     puts $searchF "set sHeaderFlags($i) [list $sHeaderFlags($i)]"
@@ -606,11 +615,12 @@ proc ::search::header::save {} {
   foreach i [array names sPgntext] {
     puts $searchF "set sPgntext($i) [list $sPgntext($i)]"
   }
-  
+
   tk_messageBox -type ok -icon info -title "Search Options saved" \
       -message "Header search options saved to: $fName"
   close $searchF
 }
+
 
 ##############################
 ### Selecting common ECO ranges
@@ -641,7 +651,7 @@ proc chooseEcoRange {} {
       "B23-B26     [tr SicilianClosed]: [trans [list 1.e4 c5 2.Nc3]]" \
       "B30-B39     [tr Sicilian]: [trans [list 1.e4 c5 2.Nf3 Nc6]]" \
       "B40-B49     [tr Sicilian]: [trans [list 1.e4 c5 2.Nf3 e6]]" \
-      "B50-B59     [tr SicilianRauzer]: [trans [list 1.e4 c5 2.Nf3 d6 ... 5.Nc3 Nc6]]" \
+      "B60-B69     [tr SicilianRauzer]: [trans [list 1.e4 c5 2.Nf3 d6 ... 5.Nc3 Nc6]]" \
       "B70-B79     [tr SicilianDragon]: [trans [list 1.e4 c5 2.Nf3 d6 ... 5.Nc3 g6]]" \
       "B80-B89     [tr SicilianScheveningen]: [trans [list 1.e4 c5 2.Nf3 d6 ... 5.Nc3 e6]]" \
       "B90-B99     [tr SicilianNajdorf]: [trans [list 1.e4 c5 2.Nf3 d6 ... 5.Nc3 a6]]" \
@@ -684,40 +694,59 @@ proc chooseEcoRange {} {
       "E80-E89     [tr KingsIndianSamisch]: 4.e4 d6 5.f3" \
       "E90-E99     [tr KingsIndianMainLine]: [trans [list 4.e4 d6 5.Nf3]]" \
       ]
-  
-  if {[winfo exists .ecoRangeWin]} { return }
+
   set w .ecoRangeWin
+
+  if {[winfo exists $w]} {
+    wm deiconify $w
+    raiseWin $w
+    return
+  }
+
   toplevel $w
-  wm title $w "Scid: Choose ECO Range"
+  wm withdraw $w
+
+  wm title $w "Choose ECO Range"
   wm minsize $w 30 5
-  
-  listbox $w.list -yscrollcommand "$w.ybar set" -height 20 -width 60 -background white -setgrid 1
+
+  listbox $w.list -yscrollcommand "$w.ybar set" -height 20 -width 60 \
+       -setgrid 1
   foreach i $ecoCommonRanges { $w.list insert end $i }
-  ttk::scrollbar $w.ybar -command "$w.list yview" -takefocus 0
-  pack [ttk::frame $w.b] -side bottom -fill x
+  scrollbar $w.ybar -command "$w.list yview" -takefocus 0
+  pack [frame $w.b] -side bottom 
   pack $w.ybar -side right -fill y
   pack $w.list -side left -fill both -expand yes
-  
-  ttk::button $w.b.ok -text "OK" -command {
+
+  dialogbutton $w.b.ok -text "OK" -command {
     set sel [.ecoRangeWin.list curselection]
     if {[llength $sel] > 0} {
       set scid_ecoRangeChosen [lindex $ecoCommonRanges [lindex $sel 0]]
       set ::sEco No
     }
-    focus .sh
+    raiseWin .sh
     destroy .ecoRangeWin
   }
-  ttk::button $w.b.cancel -text $::tr(Cancel) -command "focus .sh; destroy $w"
-  pack $w.b.cancel $w.b.ok -side right -padx 5 -pady 2
+  dialogbutton $w.b.cancel -text $::tr(Cancel) -command "focus .sh; destroy $w"
+
+  ### todo: make configFindEntryBox work with listboxes
+  # set ecoChoose(find) {}
+  # entry $w.b.find -width 10 -textvariable ecoChoose(find) -highlightthickness 0
+  # configFindEntryBox $w.b.find ecoChoose $w.list
+
+  pack $w.b.cancel $w.b.ok -side right -padx 10 -pady 4
   bind $w <Escape> "
-  set scid_ecoRangeChosen {}
-  grab release $w
-  focus .
-  destroy $w
-  break"
+    set scid_ecoRangeChosen {}
+    grab release $w
+    raiseWin .sh
+    destroy $w
+    break"
   bind $w <Return> "$w.b.ok invoke; break"
   bind $w.list <Double-ButtonRelease-1> "$w.b.ok invoke; break"
-  focus $w.list
+  # focus $w.list
+
+  placeWinOverParent $w .sh
+  wm state $w normal
+
   grab $w
   tkwait window $w
   return $scid_ecoRangeChosen

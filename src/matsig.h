@@ -17,11 +17,10 @@
 #define SCID_MATSIG_H
 
 #include "common.h"
-#include <string>
 
 // Matsigs are 32-bit unsigned ints.  We only use 24 bits of this.
 
-typedef uint32_t matSigT;
+typedef  uint  matSigT;
 
 // From most significant bits down to least, the matsig layout is:
 // Bits 22-33:  WQ    Bits 10-11:  BQ
@@ -186,8 +185,9 @@ const matSigT MATSIG_StdStart =
 
 
 // matsig_makeString: sets s to be a string representation of the sig,
-std::string
-matsig_makeString (matSigT matsig);
+//      for example: "12228.12228" for the starting position.
+void
+matsig_makeString (char * s, matSigT matsig);
 
 
 // matsig_isReachable: returns true if a game currently

@@ -17,6 +17,8 @@
 #include "attack.h"
 #include "board.h"
 #include "book.h"
+#include "book_make.h"
+#include "book_merge.h"
 // #include "engine.h"
 // #include "epd.h"
 #include "fen.h"
@@ -27,9 +29,21 @@
 #include "move_gen.h"
 #include "option.h"
 #include "piece.h"
+#include "search.h"
 #include "square.h"
 // #include "uci.h"
 #include "util.h"
+
+// constants
+
+static const char * const Version = "1.4";
+
+static const bool BlockSignal = false; // true on Windows
+
+static const int SearchDepth = 63;
+static const double SearchTime = 3600.0;
+
+static const int StringSize = 4096;
 
 // variables
 

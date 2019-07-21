@@ -16,9 +16,12 @@
 #define SCID_PBOOK_H
 
 #include "common.h"
+#include "error.h"
 #include "position.h"
+#include "stralloc.h"
 #include "strtree.h"
 #include "dstring.h"
+
 #include <stdio.h>
 
 #define PBOOK_SUFFIX ".epd"
@@ -51,6 +54,7 @@ class PBook
     uint    NodeListCapacity;
     uint    NodeListCount;
     uint    NextIndex;   // For jumping to next pbook position.
+    StrAllocator * StrAlloc;
     uint SkipCount;      // Number of searches saved by LeastMaterial
                          // comparison.
     uint LeastMaterial;  // The smallest amount of material in any
@@ -75,16 +79,18 @@ class PBook
 
   public:
     void    Init();
+    void    Clear();
 
     PBook()   { Init(); }
     ~PBook();
-
     const char *  GetFileName () { return (FileName == NULL ? "" : FileName); }
     void    SetFileName (const char * filename);
     bool    IsAltered() { return Altered; }
     bool    IsReadOnly() { return ReadOnly; }
 
     uint    GetLineNumber (void) { return LineCount; }
+    int    GetIndex (Position * pos);
+    int    SetIndex (uint idx);
 
     uint    Size () {
         uint total = 0;
@@ -102,12 +108,14 @@ class PBook
 
     errorT  Find (Position * pos, const char ** ptrComment);
     errorT  FindNext (Position * pos, bool forwards);
+    errorT  FindByIndex (Position * pos, uint idx);
     errorT  Insert (Position * pos, const char * comment);
     errorT  Delete (Position * pos);
     errorT  FindOpcode (Position * pos, const char * opcode, DString * target);
     errorT  FindSummary (Position * pos, DString * target);
     uint    StripOpcode (const char * opcode);
     void    EcoSummary (const char * ecoPrefix, DString * dstr);
+    void    EcoFind    (const char * find, DString * dstr);
     void    DumpStats (FILE * fp);
     uint    NumPositionBytes () { return Stats_PositionBytes; }
     uint    NumCommentBytes ()  { return Stats_CommentBytes; }

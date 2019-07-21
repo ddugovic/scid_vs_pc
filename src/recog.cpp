@@ -14,7 +14,7 @@
 
 #include "engine.h"
 #include "recog.h"
-#include "sqmove.h"
+
 
 // The Recognizer class provides score bound information for chess
 // endgames.
@@ -294,22 +294,9 @@ Recognizer::KBNK (Position * pos)
     }
 
     // If the lone king is to move and possible stalemate, unclear result:
-    if (stm == BLACK  &&  square_IsEdgeSquare(bk)) {
+    if (stm == BLACK  &&  square_IsEdgeSquare(bk)
+          &&  square_Distance (wk, bk) == 2) {
         return UNKNOWN;
-    }
-
-    // If the knight is near a corner, it could be trapped, unclear result:
-    if ((square_Distance (wn, A1) < 2  ||  square_Distance (wn, A8) < 2 ||
-         square_Distance (wn, H1) < 2  ||  square_Distance (wn, H8) < 2)
-        && square_Distance (bk, wn) < 4) {
-        return UNKNOWN;
-    }
-
-    // If the lone king can fork the bishop and knight, unclear result:
-    if (stm == BLACK  &&  square_Distance(wb, wn) < 3
-        &&  square_Distance (bk, wb) < 3  &&  square_Distance (bk, wn) < 3 
-        &&  square_Distance (wk, wb) > 1  &&  square_Distance (wk, wn) > 1 ) {
-      return UNKNOWN;
     }
 
     // Find lone king distance from the appropriate corner
@@ -335,18 +322,16 @@ int
 Recognizer::KBPK (Position * pos)
 {
     byte * material = pos->GetMaterial();
-    squareT /* wk, */ bk;
+    squareT bk;
     fyleT wrongFile = A_FYLE;  // Wrong-color bishop rook-pawn file.
     // Set up piece squares so that White has the bishop and pawn(s),
     // and make sure all pawns are on the wrong rook-pawn file:
     if (material[WB] == 1) {
-        // wk = pos->GetKingSquare(WHITE);
         bk = pos->GetKingSquare(BLACK);
         if (pos->SquareColorCount(WB,WHITE) == 1) { wrongFile = H_FYLE; }
         if (pos->FyleCount(WP, wrongFile) != material[WP]) { return UNKNOWN; }
     } else {
         ASSERT (material[BB] == 1);
-        // wk = square_FlipRank(pos->GetKingSquare(BLACK));
         bk = square_FlipRank(pos->GetKingSquare(WHITE));
         if (pos->SquareColorCount(BB,BLACK) == 1) { wrongFile = H_FYLE; }
         if (pos->FyleCount(BP, wrongFile) != material[BP]) { return UNKNOWN; }
@@ -1047,8 +1032,9 @@ int
 Recognizer::KRPKR (Position * pos)
 {
 
-    // Incomplete but correct
-
+    // XXX  INCOMPLETE  XXX
+    return UNKNOWN;
+/*
     byte * material = pos->GetMaterial();
     pieceT * board = pos->GetBoard();
     squareT wk, bk, wr, wp, br;
@@ -1099,16 +1085,16 @@ Recognizer::KRPKR (Position * pos)
     if (wrRank == brRank  ||  wrFyle == brFyle) { return UNKNOWN; }
 
     // Designate side-to-move king,rook as sk and sr, enemy as ek and er
-    squareT /* sk, sr, er, */ ek;
-    int /* skRank, srRank, */ ekRank, erRank;
-    int /* skFyle, srFyle, */ ekFyle, erFyle;
+    squareT sk, sr, ek, er;
+    int skRank, srRank, ekRank, erRank;
+    int skFyle, srFyle, ekFyle, erFyle;
     if (stm == WHITE) {
-        ek = bk; // sk = wk;  sr = wr;  er = br;
-        // skRank = wkRank;  skFyle = wkFyle;  srRank = wrRank;  srFyle = wrFyle;
+        sk = wk;  sr = wr;  ek = bk;  er = br;
+        skRank = wkRank;  skFyle = wkFyle;  srRank = wrRank;  srFyle = wrFyle;
         ekRank = bkRank;  ekFyle = bkFyle;  erRank = brRank;  erFyle = brFyle;
     } else {
-        ek = wk;  /// sk = bk;  sr = br;  er = wr; 
-        // skRank = bkRank;  skFyle = bkFyle;  srRank = brRank;  srFyle = brFyle;
+        sk = bk;  sr = br;  ek = wk;  er = wr;
+        skRank = bkRank;  skFyle = bkFyle;  srRank = brRank;  srFyle = brFyle;
         ekRank = wkRank;  ekFyle = wkFyle;  erRank = wrRank;  erFyle = wrFyle;
     }
     uint kingDist = square_Distance (wk, bk);
@@ -1137,29 +1123,17 @@ Recognizer::KRPKR (Position * pos)
     if (square_Move (wp, UP_LEFT) == br) { return UNKNOWN; }
     if (square_Move (wp, UP_RIGHT) == br) { return UNKNOWN; }
 
-    // Philidor and more:
-    //  white pawn and king are on 5th rank or lower, on any file;
-    //  black rook has higher rank than white king and pawn, up to rank 6;
-    //  black king is on pawn file or adjacent, ranked higher than black rook;
-    //  Drawn for white or black to move.
+    // Philidor draw:
+    //   white pawn and king are on 5th rank or lower, on any file;
+    //   black king is on the pawn file and on the 7th/8th rank;
+    //   black rook is anywhere on the 6th rank.
+    //   Drawn for white or black to move.
 
-    if (wpRank <= RANK_5  &&  wkRank <= RANK_5
-        &&  brRank <= RANK_6  &&  brRank > wpRank  &&  brRank > wkRank
-        &&  bkRank > brRank  &&  bkRank > RANK_4) {
-
+    if (wpRank <= RANK_5  &&  wkRank <= RANK_5  &&  bkFyle == wpFyle
+          &&  bkRank >= RANK_7  &&  brRank == RANK_6) {
         // Only exception: WK=a1, WP=b2, WR=b1; White may be checkmated.
         if (wk == A1  &&  wp == B2  &&  wr == B1) { return UNKNOWN; }
-
-        // black king on the pawn file
-        if (bkFyle == wpFyle && (brRank == RANK_6 || wrFyle != bkFyle)) {
-          return DRAW; 
-        }
-
-        // black king on adjacent file
-        if ((bkFyle == wpFyle + 1 || bkFyle == wpFyle - 1)
-            &&  brFyle != wpFyle  &&  wrFyle != bkFyle) {
-          return DRAW;
-        }
+        return DRAW;
     }
 
     // Sixth-rank pawn draws:
@@ -1184,6 +1158,7 @@ Recognizer::KRPKR (Position * pos)
     }
 
     return UNKNOWN;
+    */
 }
 
 //////////////////////////////////////////////////////////////////////

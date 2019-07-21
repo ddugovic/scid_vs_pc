@@ -3,28 +3,26 @@
 ### Copyright (C) 1999-2003  Shane Hudson.
 ###
 
-# Email manager window: closed by default
-set emailWin 0
-
-
-# ::tools::email
-#
 #   Opens the email chess manager window, for sending moves to opponents.
-#
+
 proc ::tools::email {} {
-  global emailWin emailData
+  global emailData
   set w .emailWin
   if {[winfo exists $w]} {
-    destroy .emailWin
-    set emailWin 0
+    raiseWin $w
     return
   }
-  set emailWin 1
+  if {! [sc_base inUse] || [sc_base current] == 9} {
+    tk_messageBox -icon info -type ok \
+       -title "Oops" -message "No database open."
+    return
+  }
+
   toplevel $w
   wm title $w "Scid: Email Manager"
   wm minsize $w 25 10
 
-  bind $w <Destroy> { set .emailWin 0 }
+  bind $w <Destroy> {set .emailWin 0}
   bind $w <F1> { helpWindow Email }
 
   frame $w.f
@@ -36,8 +34,8 @@ proc ::tools::email {} {
   set f $w.f
   label $f.title -text "Opponent list" -font font_Bold
   listbox $f.list -height 16 -width 40 -exportselection false \
-    -selectmode browse -selectbackground lightBlue -font font_Fixed \
-    -yscrollcommand "$f.scroll set" -background white -setgrid 1
+    -selectmode browse -font font_Fixed \
+    -yscrollcommand "$f.scroll set"  -setgrid 1
   scrollbar $f.scroll -command "$w.list yview" -takefocus 0
   pack $f -side left -expand true -fill both
   pack $f.title -side top
@@ -58,7 +56,7 @@ proc ::tools::email {} {
 
   set b .emailWin.b
 
-  button $b.add -text "Add..." -underline 0 -command {
+  button $b.add -text "Add" -underline 0 -command {
     set idx [llength $emailData]
     lappend emailData [list "" "" "" "" ""]
     modifyEmailDetails $idx
@@ -79,7 +77,7 @@ proc ::tools::email {} {
   $b.time.m add command -label "Edit..." -underline 0 \
     -command {::tools::email::TimesButton e}
 
-  button $b.config -text "Settings..." -command ::tools::email::config
+  button $b.config -text "Settings" -command ::tools::email::config
   button $b.help -text $::tr(Help) -command { helpWindow Email }
   button $b.close -text $::tr(Close) -command { destroy .emailWin }
 
@@ -90,7 +88,7 @@ proc ::tools::email {} {
     -side top -pady 1 -padx 5 -fill x
   pack $b.close $b.help $b.config -side bottom -pady 1 -padx 5  -fill x
 
-  bind $w <Destroy> { set emailWin 0 }
+  bind $w <Destroy> {}
   set emailData [::tools::email::readOpponentFile]
   focus $w.f.list
   ::tools::email::refresh
@@ -99,15 +97,23 @@ proc ::tools::email {} {
 proc ::tools::email::config {} {
   global email
   set w .emailConfig
+
+  if {[winfo exists $w]} {
+    raiseWin $w 
+    return
+  }
   toplevel $w
-  wm title $w "Scid"
+  wm resizable $w 1 0
+  wm withdraw $w
+
+  wm title $w Scid
   label $w.use -text "Send email using:" -font font_Bold
   frame $w.smtp
   radiobutton $w.smtp.b -text "SMTP server:" -variable email(smtp) -value 1
-  entry $w.smtp.s -width 30 -textvar email(server) -bg white
+  entry $w.smtp.s -width 30 -textvar email(server) 
   frame $w.sm
   radiobutton $w.sm.b -text "sendmail process:" -variable email(smtp) -value 0
-  entry $w.sm.s -width 30 -textvar email(smproc) -bg white
+  entry $w.sm.s -width 30 -textvar email(smproc) 
   pack $w.use -side top
   pack $w.smtp $w.sm -side top -fill x
   pack $w.smtp.s $w.smtp.b -side right
@@ -116,25 +122,25 @@ proc ::tools::email::config {} {
   label $w.addr -text "Email address fields:" -font font_Bold
   frame $w.from
   label $w.from.lab -text "From:"
-  entry $w.from.e -textvar email(from) -width 30 -bg white
+  entry $w.from.e -textvar email(from) -width 30 
   frame $w.bcc
   label $w.bcc.lab -text "Bcc:"
-  entry $w.bcc.e -textvar email(bcc) -width 30 -bg white
+  entry $w.bcc.e -textvar email(bcc) -width 30 
   pack $w.addr $w.from $w.bcc -side top -fill x
   pack $w.from.e $w.from.lab -side right
   pack $w.bcc.e $w.bcc.lab -side right
   addHorizontalRule $w
   pack [frame $w.b] -side top -fill x
-  button $w.b.ok -text [tr OptionsSave] -command {
-    options.write
-    catch {grab release .emailConfig}
+  dialogbutton $w.b.ok -text [tr OptionsSave] -command {
+    .menu.options invoke [tr OptionsSave]
     destroy .emailConfig
   }
-  button $w.b.cancel -text $::tr(Cancel) \
-    -command "catch {grab release $w}; destroy $w"
+  dialogbutton $w.b.cancel -text $::tr(Cancel) \
+    -command "destroy $w"
   pack $w.b.cancel $w.b.ok -side right -padx 2 -pady 2
-  wm resizable $w 1 0
-  catch {grab $w}
+
+  placeWinOverParent $w .emailWin
+  wm deiconify $w
 }
 
 proc ::tools::email::EditButton {} {
@@ -174,7 +180,7 @@ proc ::tools::email::LoadButton {} {
   set details [lindex $emailData $idx]
   if {[llength [lindex $details 3]] > 0} {
     if {[catch {::game::Load [lindex [lindex $details 3] 0]} result]} {
-      tk_messageBox -type ok -icon warning -title "Scid" -message $result
+      tk_messageBox -type ok -icon warning -title Scid -message $result
     } else {
       sc_move end
     }
@@ -218,7 +224,7 @@ proc ::tools::email::TimesButton {type} {
   label $w.title -text "Email Times for [lindex $details 0]"
   frame $w.t
   text $w.t.text -height 15 -width 30 -font font_Fixed -setgrid 1 \
-    -yscrollcommand "$w.t.ybar set" -bg white -fg black
+    -yscrollcommand "$w.t.ybar set"  -fg black
   scrollbar $w.t.ybar -command "$w.t.text yview"
   frame $w.b
   button $w.b.ok -text "OK" -command {
@@ -227,13 +233,12 @@ proc ::tools::email::TimesButton {type} {
     set details [lreplace $details 5 5 $timeList]
     set emailData [lreplace $emailData $emailTimesIdx $emailTimesIdx $details]
     ::tools::email::writeOpponentFile $emailData
-    grab release .emailTimesWin
     ::tools::email::refresh 0
     catch {focus .emailWin}
     destroy .emailTimesWin
   }
   button $w.b.cancel -text $::tr(Cancel) \
-    -command "grab release $w; catch {focus .emailWin}; destroy $w"
+    -command "catch {raiseWin .emailWin}; destroy $w"
   pack $w.title -side top -fill x
   pack $w.t -side top -fill both
   pack $w.t.ybar -side right -fill y
@@ -243,7 +248,6 @@ proc ::tools::email::TimesButton {type} {
   foreach i $timeList {
     $w.t.text insert end "$i\n"
   }
-  grab $w
 }
 
 proc ::tools::email::addSentReceived {idx type} {
@@ -265,7 +269,7 @@ proc ::tools::email::addSentReceived {idx type} {
     if {[catch {::game::Load $oppGNum}]} {
     } else {
       sc_move end
-      set m [llength [split [sc_game moves coord list]]]
+      set m [llength [split [sc_game moves coord]]]
       if {$m > 0} {
         set m [expr int(($m+1)/2)]
         set mnum [format "%3d  " $m]
@@ -299,8 +303,10 @@ proc ::tools::email::refreshButtons {} {
 }
 
 proc ::tools::email::refresh {{clearSelection 1}} {
-  global emailWin emailData
-  if {! [winfo exists .emailWin]} { return }
+  global emailData
+  if {! [winfo exists .emailWin]} {
+    return
+  }
   if {$clearSelection} {
     set sel ""
     .emailWin.f.list selection clear 0 end
@@ -332,8 +338,6 @@ set emailData_addr ""
 set emailData_subj ""
 set emailData_glist ""
 set emailData_dates ""
-set emailData_helpBar {}
-array set ::tools::email::helpBar ""
 
 # Force the game numbers list to be digits and spaces only:
 trace variable emailData_glist w {::utils::validate::Regexp {^[0-9\ ]*$}}
@@ -343,7 +347,7 @@ trace variable emailData_glist w {::utils::validate::Regexp {^[0-9\ ]*$}}
 set emailCount 0
 
 # emailMessageEditor:
-#    Constructs the email message to the opponent and
+#    Contsructs the email message to the opponent and
 #    creates the editor window for editing and sending the message.
 #
 proc emailMessageEditor {idx name addr subj gamelist sig} {
@@ -357,19 +361,19 @@ proc emailMessageEditor {idx name addr subj gamelist sig} {
   set f [frame $w.fields]
 
   label $f.fromlab -text "From: "
-  entry $f.from -background white
+  entry $f.from 
   $f.from insert end $email(from)
 
   label $f.tolab -text "To: "
-  entry $f.to -background white
+  entry $f.to 
   $f.to insert end $addr
 
   label $f.subjlab -text "Subject: "
-  entry $f.subj -background white
+  entry $f.subj 
   $f.subj insert end $subj
 
   label $f.bcclab -text "Bcc: "
-  entry $f.bcc -background white
+  entry $f.bcc 
   $f.bcc insert end $email(bcc)
 
   button $f.send -text "Send" -command "::tools::email::processMessage $w $idx"
@@ -394,7 +398,7 @@ proc emailMessageEditor {idx name addr subj gamelist sig} {
   scrollbar $f.ybar -command "$f.text yview"
   scrollbar $f.xbar -orient horizontal -command "$f.text xview"
   text $f.text -yscrollcommand "$f.ybar set" -xscrollcommand "$f.xbar set" \
-    -setgrid 1 -width 72 -height 20 -background white -wrap none
+    -setgrid 1 -width 72 -height 20  -wrap none
 
   grid $f.text -row 0 -column 0 -sticky news
   grid $f.ybar -row 0 -column 1 -sticky news
@@ -408,7 +412,7 @@ proc emailMessageEditor {idx name addr subj gamelist sig} {
   $f.text.edit add command -label "Cut" -command "tk_textCut $f.text"
   $f.text.edit add command -label "Copy" -command "tk_textCopy $f.text"
   $f.text.edit add command -label "Paste" -command "tk_textPaste $f.text"
-  bind $f.text <ButtonPress-$::MB3> "tk_popup $f.text.edit %X %Y"
+  bind $f.text <ButtonPress-3> "tk_popup $f.text.edit %X %Y"
 
   set text $w.message.text
   # $text insert end "Hi $name,\n\n"
@@ -440,7 +444,7 @@ proc ::tools::email::processMessage {w idx} {
       -message "Error sending email: $result"
   } else {
     ::tools::email::addSentReceived $idx s
-    tk_messageBox -icon info -type ok -title "Scid" -message $result
+    tk_messageBox -icon info -type ok -title Scid -message $result
     destroy $w
   }
 }
@@ -500,11 +504,12 @@ proc ::tools::email::sendMessage {from to subject bcc message} {
 
 proc modifyEmailDetails {i} {
   global emailData emailData_name emailData_addr emailData_glist emailData_subj
-  global emailData_sig emailData_index emailData_helpBar ::tools::email::helpBar
+  global emailData_sig emailData_index
 
-  toplevel .emailEditor
   set w .emailEditor
-  bind $w <F1> { helpWindow Email }
+  toplevel $w
+  wm withdraw $w
+
   set emailData_index $i
   if {[lindex [lindex $emailData $i] 0] == ""} {
     wm title $w "Add opponent details"
@@ -513,42 +518,31 @@ proc modifyEmailDetails {i} {
   }
   set f [frame $w.name]
   label $f.label -text "Name: "
-  entry $f.entry -width 30 -background white -textvariable emailData_name
-  set ::tools::email::helpBar(name) "Enter the opponent's name"
+  entry $f.entry -width 30  -textvariable emailData_name
 
   set f [frame $w.addr]
   label $f.label -text "Email address: "
-  entry $f.entry -width 30 -background white -textvariable emailData_addr
-  set ::tools::email::helpBar(addr) "Enter the opponent's email address"
+  entry $f.entry -width 30  -textvariable emailData_addr
 
   set f [frame $w.subj]
   label $f.label -text "Subject: "
-  entry $f.entry -width 30 -background white -textvariable emailData_subj
-  set ::tools::email::helpBar(subj) "Enter the subject for each message"
+  entry $f.entry -width 30  -textvariable emailData_subj
 
   set f [frame $w.glist]
   label $f.label -text "Game Numbers: "
-  entry $f.entry -width 30 -background white -textvariable emailData_glist
-  set ::tools::email::helpBar(glist) \
-    "Enter opponent's game numbers, separated by spaces"
+  entry $f.entry -width 30  -textvariable emailData_glist
 
   foreach f {name addr subj glist} {
     pack $w.$f -side top -fill x
     pack $w.$f.entry $w.$f.label -side right -anchor e
     set e $w.$f.entry
-    bind $e <FocusIn> "$e configure -background lightYellow;
-      set emailData_helpBar \$::tools::email::helpBar($f)"
-    bind $e <FocusOut> "$e configure -background white"
   }
 
   addHorizontalRule $w
 
   set f [frame $w.sig]
   label $f.label -text "Signature: " -anchor n
-  text $f.entry -width 30 -height 5 -background white
-  bind $f.entry <FocusIn> "$f.entry configure -background lightYellow
-    set emailData_helpBar {Enter the closing text for each message}"
-  bind $f.entry <FocusOut> "$f.entry configure -background white"
+  text $f.entry -width 30 -height 5 
 
   pack $f -side top -fill x
   pack $f.entry $f.label -side right -anchor n
@@ -559,9 +553,8 @@ proc modifyEmailDetails {i} {
   button $w.buttons.save -text "Save" -command {
     set gNumberErr [::tools::email::validGameNumbers $emailData_glist]
     if {$gNumberErr != -1} {
-      set nGames [sc_base numGames [sc_base current]]
       tk_messageBox -icon error -type ok -title "Invalid data" \
-        -message "The games list contains an invalid game number: $gNumberErr; there are only $nGames games in this database."
+        -message "The games list contains an invalid game number: $gNumberErr; there are only [sc_base numGames] games in this database."
     } else {
       set emailData [lreplace $emailData $emailData_index \
                        $emailData_index \
@@ -579,11 +572,7 @@ proc modifyEmailDetails {i} {
     ::tools::email::refresh
   }
   pack $f -side top
-  pack $f.save $f.cancel -side left -padx 20 -pady 10
-
-  label $w.helpBar -width 1 -textvariable emailData_helpBar -relief sunken \
-    -font font_Small -anchor w
-  pack $w.helpBar -side bottom -fill x
+  pack $f.save $f.cancel -side left -padx 15 -pady 5
 
   # Set up the initial values in the entry boxes:
   set details [lindex $emailData $emailData_index]
@@ -592,19 +581,23 @@ proc modifyEmailDetails {i} {
   set emailData_subj [lindex $details 2]
   set emailData_glist [lindex $details 3]
   $w.sig.entry insert 1.0 [lindex $details 4]
-  grab .emailEditor
+
+  bind $w <Escape> "destroy $w"
+  bind $w <F1> { helpWindow Email }
+  update
+  placeWinOverParent $w .emailWin
+  wm deiconify $w
 }
 
 proc ::tools::email::validGameNumbers {numberList} {
-  set nGames [sc_base numGames [sc_base current]]
   foreach i $numberList {
-    if {$i < 1  ||  $i > $nGames} { return $i }
+    if {$i < 1  ||  $i > [sc_base numGames]} { return $i }
   }
   return -1
 }
 
 proc ::tools::email::opponentFilename {} {
-  set filename [sc_base filename $::curr_db]
+  set filename [sc_base filename]
   append filename ".sem"
   return $filename
 }
@@ -623,7 +616,7 @@ proc ::tools::email::readOpponentFile {} {
 proc ::tools::email::writeOpponentFile {data} {
   set filename [::tools::email::opponentFilename]
   if {[catch {set f [open $filename "w"]} ]} {
-    # puts "Unable to write opponent file"
+    puts "Unable to write opponent file"
     return {}
   }
   puts $f $data

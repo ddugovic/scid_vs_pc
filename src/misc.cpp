@@ -13,43 +13,49 @@
 //////////////////////////////////////////////////////////////////////
 
 #include "common.h"
+#include "error.h"
 #include "misc.h"
-#include "sqmove.h"
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <ctype.h>     // For isspace() function.
 #include <sys/stat.h>  // Needed for fileSize() function.
-#include <cmath>
+
+#ifdef WINCE
+#include <tcl.h>
+extern "C" int my_stat(const char *path, struct stat *buf);
+#endif
 
 // Table of direction between any two chessboard squares
 directionT sqDir[66][66];
 struct sqDir_Init
 {
-    sqDir_Init() {
-        // Initialise the sqDir[][] array of directions between every pair
-        // of squares.
-        squareT i, j;
-        directionT dirArray[] = { UP, DOWN, LEFT, RIGHT, UP_LEFT, UP_RIGHT,
-                                  DOWN_LEFT, DOWN_RIGHT, NULL_DIR };
-        // First, set everything to NULL_DIR:
-        for (i=A1; i <= NS; i++) {
-            for (j=A1; j <= NS; j++) {
-                sqDir[i][j] = NULL_DIR;
-            }
-        }
-        // Now fill in the valid directions:
-        for (i=A1; i <= H8; i++) {
-            directionT * dirptr = dirArray;
-            while (*dirptr != NULL_DIR) {
-                j = square_Move (i, *dirptr);
-                while (j != NS) {
-                    sqDir[i][j] = *dirptr;
-                    j = square_Move (j, *dirptr);
-                }
-                dirptr++;
-            }
+  sqDir_Init () {
+    // Initialise the sqDir[][] array of directions between every pair
+    // of squares.
+
+    squareT i, j;
+    directionT dirArray[] = { UP, DOWN, LEFT, RIGHT, UP_LEFT, UP_RIGHT,
+                              DOWN_LEFT, DOWN_RIGHT, NULL_DIR };
+    // First, set everything to NULL_DIR:
+    for (i=A1; i <= NS; i++) {
+        for (j=A1; j <= NS; j++) {
+            sqDir[i][j] = NULL_DIR;
         }
     }
+    // Now fill in the valid directions:
+    for (i=A1; i <= H8; i++) {
+        directionT * dirptr = dirArray;
+        while (*dirptr != NULL_DIR) {
+            j = square_Move (i, *dirptr);
+            while (j != NS) {
+                sqDir[i][j] = *dirptr;
+                j = square_Move (j, *dirptr);
+            }
+            dirptr++;
+        }
+    }
+  }
 } sqDir_Init_singleton;
 
 //////////////////////////////////////////////////////////////////////
@@ -149,24 +155,6 @@ eco_BasicCode (ecoT eco)
     eco /= 131;
     eco *= 131;
     return eco + 1;
-}
-
-/**
- * ecoReduce() - maps eco to a smaller set
- * @eco: the eco value to convert (must be != 0)
- *
- * Scid ECO subcodes use 131 values for each canonical ECO.
- * For example A00 is divided in A00,A00a,A00a1,A00a2,A00a3,A00a4,A00b...A00z4
- * corresponding to eco values 1,2,3,4,5,6,7...131 (value 0 means no ECO).
- * This functions will map subECOs like A00a1...A00a4 into A00a, reducing
- * the 131 values to 27. The previous sequence will became 0,1,1,1,1,1,2...26
- */
-ecoT eco_Reduce(ecoT eco) {
-	ASSERT(eco != 0);
-
-	eco--;
-	ecoT res = (eco / 131) * 27;
-	return res + static_cast<ecoT>(std::ceil((eco % 131) / 5.0));
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -320,8 +308,11 @@ int strCaseCompare (const char * s1, const char * s2)
 {
     ASSERT (s1 != NULL  &&  s2 != NULL);
     while (1) {
-        int d = tolower(*s1) - tolower(*s2);
-        if (d != 0 || *s1 == 0) return d;
+        if (tolower(*s1) != tolower(*s2)) {
+            return (int) *s1 - (int) *s2;
+        }
+        if (*s1 == 0)
+            break;
         s1++; s2++;
     }
     return 0;
@@ -379,7 +370,11 @@ char *
 strDuplicate (const char * original)
 {
     ASSERT (original != NULL);
+#ifdef WINCE
+    char * newStr = my_Tcl_Alloc(sizeof( char [strLength(original) + 1]));
+#else
     char * newStr = new char [strLength(original) + 1];
+#endif
     if (newStr == NULL)  return NULL;
     char *s = newStr;
     while (*original != 0) {
@@ -482,7 +477,7 @@ strLastChar (const char * target, char matchChar)
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // strStrip():
-//      Removes all occurrences of the specified char from the string.
+//      Removes all occurances of the specified char from the string.
 void
 strStrip (char * str, char ch)
 {
@@ -513,9 +508,42 @@ strTrimLeft (const char * target, const char * trimChars)
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// strTrimRight():
+//      Trims the provided string in-place, removing the
+//      end characters that match the trimChars.
+//      Returns the number of characters trimmed.
+//      E.g., strTrimRight("abcyzyz", "yz") would leave the string
+//      as "abc" and return 4.
+uint
+strTrimRight (char * target, const char * trimChars)
+{
+    uint trimCount = 0;
+    char * s = target;
+    char * lastNonTrim = NULL;
+    while (*s) {
+        if (strContainsChar (trimChars, *s)) {
+            trimCount++;
+        } else {
+            lastNonTrim = s;
+            trimCount = 0;
+        }
+        s++;
+    }
+    if (lastNonTrim != NULL) {
+        // End the string after the last nontrimmable char:
+        lastNonTrim++;
+        *lastNonTrim = 0;
+    } else {
+       // The string only contained trimmable characters:
+        *target = 0;
+    }
+    return trimCount;
+}
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // strTrimSuffix():
 //      Trims the provided string in-place, at the last
-//      occurrence of the provided suffix character.
+//      occurance of the provided suffix character.
 //      Returns the number of characters trimmed.
 //      E.g., strTrimSuffix ("file.txt", '.') would leave the
 //      string as "file" and return 4.
@@ -598,10 +626,27 @@ strTrimMarkCodes (char * str)
     *out = 0;
 }
 
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// strTrimMarkup():
+//    Converts braces to parenthesis.  PGN standard doesnt allow for
+//    '{' and '}'  inside comments, and it breaks Scid's parser too.
+//    Perhaps other chars are illegal in PGN comment ?? They can be added here.
+
+void
+strConvertBraces (char * str)
+{
+    while (*str != 0) {
+        if (*str == '{') {
+            *str = '(';
+        }
+        if (*str == '}') {
+            *str = ')';
+        }
+        str++;
+    }
+}
+
 //    Trims in-place all HTML-like markup codes (<b>, </i>, etc)
 //    from the provided string.
+
 void
 strTrimMarkup (char * str)
 {
@@ -679,9 +724,63 @@ strNextWord (const char * str)
     return str;
 }
 
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// strSingleSpace():
+//      Modifies the parameter string in-place, trimming all
+//      whitespace at the start and end of the string, and reducing
+//      all other sequences of whitespace to a single space.
+//
+//      Example: "\t\n   A  \t\n   B   C  "  (where \t and \n are tabs
+//      and newlines) becomes "A B C".
+//
+//      Returns the new string length, to save time if the caller
+//      wants to find the length of the modified string.
+//
+uint
+strSingleSpace (char * str)
+{
+    ASSERT (str);
+    bool spaceSeen = true;  // Initially true so whitespace at the start
+                            // of the string is removed.
+    char * forward = str;
+    char * back = str;
+    uint length = 0;
+
+    // Loop through the string compacting out unwanted whitespace:
+
+    while (*forward) {
+        if (isspace (*forward)) {
+            if (spaceSeen) {
+                // Already seen whitespace, so skip over this char.
+            } else {
+                spaceSeen = true;
+                *back++ = ' ';
+                length++;
+            }
+        } else {
+            spaceSeen = false;
+            *back++ = *forward;
+            length++;
+        }
+        forward++;
+    }
+
+    // Now, if the last char kept was a space, remove it:
+
+    if (length > 0  &&  spaceSeen) {
+        ASSERT (back != str);
+        back--;
+        length--;
+        ASSERT (*back == ' ');
+    }
+
+    *back = 0;
+    return length;
+}
+
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // strIsAllWhitespace():
-//    Returns true if the string contains only whitespace characters.
+//    Returns true if the string contains only whitespace charaters.
 bool
 strIsAllWhitespace (const char * str)
 {
@@ -707,6 +806,63 @@ strIsUnknownName (const char * str)
     return false;
 }
 
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// strIsScore():
+//    Returns true if the string is a solitary score (a floating-point positive
+//    or negative number, which may or may not be encased in brackets)
+bool
+strIsScore(const char *str)
+{
+   char *test = (char*)str;
+   while (*test != '\0'){
+      if ((*test >='0') && (*test<='9')){ //If we've found a number...
+         test--;
+         if ((*test=='+')||(*test=='-')){ //And it looks like a score...
+               // printf("Possible number: %s\n",test);
+               return true; //It might be a score
+         }
+         test++;
+      }
+      test++;
+   }
+   return false;
+   /*
+	const char *trimStr = strTrimLeft(str, " \t\r\n(");
+	strTrimRight((char*)trimStr, " \t\r\n)");
+	char *test = NULL;
+	strtod(trimStr, &test);
+	return (test != NULL) && (!strContains(trimStr, " "));
+   */
+}
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// strGetScore():
+//    Returns the score if the string starts with a score (a floating-point positive
+//    or negative number, which may or may not be encased in brackets)
+//    Returns zero if there's no score in the string, so be sure to
+//    check with strIsScore() first...
+double
+strGetScore(const char *str)
+{
+   char *test = (char*)str;
+   while (*test != '\0'){
+      if ((*test >='0') && (*test<='9')){
+         test--;
+         if ((*test=='+')||(*test=='-')){ 
+               break;
+         }
+         test++;
+      }
+      test++;
+   }
+   // printf("%s\n%s\n",str,test);
+   strTrimRight(test, " \t\r\n)");
+   // printf("Possible Score String: %s\n\n",test);
+   fflush(stdout);
+   char *tmp = NULL;
+   return strtod(test, &tmp);
+}
 
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -769,7 +925,7 @@ strIsSurnameOnly (const char * name)
     uint capcount = 0;
     const char * s = name;
     while (*s != 0) {
-        unsigned char c = *s;
+        char c = *s;
         if (! isalpha(c)) { return false; }
         if (isupper(c)) {
             capcount++;
@@ -782,7 +938,7 @@ strIsSurnameOnly (const char * name)
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // strContains():
-//      Returns true if longStr contains an occurrence of keyStr,
+//      Returns true if longStr contains an occurence of keyStr,
 //      case-sensitive and NOT ignoring any characters such as spaces.
 bool
 strContains (const char * longStr, const char * keyStr)
@@ -796,7 +952,7 @@ strContains (const char * longStr, const char * keyStr)
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // strCaseContains():
-//      Returns true if longStr contains an occurrence of keyStr,
+//      Returns true if longStr contains an occurence of keyStr,
 //      case-insensitive and NOT ignoring any characters such as spaces.
 bool
 strCaseContains (const char * longStr, const char * keyStr)
@@ -810,7 +966,7 @@ strCaseContains (const char * longStr, const char * keyStr)
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // strContainsIndex():
-//      Returns the first index if longStr contains an occurrence of keyStr,
+//      Returns the first index if longStr contains an occurence of keyStr,
 //      case-sensitive and NOT ignoring any characters such as spaces.
 //      Returns -1 if longStr does not contain keyStr
 int
@@ -827,7 +983,7 @@ strContainsIndex (const char * longStr, const char * keyStr)
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // strAlphaContains():
-//      Returns true if longStr contains an occurrence of keyStr,
+//      Returns true if longStr contains an occurence of keyStr,
 //      case-insensitive and ignoring spaces.
 //      Example: strAlphaContains ("Smith, John", "th,j") == true.
 //
@@ -1103,6 +1259,36 @@ rawFileSize (const char * name)
 uint
 gzipFileSize (const char * name)
 {
+#ifdef WINCE
+    /*FILE * */
+    Tcl_Channel fp;
+    //fp = fopen (name, "rb");
+    fp = my_Tcl_OpenFileChannel(NULL, name, "r", 0666);//fopen (name, modeStr);
+
+    if (fp == NULL) { return 0; }
+ my_Tcl_SetChannelOption(NULL, fp, "-encoding", "binary");
+ my_Tcl_SetChannelOption(NULL, fp, "-translation", "binary");
+
+    // Seek to 4 bytes from the end:
+    if (my_Tcl_Seek(fp, -4L, SEEK_END) == -1) {
+    
+    //if (fseek (fp, -4L, SEEK_END) != 0) {
+        //fclose (fp);
+        my_Tcl_Close(NULL, fp);
+        return 0;
+    }
+    // Read the 4-byte number in little-endian format:
+    uint size = 0;
+    char b = 0;
+    my_Tcl_Read(fp, &b, 1); uint b0 = (uint) b; //(uint) getc(fp);
+    my_Tcl_Read(fp, &b, 1); uint b1 = (uint) b; //(uint) getc(fp);
+    my_Tcl_Read(fp, &b, 1); uint b2 = (uint) b; //(uint) getc(fp);
+    my_Tcl_Read(fp, &b, 1); uint b3 = (uint) b; //(uint) getc(fp);
+    size = b0 | (b1 << 8) | (b2 << 16) | (b3 << 24);
+    //fclose (fp);
+    my_Tcl_Close(NULL, fp);
+    return size;
+#else
     FILE * fp;
     fp = fopen (name, "rb");
     if (fp == NULL) { return 0; }
@@ -1120,6 +1306,7 @@ gzipFileSize (const char * name)
     size = b0 | (b1 << 8) | (b2 << 16) | (b3 << 24);
     fclose (fp);
     return size;
+#endif
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1160,9 +1347,99 @@ removeFile (const char * name, const char * suffix)
 }
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// createFile():
+//      Creates (and immediately closes) an empty file.
+//      Returns OK if successfull, ERROR_FileOpen otherwise.
+errorT
+createFile (const char * name, const char * suffix)
+{
+    fileNameT fname;
+    strCopy (fname, name);
+    strAppend (fname, suffix);
+#ifdef WINCE
+    //FILE * fp = fopen (fname, "w");
+    Tcl_Channel fp = my_Tcl_OpenFileChannel(NULL, name, "w", 0666);
+    if (!fp) { return ERROR_FileOpen; }
+    my_Tcl_SetChannelOption(NULL, fp, "-encoding", "binary");
+    my_Tcl_SetChannelOption(NULL, fp, "-translation", "binary");
+    my_Tcl_Close (NULL,fp);
+#else
+    FILE * fp = fopen (fname, "w");
+    if (!fp) { return ERROR_FileOpen; }
+    fclose (fp);
+#endif
+    return OK;
+}
+
+#ifdef WINCE
+  #include <string.h>
+#endif
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// fileExists():
+//      Returns true if the file exists, false otherwise.
+bool
+fileExists (const char * name, const char * suffix)
+{
+#ifdef WINCE
+    Tcl_StatBuf statBuf;
+    fileNameT fname;
+    int res;
+    strCopy (fname, name);
+    strAppend (fname, suffix);
+//    if (my_stat (fname, &statBuf) != 0) {
+    Tcl_Obj * obj = Tcl_NewStringObj(fname, strlen(fname));
+    res = Tcl_FSLstat(obj, &statBuf );
+    Tcl_DecrRefCount(obj); 
+    if ( res != 0) {
+        return false;
+    }
+#else
+    struct stat statBuf;    // Defined in <sys/stat.h>
+    fileNameT fname;
+    strCopy (fname, name);
+    strAppend (fname, suffix);
+    if (stat (fname, &statBuf) != 0) {
+        return false;
+    }
+#endif
+    return true;
+}
+
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // writeString(), readString():
 //      Read/write fixed-length strings.
 //      Lengths of zero bytes ARE allowed.
+#ifdef WINCE
+errorT
+writeString (/*FILE * */Tcl_Channel fp, const char * str, uint length)
+{
+    ASSERT (fp != NULL  &&  str != NULL);
+    int result = 0;
+    while (length > 0) {
+        result = my_Tcl_Write(fp, str, 1);//putc(*str, fp);
+        str++;
+        length--;
+    }
+    return (result == -1 ? ERROR_FileWrite : OK);
+}
+
+errorT
+readString (/*FILE * */ Tcl_Channel fp, char * str, uint length)
+{
+    ASSERT (fp != NULL  &&  str != NULL);
+    char c;
+    while (length > 0) {
+        my_Tcl_Read(fp, &c, 1);
+        *str = c;//getc(fp);
+        str++;
+        length--;
+    }
+    return OK;
+}
+
+#else
+
 errorT
 writeString (FILE * fp, const char * str, uint length)
 {
@@ -1187,6 +1464,7 @@ readString (FILE * fp, char * str, uint length)
     }
     return OK;
 }
+#endif
 
 //////////////////////////////////////////////////////////////////////
 //  EOF: misc.cpp
